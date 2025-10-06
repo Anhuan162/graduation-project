@@ -1,0 +1,37 @@
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: project
+  datasource:
+    url: jdbc:mysql://localhost:3306/authdb
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: YOUR_GOOGLE_CLIENT_ID
+            client-secret: YOUR_GOOGLE_CLIENT_SECRET
+            scope: email, profile
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://www.googleapis.com/oauth2/v4/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+
+app:
+  jwt:
+    secret: your-very-secret-string-change-in-prod
+    accessTokenExpirationMs: 900000     # 15 minutes
+    refreshTokenExpirationMs: 604800000 # 7 days
+  oauth2:
+    authorizedRedirectUri: http://localhost:3000/oauth2/redirect
