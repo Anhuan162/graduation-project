@@ -31,7 +31,7 @@ public class JwtUtils {
 
     public String generateAccessToken(String subject, UUID userId, List<String> roles) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + accessTokenValidityMs);
+        Date expiry = new Date(now.getTime() + Long.parseLong(accessTokenValidityMs));
 
         return Jwts.builder()
                 .setSubject(subject)
@@ -44,7 +44,7 @@ public class JwtUtils {
 
     public String generateRefreshToken(String subject) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + refreshTokenValidityMs);
+        Date expiry = new Date(now.getTime() + Long.parseLong(refreshTokenValidityMs));
 
         return Jwts.builder()
                 .setSubject(subject)
