@@ -1,0 +1,51 @@
+services:
+  db:
+    image: mysql:8.4           
+    environment:
+      MYSQL_DATABASE: authdb
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_HOST: '%'
+    ports:
+      - "3306:3306"             
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -proot || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    image: maven:3.9-eclipse-temurin-21
+    working_dir: /app
+    command: mvn -T 1C -DskipTests spring-boot:run
+    ports:
+      - "8080:8080"
+      - "5005:5005"  
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/authdb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+      SPRING_BOOT_RUN_JVM_ARGUMENTS: >
+        -Dspring.devtools.restart.poll-interval=2s
+        -Dspring.devtools.restart.quiet-period=1s
+        -Dspring.output.ansi.enabled=ALWAYS
+        -Djava.security.egd=file:/dev/./urandom
+        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+
+    volumes:
+      - ./:/app                 
+      - m2-cache:/root/.m2      
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  m2-cache:
+  db-data:
