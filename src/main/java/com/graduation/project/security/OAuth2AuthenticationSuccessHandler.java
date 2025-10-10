@@ -4,6 +4,7 @@ import com.graduation.project.entity.*;
 import com.graduation.project.repository.*;
 import com.graduation.project.service.RefreshTokenService;
 import jakarta.servlet.http.*;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.*;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Component
+@Log4j2
 public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccessHandler {
 
     private final UserRepository userRepo;
@@ -38,12 +40,19 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
         OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
-        String provider = authentication.getAuthorities().stream().findFirst().map(Object::toString).orElse("OAUTH").toUpperCase();
-        // Better: get registrationId from OAuth2AuthenticationToken cast, but kept simple here
+        String provider = "LOCAL";
+        if (authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken token) {
+            provider = token.getAuthorizedClientRegistrationId().toUpperCase(); // "GOOGLE" or "FACEBOOK"
+        }
 
         String email = (String) oauthUser.getAttributes().get("email");
         String providerUserId = (String) oauthUser.getAttribute("sub"); // google uses "sub"; facebook uses "id"
 
+        log.info("provider = " + provider);
+        log.info("email = " + email);
+
+        // ✅ This will now correctly map to your enum
+        Provider providerEnum = Provider.valueOf(provider);
         // Try find oauth account
         Optional<OauthAccount> accOpt = oauthRepo.findByProviderAndProviderUserId(Provider.valueOf(provider), providerUserId);
         User user;

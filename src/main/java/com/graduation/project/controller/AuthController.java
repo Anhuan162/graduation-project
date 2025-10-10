@@ -1,6 +1,7 @@
 package com.graduation.project.controller;
 
 import com.graduation.project.entity.Provider;
+import com.graduation.project.entity.Role;
 import com.graduation.project.entity.User;
 import com.graduation.project.repository.UserRepository;
 import com.graduation.project.security.*;
@@ -60,7 +61,7 @@ public class AuthController {
         Authentication auth = authManager.authenticate(new UsernamePasswordAuthenticationToken(email, password));
         CustomUserDetails ud = (CustomUserDetails) auth.getPrincipal();
         User user = userRepo.findByEmail(email).orElseThrow();
-        List<String> roles = user.getRoles().stream().map(r -> r.getName()).toList();
+        List<String> roles = user.getRoles().stream().map(Role::getName).toList();
         String access = jwtUtils.generateAccessToken(user.getEmail(), user.getId(), roles);
         String refresh = jwtUtils.generateRefreshToken(user.getEmail());
         refreshTokenService.createRefreshTokenForUser(user, refresh);
