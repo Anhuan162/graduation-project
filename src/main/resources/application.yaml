@@ -1,25 +1,23 @@
-
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: project
   datasource:
-    url: jdbc:mysql://localhost:3306/authdb
-    username: root
-    password: root
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://db:3306/authdb}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
   jpa:
     hibernate:
-      ddl-auto: update
-
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: YOUR_GOOGLE_CLIENT_ID
-            client-secret: YOUR_GOOGLE_CLIENT_SECRET
+            client-id: ${GOOGLE_CLIENT_ID:dummy}
+            client-secret: ${GOOGLE_CLIENT_SECRET:dummy}
             scope: email, profile
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
@@ -30,8 +28,8 @@ spring:
 
 app:
   jwt:
-    secret: your-very-secret-string-change-in-prod
-    accessTokenExpirationMs: 900000     # 15 minutes
-    refreshTokenExpirationMs: 604800000 # 7 days
+    secret: ${APP_JWT_SECRET:dev-only}
+    accessTokenExpirationMs: ${APP_JWT_ACCESS_EXP_MS:900000}
+    refreshTokenExpirationMs: ${APP_JWT_REFRESH_EXP_MS:604800000}
   oauth2:
-    authorizedRedirectUri: http://localhost:3000/oauth2/redirect
+    authorizedRedirectUri: ${APP_OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
