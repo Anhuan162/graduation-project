@@ -52,10 +52,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
-                        .authorizationEndpoint(a -> a.baseUri("/oauth2/authorization"))
-                        .redirectionEndpoint(r -> r.baseUri("/oauth2/callback/*"))
-                        .successHandler(oauth2SuccessHandler)
-                )
+                .successHandler(oauth2SuccessHandler))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(new RestAuthenticationEntryPoint()));
 
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
