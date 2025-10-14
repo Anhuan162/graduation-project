@@ -10,10 +10,9 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ApiResponse <T> {
-    @Builder.Default
-    private int code = 1000;
+public class ApiResponse<T> {
+  @Builder.Default private int code = 1000;
 
-    private String message;
-    private T result;
+  private String message;
+  private T result;
 }

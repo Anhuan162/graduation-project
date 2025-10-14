@@ -22,45 +22,48 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final CustomUserDetailsService userDetailsService;
-    private final JwtUtils jwtUtils;
-    private final OAuth2AuthenticationSuccessHandler oauth2SuccessHandler;
+  private final CustomUserDetailsService userDetailsService;
+  private final JwtUtils jwtUtils;
+  private final OAuth2AuthenticationSuccessHandler oauth2SuccessHandler;
 
-    public SecurityConfig(CustomUserDetailsService uds, JwtUtils jwtUtils, OAuth2AuthenticationSuccessHandler successHandler) {
-        this.userDetailsService = uds;
-        this.jwtUtils = jwtUtils;
-        this.oauth2SuccessHandler = successHandler;
-    }
+  public SecurityConfig(
+      CustomUserDetailsService uds,
+      JwtUtils jwtUtils,
+      OAuth2AuthenticationSuccessHandler successHandler) {
+    this.userDetailsService = uds;
+    this.jwtUtils = jwtUtils;
+    this.oauth2SuccessHandler = successHandler;
+  }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
+  @Bean
+  public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+      throws Exception {
+    return config.getAuthenticationManager();
+  }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtils, userDetailsService);
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtils, userDetailsService);
 
-        http
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/oauth2/**", "/login/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/public/**").permitAll()
-                        .anyRequest().authenticated()
-                )
-                .oauth2Login(oauth2 -> oauth2
-                .successHandler(oauth2SuccessHandler))
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(new RestAuthenticationEntryPoint()));
+    http.csrf(AbstractHttpConfigurer::disable)
+        .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers("/api/auth/**", "/oauth2/**", "/login/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/public/**")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated())
+        .oauth2Login(oauth2 -> oauth2.successHandler(oauth2SuccessHandler))
+        .exceptionHandling(ex -> ex.authenticationEntryPoint(new RestAuthenticationEntryPoint()));
 
-        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-        return http.build();
-    }
+    http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+    return http.build();
+  }
 }
-
-

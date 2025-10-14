@@ -1,4 +1,4 @@
-package com.graduation.project.auth.dto.request;
+package com.graduation.project.auth.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -8,7 +8,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class AuthenticationRequest {
-  private String email;
-  private String password;
+public class LoginResponse {
+  private String accessToken;
+  private String refreshToken;
 }
