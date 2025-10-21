@@ -14,7 +14,11 @@ public class Faculty {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  private String name;
-  private String code;
+  @Column(name = "faculty_name")
+  private String facultyName;
+
+  @Column(name = "faculty_code")
+  private String facultyCode;
+
   private String description;
 }

@@ -1,38 +1,38 @@
 package com.graduation.project.auth.config;
 
-import com.graduation.project.auth.security.JwtAuthenticationFilter;
-import com.graduation.project.auth.security.JwtUtils;
+import com.graduation.project.auth.security.JwtAuthenticationEntryPoint;
 import com.graduation.project.auth.security.OAuth2AuthenticationSuccessHandler;
-import com.graduation.project.auth.security.RestAuthenticationEntryPoint;
-import com.graduation.project.auth.service.CustomUserDetailsService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.authentication.*;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.*;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
-  private final CustomUserDetailsService userDetailsService;
-  private final JwtUtils jwtUtils;
   private final OAuth2AuthenticationSuccessHandler oauth2SuccessHandler;
+  @Autowired private CustomJwtDecoder customJwtDecoder;
+  private final CustomPermissionEvaluator customPermissionEvaluator;
 
   public SecurityConfig(
-      CustomUserDetailsService uds,
-      JwtUtils jwtUtils,
-      OAuth2AuthenticationSuccessHandler successHandler) {
-    this.userDetailsService = uds;
-    this.jwtUtils = jwtUtils;
+      OAuth2AuthenticationSuccessHandler successHandler,
+      CustomPermissionEvaluator customPermissionEvaluator) {
     this.oauth2SuccessHandler = successHandler;
+    this.customPermissionEvaluator = customPermissionEvaluator;
   }
 
   @Bean
@@ -42,28 +42,58 @@ public class SecurityConfig {
   }
 
   @Bean
-  public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
+  public DefaultMethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+    DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+    handler.setPermissionEvaluator(customPermissionEvaluator);
+    return handler;
   }
 
   @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtils, userDetailsService);
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(10);
+  }
 
-    http.csrf(AbstractHttpConfigurer::disable)
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
+
+    httpSecurity
+        .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/api/auth/**", "/oauth2/**", "/login/**")
+                auth.requestMatchers("/api/auth/**", "/oauth2/**", "/login/**", "/user/**")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/public/**")
                     .permitAll()
+                    .requestMatchers("/admin/**")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
         .oauth2Login(oauth2 -> oauth2.successHandler(oauth2SuccessHandler))
-        .exceptionHandling(ex -> ex.authenticationEntryPoint(new RestAuthenticationEntryPoint()));
+        .exceptionHandling(ex -> ex.authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
 
-    http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-    return http.build();
+    httpSecurity.oauth2ResourceServer(
+        oauth2 ->
+            oauth2
+                .jwt(
+                    jwtConfigurer ->
+                        jwtConfigurer
+                            .decoder(customJwtDecoder)
+                            .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
+
+    return httpSecurity.build();
+  }
+
+  @Bean
+  JwtAuthenticationConverter jwtAuthenticationConverter() {
+    JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter =
+        new JwtGrantedAuthoritiesConverter();
+    jwtGrantedAuthoritiesConverter.setAuthorityPrefix("");
+
+    JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+    jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(jwtGrantedAuthoritiesConverter);
+
+    return jwtAuthenticationConverter;
   }
 }

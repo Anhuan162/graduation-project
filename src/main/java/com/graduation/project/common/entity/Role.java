@@ -1,18 +1,20 @@
 package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import java.util.Set;
+import lombok.*;
 
 @Getter
 @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "roles")
 public class Role {
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  @Id String name;
 
-  @Column(nullable = false, unique = true)
-  private String name; // USER, ADMIN, MANAGER
+  String description;
+
+  @ManyToMany Set<Permission> permissions;
 }

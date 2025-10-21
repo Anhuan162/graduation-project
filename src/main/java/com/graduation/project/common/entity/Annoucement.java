@@ -2,12 +2,16 @@ package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "annoucements")
 public class Annoucement {
@@ -29,8 +33,15 @@ public class Annoucement {
   private User modifiedBy;
 
   private LocalDate modifiedDate;
-  private Boolean status;
+  private Boolean annoucementStatus;
 
   @Enumerated(EnumType.STRING)
   private AnnoucementType annoucementType;
+
+  @OneToMany(
+      mappedBy = "annoucement",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  private List<AnnoucementTarget> targets = new ArrayList<>();
 }
