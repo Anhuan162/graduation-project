@@ -17,11 +17,15 @@ public class OauthAccount {
   @Enumerated(EnumType.STRING)
   private Provider provider; // GOOGLE, FACEBOOK
 
-  @Column(nullable = false)
+  @Column(name = "provider_user_id", nullable = false)
   private String providerUserId; // Google/FB ID
 
+  @Column(name = "access_token")
   private String accessToken;
+
+  @Column(name = "refresh_token")
   private String refreshToken;
+
   private LocalDateTime expiresAt;
 
   @ManyToOne

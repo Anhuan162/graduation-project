@@ -1,25 +1,17 @@
 package com.graduation.project.auth.dto.response;
 
-import com.graduation.project.common.entity.Provider;
-import com.graduation.project.common.entity.User;
-import java.util.UUID;
-import lombok.Builder;
-import lombok.Value;
+import com.graduation.project.common.dto.PermissionResponse;
+import java.util.List;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
-@Value
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class AuthenticationResponse {
-  UUID id;
-  String email;
-  String password;
-  Provider provider;
-
-  public static AuthenticationResponse from(User user) {
-    return AuthenticationResponse.builder()
-        .id(user.getId())
-        .email(user.getEmail())
-        .password(user.getPassword())
-        .provider(user.getProvider())
-        .build();
-  }
+  private UserResponse userResponse;
+  private List<PermissionResponse> permissionResponse;
+  private TokenResponse tokenResponse;
 }

@@ -2,7 +2,7 @@ package com.graduation.project.auth.security;
 
 import com.graduation.project.auth.repository.OauthAccountRepository;
 import com.graduation.project.auth.repository.UserRepository;
-import com.graduation.project.auth.service.RefreshTokenService;
+import com.graduation.project.auth.service.TokenService;
 import com.graduation.project.common.entity.OauthAccount;
 import com.graduation.project.common.entity.Provider;
 import com.graduation.project.common.entity.Role;
@@ -26,22 +26,19 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
   private final UserRepository userRepo;
   private final RoleRepository roleRepo;
   private final OauthAccountRepository oauthRepo;
-  private final JwtUtils jwtUtils;
-  private final RefreshTokenService refreshService;
+  private final TokenService tokenService;
   private final String redirectUri; // from properties
 
   public OAuth2AuthenticationSuccessHandler(
       UserRepository userRepo,
       RoleRepository roleRepo,
       OauthAccountRepository oauthRepo,
-      JwtUtils jwtUtils,
-      RefreshTokenService refreshService,
+      TokenService tokenService,
       @Value("${app.oauth2.authorizedRedirectUri}") String redirectUri) {
     this.userRepo = userRepo;
     this.roleRepo = roleRepo;
     this.oauthRepo = oauthRepo;
-    this.jwtUtils = jwtUtils;
-    this.refreshService = refreshService;
+    this.tokenService = tokenService;
     this.redirectUri = redirectUri;
   }
 
@@ -82,7 +79,6 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
           roleRepo
               .findByName("USER")
               .orElseThrow(() -> new RuntimeException("Role USER not found"));
-      // Try find user by email
       String finalEmail = email;
       user =
           userRepo
@@ -107,9 +103,8 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
     }
 
     List<String> roles = user.getRoles().stream().map(Role::getName).toList();
-    String accessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getId(), roles);
-    String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
-    refreshService.createRefreshTokenForUser(user, refreshToken);
+    String accessToken = tokenService.generateToken(user, false);
+    String refreshToken = tokenService.generateToken(user, true);
 
     // Safer way: use cookies instead of query params
     Cookie accessCookie = new Cookie("accessToken", accessToken);
