@@ -6,7 +6,7 @@ import lombok.Value;
 
 @Value
 @Builder
-public class AnnoucementTargetResponse {
+public class AnnouncementTargetResponse {
   UUID id;
   String classroomCode;
 }

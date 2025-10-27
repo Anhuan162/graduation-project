@@ -17,10 +17,7 @@ import com.graduation.project.common.repository.RoleRepository;
 import com.graduation.project.common.service.EmailService;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -140,7 +137,7 @@ public class UserService {
 
   @PreAuthorize("hasRole('ADMIN')")
   public void deleteUser(String userId) {
-    userRepository.deleteById(userId);
+    userRepository.deleteById(UUID.fromString(userId));
   }
 
   @PreAuthorize("hasRole('ADMIN')")
@@ -152,6 +149,8 @@ public class UserService {
   @PreAuthorize("hasRole('ADMIN')")
   public UserResponse getUser(String id) {
     return UserResponse.from(
-        userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)));
+        userRepository
+            .findById(UUID.fromString(id))
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)));
   }
 }

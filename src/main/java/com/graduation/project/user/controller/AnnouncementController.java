@@ -1,8 +1,8 @@
 package com.graduation.project.user.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.user.dto.AnnoucementResponse;
-import com.graduation.project.user.service.AnnoucementService;
+import com.graduation.project.user.dto.AnnouncementResponse;
+import com.graduation.project.user.service.AnnouncementService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,14 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/users")
-public class AnnoucementController {
+public class AnnouncementController {
 
-  private final AnnoucementService annoucementService;
+  private final AnnouncementService announcementService;
 
   @GetMapping
-  public ApiResponse<List<AnnoucementResponse>> getAnnoucements() {
-    return ApiResponse.<List<AnnoucementResponse>>builder()
-        .result(annoucementService.getAllAnnoucements())
+  public ApiResponse<List<AnnouncementResponse>> getAnnouncements() {
+    return ApiResponse.<List<AnnouncementResponse>>builder()
+        .result(announcementService.getAllAnnouncements())
         .build();
   }
 }

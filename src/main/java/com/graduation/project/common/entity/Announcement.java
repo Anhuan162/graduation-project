@@ -13,8 +13,8 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "annoucements")
-public class Annoucement {
+@Table(name = "announcements")
+public class Announcement {
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
@@ -33,15 +33,15 @@ public class Annoucement {
   private User modifiedBy;
 
   private LocalDate modifiedDate;
-  private Boolean annoucementStatus;
+  private Boolean announcementStatus;
 
   @Enumerated(EnumType.STRING)
-  private AnnoucementType annoucementType;
+  private AnnouncementType announcementType;
 
   @OneToMany(
-      mappedBy = "annoucement",
+      mappedBy = "announcement",
       cascade = CascadeType.ALL,
       orphanRemoval = true,
       fetch = FetchType.LAZY)
-  private List<AnnoucementTarget> targets = new ArrayList<>();
+  private List<AnnouncementTarget> targets = new ArrayList<>();
 }
