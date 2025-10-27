@@ -1,5 +1,9 @@
 package com.graduation.project.auth.dto.request;
 
+import com.graduation.project.common.validation.PasswordMatches;
+import com.graduation.project.common.validation.StrongPassword;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -8,7 +12,14 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@PasswordMatches
 public class SignupRequest {
+  @Email(message = "Invalid email format")
+  @NotBlank(message = "Email is required")
   private String email;
-  private String password;
+
+  @StrongPassword private String password;
+
+  @NotBlank(message = "Confirm password is required")
+  private String confirmPassword;
 }

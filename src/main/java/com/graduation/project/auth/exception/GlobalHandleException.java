@@ -4,6 +4,7 @@ import com.graduation.project.auth.dto.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -54,4 +55,15 @@ public class GlobalHandleException {
 
     return ResponseEntity.status(ErrorCode.UNAUTHORIZED.getHttpStatusCode()).body(apiResponse);
   }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<?>> handleValidationErrors(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getAllErrors().getFirst().getDefaultMessage();
+
+        ApiResponse<?> apiResponse = new ApiResponse<>();
+        apiResponse.setCode(ErrorCode.UNAUTHORIZED.getCode());
+        apiResponse.setMessage(message);
+        return ResponseEntity.badRequest()
+                .body(apiResponse);
+    }
 }

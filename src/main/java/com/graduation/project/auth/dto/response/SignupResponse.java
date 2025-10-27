@@ -11,14 +11,12 @@ import lombok.Value;
 public class SignupResponse {
   UUID id;
   String email;
-  String password;
   Provider provider;
 
   public static SignupResponse from(User user) {
     return SignupResponse.builder()
         .id(user.getId())
         .email(user.getEmail())
-        .password(user.getPassword())
         .provider(user.getProvider())
         .build();
   }
