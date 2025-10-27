@@ -7,6 +7,8 @@ import com.graduation.project.auth.dto.response.SignupResponse;
 import com.graduation.project.auth.dto.response.UserResponse;
 import com.graduation.project.auth.service.UserService;
 import java.util.List;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +21,7 @@ public class UserController {
   private final UserService userService;
 
   @PostMapping("/register")
-  public ApiResponse<SignupResponse> register(@RequestBody SignupRequest request) {
+  public ApiResponse<SignupResponse> register(@Valid @RequestBody SignupRequest request) {
     return ApiResponse.<SignupResponse>builder()
         .result(userService.register(request))
         .build();

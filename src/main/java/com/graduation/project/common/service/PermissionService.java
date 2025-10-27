@@ -26,6 +26,7 @@ public class PermissionService {
     return PermissionResponse.from(permission);
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   public List<PermissionResponse> getAll() {
     var permissions = permissionRepository.findAll();
     return permissions.stream().map(PermissionResponse::from).toList();
