@@ -1,6 +1,7 @@
 package com.graduation.project.auth.config;
 
 import com.graduation.project.auth.security.JwtAuthenticationEntryPoint;
+import com.graduation.project.auth.security.JwtToUserPrincipalConverter;
 import com.graduation.project.auth.security.OAuth2AuthenticationSuccessHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.*;
@@ -79,7 +80,7 @@ public class SecurityConfig {
                     jwtConfigurer ->
                         jwtConfigurer
                             .decoder(customJwtDecoder)
-                            .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                            .jwtAuthenticationConverter(new JwtToUserPrincipalConverter()))
                 .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
 
     return httpSecurity.build();

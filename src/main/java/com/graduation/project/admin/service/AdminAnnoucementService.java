@@ -1,20 +1,21 @@
 package com.graduation.project.admin.service;
 
-import com.graduation.project.admin.dto.CreatedAnnoucementRequest;
+import com.graduation.project.admin.dto.AnnouncementResponse;
 import com.graduation.project.admin.dto.CreatedAnnoucementResponse;
+import com.graduation.project.admin.dto.CreatedAnnouncementRequest;
 import com.graduation.project.admin.dto.UpdatedAnnoucementRequest;
-import com.graduation.project.admin.dto.UpdatedAnnoucementResponse;
 import com.graduation.project.auth.exception.AppException;
 import com.graduation.project.auth.exception.ErrorCode;
-import com.graduation.project.common.entity.Annoucement;
-import com.graduation.project.common.entity.AnnoucementTarget;
-import com.graduation.project.common.entity.Classroom;
-import com.graduation.project.common.entity.User;
+import com.graduation.project.auth.repository.UserRepository;
+import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.AnnoucementRepository;
 import com.graduation.project.common.repository.AnnoucementTargetRepository;
 import com.graduation.project.common.repository.ClassroomRepository;
+import com.graduation.project.notification.NotificationMessageDTO;
+import com.graduation.project.notification.NotificationStreamProducer;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -28,32 +29,50 @@ public class AdminAnnoucementService {
   private final AnnoucementRepository annoucementRepository;
   private final AnnoucementTargetRepository annoucementTargetRepository;
   private final ClassroomRepository classroomRepository;
+  private final NotificationStreamProducer producer;
+  private final UserRepository userRepository;
 
-  public CreatedAnnoucementResponse createAnnoucement(
-      CreatedAnnoucementRequest request, User user) {
-    Annoucement annoucement = CreatedAnnoucementRequest.toAnnoucement(request, user);
+  public CreatedAnnoucementResponse createAnnouncement(
+      CreatedAnnouncementRequest request, User user) {
+    Annoucement announcement = CreatedAnnouncementRequest.toAnnoucement(request, user);
 
     Set<String> allClassroomCodes =
         getAllClassroomCodes(
             request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
 
-    List<AnnoucementTarget> annoucementTargets =
-        generateAnnoucementTargets(allClassroomCodes, annoucement);
+    List<AnnoucementTarget> announcementTargets =
+        generateAnnoucementTargets(allClassroomCodes, announcement);
 
-    annoucement.setTargets(annoucementTargets);
-    annoucementRepository.save(annoucement);
-    return CreatedAnnoucementResponse.from(annoucement);
+    announcement.setTargets(announcementTargets);
+    annoucementRepository.save(announcement);
+
+    List<User> receivedUsers = userRepository.findAllByRoleName("USER");
+    List<String> receiverUserIds = receivedUsers.stream().map(re -> re.getId().toString()).toList();
+    NotificationMessageDTO dto =
+        NotificationMessageDTO.builder()
+            .relatedId(announcement.getId())
+            .type(NotificationType.ANNOUNCEMENT)
+            .title(announcement.getTitle())
+            .content(announcement.getContent())
+            .senderId(user.getId())
+            .senderName(user.getEmail())
+            .receiverIds(receiverUserIds) // build list of UUID receivers
+            .createdAt(LocalDateTime.now())
+            .build();
+    producer.publish(dto);
+
+    return CreatedAnnoucementResponse.from(announcement);
   }
 
   private static List<AnnoucementTarget> generateAnnoucementTargets(
-      Set<String> allClassroomCodes, Annoucement annoucement) {
+      Set<String> allClassroomCodes, Annoucement announcement) {
     return allClassroomCodes.stream()
         .map(
             classroomCode -> {
               return AnnoucementTarget.builder()
                   .classroomCode(classroomCode)
                   .id(UUID.randomUUID())
-                  .annoucement(annoucement)
+                  .annoucement(announcement)
                   .build();
             })
         .toList();
@@ -84,11 +103,11 @@ public class AdminAnnoucementService {
     return allClassroomCodes;
   }
 
-  public UpdatedAnnoucementResponse updateAnnoucement(
-      String annoucementId, UpdatedAnnoucementRequest request, User user) {
+  public AnnouncementResponse updateAnnouncement(
+      String announcementId, UpdatedAnnoucementRequest request, User user) {
     Annoucement annoucement =
         annoucementRepository
-            .findById(annoucementId)
+            .findById(announcementId)
             .orElseThrow(() -> new AppException(ErrorCode.ANNOUCEMENT_NOT_FOUND));
 
     annoucement.setTitle(request.getTitle());
@@ -102,6 +121,18 @@ public class AdminAnnoucementService {
             request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
     annoucement.setTargets(generateAnnoucementTargets(allClassroomCodes, annoucement));
     annoucementRepository.save(annoucement);
-    return UpdatedAnnoucementResponse.from(annoucement);
+    return AnnouncementResponse.from(annoucement);
+  }
+
+  public AnnouncementResponse getAnnouncement(String annoucementId) {
+    var announcement =
+        annoucementRepository
+            .findById(annoucementId)
+            .orElseThrow(() -> new AppException(ErrorCode.ANNOUCEMENT_NOT_FOUND));
+    return AnnouncementResponse.from(announcement);
+  }
+
+  public List<AnnouncementResponse> getAnnouncements() {
+    return AnnouncementResponse.from(annoucementRepository.findAll());
   }
 }
