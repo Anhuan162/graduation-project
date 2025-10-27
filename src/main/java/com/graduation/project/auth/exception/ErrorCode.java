@@ -14,7 +14,7 @@ public enum ErrorCode {
   TOKEN_EXPIRED(1005, "Token expired", HttpStatus.NOT_FOUND),
   ACCOUNT_NOT_VERIFIED(
       1006, "Account not verified. Please verify your account.", HttpStatus.NOT_FOUND),
-  ANNOUCEMENT_NOT_FOUND(1007, "Annoucement not found", HttpStatus.NOT_FOUND),
+  ANNOUNCEMENT_NOT_FOUND(1007, "Announcement not found", HttpStatus.NOT_FOUND),
   FACULTY_NOT_FOUND(1008, "Faculty not found", HttpStatus.NOT_FOUND),
   UNAUTHENTICATED(1009, "Unauthenticated", HttpStatus.UNAUTHORIZED),
   ;

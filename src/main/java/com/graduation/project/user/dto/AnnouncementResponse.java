@@ -1,6 +1,6 @@
 package com.graduation.project.user.dto;
 
-import com.graduation.project.common.entity.AnnoucementType;
+import com.graduation.project.common.entity.AnnouncementType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -9,7 +9,7 @@ import lombok.Value;
 
 @Value
 @Builder
-public class AnnoucementResponse {
+public class AnnouncementResponse {
   UUID id;
   String title;
   String content;
@@ -19,8 +19,8 @@ public class AnnoucementResponse {
 
   LocalDate createdDate;
   LocalDate modifiedDate;
-  Boolean annoucementStatus;
-  AnnoucementType annoucementType;
+  Boolean announcementStatus;
+  AnnouncementType announcementType;
 
-  List<AnnoucementTargetResponse> annoucementTargetResponses;
+  List<AnnouncementTargetResponse> announcementTargetResponses;
 }

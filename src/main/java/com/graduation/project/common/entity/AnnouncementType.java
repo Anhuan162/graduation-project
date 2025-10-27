@@ -1,6 +1,6 @@
 package com.graduation.project.common.entity;
 
-public enum AnnoucementType {
+public enum AnnouncementType {
   CLASS,
   FACULTY,
 }

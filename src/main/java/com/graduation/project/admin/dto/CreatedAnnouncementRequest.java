@@ -1,7 +1,7 @@
 package com.graduation.project.admin.dto;
 
-import com.graduation.project.common.entity.Annoucement;
-import com.graduation.project.common.entity.AnnoucementType;
+import com.graduation.project.common.entity.Announcement;
+import com.graduation.project.common.entity.AnnouncementType;
 import com.graduation.project.common.entity.User;
 import java.time.LocalDate;
 import java.util.List;
@@ -23,11 +23,11 @@ public class CreatedAnnouncementRequest {
   List<String> classCodes;
   List<String> schoolYearCodes;
 
-  public static Annoucement toAnnoucement(CreatedAnnouncementRequest request, User user) {
-    return Annoucement.builder()
+  public static Announcement toAnnouncement(CreatedAnnouncementRequest request, User user) {
+    return Announcement.builder()
         .title(request.getTitle())
         .content(request.getContent())
-        .annoucementType(AnnoucementType.valueOf(request.getAnnouncementType()))
+        .announcementType(AnnouncementType.valueOf(request.getAnnouncementType()))
         .createdBy(user)
         .createdDate(LocalDate.now())
         .build();

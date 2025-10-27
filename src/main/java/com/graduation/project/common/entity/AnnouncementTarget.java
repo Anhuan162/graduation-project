@@ -11,8 +11,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "annoucement_targets")
-public class AnnoucementTarget {
+@Table(name = "announcement_targets")
+public class AnnouncementTarget {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -21,6 +21,6 @@ public class AnnoucementTarget {
     private String classroomCode;
 
     @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "annoucement_id")
-    private Annoucement annoucement;
+    @JoinColumn(name = "announcement_id")
+    private Announcement announcement;
 }

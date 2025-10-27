@@ -1,10 +1,11 @@
 package com.graduation.project.admin.dto;
 
-import com.graduation.project.common.entity.Annoucement;
+import com.graduation.project.common.entity.Announcement;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
 import lombok.Builder;
 import lombok.Value;
 
@@ -19,7 +20,7 @@ public class AnnouncementResponse {
   String modifiedBy;
   LocalDate modifiedDate;
 
-  public static AnnouncementResponse from(Annoucement announcement) {
+  public static AnnouncementResponse from(Announcement announcement) {
     return AnnouncementResponse.builder()
         .id(announcement.getId())
         .title(announcement.getTitle())
@@ -29,11 +30,11 @@ public class AnnouncementResponse {
                 ? announcement.getModifiedBy().getFullName()
                 : "")
         .modifiedDate(announcement.getModifiedDate())
-        .announcementStatus(announcement.getAnnoucementStatus())
+        .announcementStatus(announcement.getAnnouncementStatus())
         .build();
   }
 
-  public static List<AnnouncementResponse> from(List<Annoucement> announcements) {
+  public static List<AnnouncementResponse> from(List<Announcement> announcements) {
     return announcements.stream().map(AnnouncementResponse::from).toList();
   }
 }
