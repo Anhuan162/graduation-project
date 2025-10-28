@@ -33,7 +33,7 @@ public class AdminClassroomService {
 
   public ClassroomResponse createClassroom(CreatedClassroomRequest request, UUID facultyId) {
     if (classroomRepository.existsByClassCode(request.getClassCode())) {
-      throw new IllegalArgumentException("Class code already exists");
+      throw new AppException(ErrorCode.CLASS_CODE_EXISTED);
     }
 
     Faculty faculty =

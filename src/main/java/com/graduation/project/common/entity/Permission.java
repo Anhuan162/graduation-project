@@ -11,12 +11,14 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Entity
-@Table(name = "permissions")
+@Table(
+    name = "permissions",
+    uniqueConstraints = {@UniqueConstraint(columnNames = {"resourceType", "permissionType"})})
 public class Permission {
   @Id String name;
 
   @Enumerated(EnumType.STRING)
-  ResouceType resouceType;
+  ResourceType resourceType;
 
   @Enumerated(EnumType.STRING)
   PermissionType permissionType;

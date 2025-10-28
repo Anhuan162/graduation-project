@@ -10,6 +10,7 @@ import com.graduation.project.common.dto.PermissionResponse;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.InvalidatedTokenRepository;
 import com.nimbusds.jose.*;
+import com.nimbusds.jwt.SignedJWT;
 import jakarta.transaction.Transactional;
 import java.text.ParseException;
 import java.util.*;
@@ -51,17 +52,19 @@ public class AuthService {
     List<PermissionResponse> permissionResponses = new ArrayList<>();
     user.getRoles()
         .forEach(
-            role -> {
-              role.getPermissions()
-                  .forEach(
-                      permission -> {
-                        permissionResponses.add(
-                            new PermissionResponse(
-                                permission.getName(),
-                                permission.getResouceType().toString(),
-                                permission.getPermissionType().toString()));
-                      });
-            });
+            role ->
+                role.getPermissions()
+                    .forEach(
+                        permission ->
+                            permissionResponses.add(
+                                new PermissionResponse(
+                                    permission.getName(),
+                                    Objects.nonNull(permission.getResourceType())
+                                        ? permission.getResourceType().toString()
+                                        : null,
+                                    Objects.nonNull(permission.getPermissionType())
+                                        ? permission.getPermissionType().toString()
+                                        : null))));
     UserResponse userResponse = UserResponse.from(user);
 
     return AuthenticationResponse.builder()
@@ -71,28 +74,9 @@ public class AuthService {
         .build();
   }
 
-  public RefreshTokenResponse refreshToken(String refreshToken)
-      throws ParseException, JOSEException {
+  public RefreshTokenResponse refreshToken(String refreshToken) throws ParseException {
     var signedJWT = tokenService.verifyToken(refreshToken, true);
-
-    var jit = signedJWT.getJWTClaimsSet().getJWTID();
-    var expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
-    var issuedAt = signedJWT.getJWTClaimsSet().getIssueTime();
-
-    InvalidatedToken invalidatedToken =
-        InvalidatedToken.builder()
-            .id(UUID.randomUUID())
-            .jit(jit)
-            .issuedAt(issuedAt)
-            .expiryTime(expirationTime)
-            .build();
-    invalidatedTokenRepository.save(invalidatedToken);
-
-    String email = signedJWT.getJWTClaimsSet().getSubject();
-    User user =
-        userRepository
-            .findByEmail(email)
-            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    User user = invalidateValidToken(signedJWT);
 
     String newRefreshToken = tokenService.generateToken(user, true);
     String newAccessToken = tokenService.generateToken(user, false);
@@ -102,28 +86,36 @@ public class AuthService {
         .build();
   }
 
-  public void logout(String refreshToken) throws ParseException, JOSEException {
+  private User invalidateValidToken(SignedJWT signedJWT) throws ParseException {
+    var jit = signedJWT.getJWTClaimsSet().getJWTID();
+    var expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+    var issuedAt = signedJWT.getJWTClaimsSet().getIssueTime();
+    String email = signedJWT.getJWTClaimsSet().getSubject();
+    User user =
+        userRepository
+            .findByEmail(email)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+    InvalidatedToken invalidatedToken =
+        InvalidatedToken.builder()
+            .id(UUID.randomUUID())
+            .jit(jit)
+            .issuedAt(issuedAt)
+            .expiryTime(expirationTime)
+            .user(user)
+            .build();
+
+    invalidatedTokenRepository.save(invalidatedToken);
+    log.debug("Invalidated token for user {}", email);
+
+    return user;
+  }
+
+  public void logout(String refreshToken) throws ParseException {
     try {
       var signToken = tokenService.verifyToken(refreshToken, true);
 
-      String jit = signToken.getJWTClaimsSet().getJWTID();
-      Date expiryTime = signToken.getJWTClaimsSet().getExpirationTime();
-      Date issuedAt = signToken.getJWTClaimsSet().getIssueTime();
-      String email = signToken.getJWTClaimsSet().getSubject();
-      User user =
-          userRepository
-              .findByEmail(email)
-              .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-
-      InvalidatedToken invalidatedToken =
-          InvalidatedToken.builder()
-              .id(UUID.randomUUID())
-              .jit(jit)
-              .issuedAt(issuedAt)
-              .expiryTime(expiryTime)
-              .user(user)
-              .build();
-      invalidatedTokenRepository.save(invalidatedToken);
+      invalidateValidToken(signToken);
     } catch (AppException exception) {
       log.info("Token already expired");
     }

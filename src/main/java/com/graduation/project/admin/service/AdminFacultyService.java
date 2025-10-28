@@ -35,6 +35,7 @@ public class AdminFacultyService {
             .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
 
     faculty.setFacultyName(request.getFacultyName());
+    faculty.setFacultyCode(request.getFacultyCode());
     faculty.setDescription(request.getDescription());
 
     facultyRepository.save(faculty);

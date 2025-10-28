@@ -83,32 +83,43 @@ public class TokenService {
         .build();
   }
 
-  public SignedJWT verifyToken(String token, boolean isRefresh)
-      throws JOSEException, ParseException {
-    JWSVerifier verifier = new MACVerifier(secretKey.getBytes());
-
-    SignedJWT signedJWT = SignedJWT.parse(token);
-
-    Date expiryTime =
-        (isRefresh)
-            ? new Date(
-                signedJWT
-                    .getJWTClaimsSet()
-                    .getIssueTime()
-                    .toInstant()
-                    .plus(refreshTokenValidityMs, ChronoUnit.SECONDS)
-                    .toEpochMilli())
-            : signedJWT.getJWTClaimsSet().getExpirationTime();
-
-    var verified = signedJWT.verify(verifier);
-
-    if (!(verified && expiryTime.after(new Date())))
+  public SignedJWT verifyToken(String token, boolean isRefresh) {
+    if (token == null || token.isBlank()) {
       throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
 
-    if (invalidatedTokenRepository.existsById(UUID.fromString(signedJWT.getJWTClaimsSet().getJWTID())))
+    try {
+      JWSVerifier verifier = new MACVerifier(secretKey.getBytes());
+
+      SignedJWT signedJWT = SignedJWT.parse(token);
+
+      Date expiryTime =
+          (isRefresh)
+              ? new Date(
+                  signedJWT
+                      .getJWTClaimsSet()
+                      .getIssueTime()
+                      .toInstant()
+                      .plus(refreshTokenValidityMs, ChronoUnit.SECONDS)
+                      .toEpochMilli())
+              : signedJWT.getJWTClaimsSet().getExpirationTime();
+
+      var verified = signedJWT.verify(verifier);
+
+      if (!(verified && expiryTime.after(new Date())))
+        throw new AppException(ErrorCode.UNAUTHENTICATED);
+
+      if (invalidatedTokenRepository.existsByJit(signedJWT.getJWTClaimsSet().getJWTID()))
+        throw new AppException(ErrorCode.UNAUTHENTICATED);
+
+      return signedJWT;
+    } catch (ParseException e) {
+      log.warn("Failed to parse JWT token: {}", token);
       throw new AppException(ErrorCode.UNAUTHENTICATED);
-
-    return signedJWT;
+    } catch (JOSEException e) {
+      log.error("Failed to verify JWT signature", e);
+      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
   }
 
   private String buildScope(User user) {

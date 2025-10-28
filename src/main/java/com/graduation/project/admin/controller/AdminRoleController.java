@@ -1,9 +1,10 @@
-package com.graduation.project.common.controller;
+package com.graduation.project.admin.controller;
 
+import com.graduation.project.admin.service.RoleService;
 import com.graduation.project.auth.dto.response.ApiResponse;
+import com.graduation.project.common.dto.AddPermissionRequest;
 import com.graduation.project.common.dto.RoleRequest;
 import com.graduation.project.common.dto.RoleResponse;
-import com.graduation.project.common.service.RoleService;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -12,16 +13,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/roles")
+@RequestMapping("admin/role")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
-public class RoleController {
+public class AdminRoleController {
   RoleService roleService;
 
   @PostMapping
   ApiResponse<RoleResponse> create(@RequestBody RoleRequest request) {
     return ApiResponse.<RoleResponse>builder().result(roleService.create(request)).build();
+  }
+
+  @PutMapping("/{roleId}")
+  ApiResponse<RoleResponse> addPermissions(
+      @PathVariable String roleId, @RequestBody AddPermissionRequest request) {
+    return ApiResponse.<RoleResponse>builder()
+        .result(roleService.addPermissions(roleId, request))
+        .build();
   }
 
   @GetMapping

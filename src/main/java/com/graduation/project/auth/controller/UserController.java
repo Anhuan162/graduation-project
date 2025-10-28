@@ -34,13 +34,9 @@ public class UserController {
   }
 
   @PostMapping("/resend")
-  public ResponseEntity<?> resendVerificationCode(@RequestParam String email) {
-    try {
-      userService.resendVerificationCode(email);
-      return ResponseEntity.ok("Verification code sent");
-    } catch (RuntimeException e) {
-      return ResponseEntity.badRequest().body(e.getMessage());
-    }
+  public ApiResponse<Void> resendVerificationCode(@RequestParam String email) {
+    userService.resendVerificationCode(email);
+    return ApiResponse.<Void>builder().result(null).build();
   }
 
   @GetMapping

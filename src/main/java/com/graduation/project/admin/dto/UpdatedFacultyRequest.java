@@ -7,5 +7,6 @@ import lombok.Setter;
 @Setter
 public class UpdatedFacultyRequest {
   private String facultyName;
+  private String facultyCode;
   private String description;
 }

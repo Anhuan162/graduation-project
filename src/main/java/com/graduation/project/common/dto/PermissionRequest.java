@@ -2,7 +2,7 @@ package com.graduation.project.common.dto;
 
 import com.graduation.project.common.entity.Permission;
 import com.graduation.project.common.entity.PermissionType;
-import com.graduation.project.common.entity.ResouceType;
+import com.graduation.project.common.entity.ResourceType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -20,7 +20,7 @@ public class PermissionRequest {
     return Permission.builder()
         .name(permissionRequest.getName())
         .permissionType(PermissionType.valueOf(permissionRequest.getPermissionType()))
-        .resouceType(ResouceType.valueOf(permissionRequest.getPermissionType()))
+        .resourceType(ResourceType.valueOf(permissionRequest.getResourceType()))
         .build();
   }
 }

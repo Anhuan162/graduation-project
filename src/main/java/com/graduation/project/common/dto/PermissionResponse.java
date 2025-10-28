@@ -20,7 +20,7 @@ public class PermissionResponse {
     return PermissionResponse.builder()
         .name(permission.getName())
         .permissionType(String.valueOf(permission.getPermissionType()))
-        .resourceType(String.valueOf(permission.getPermissionType()))
+        .resourceType(String.valueOf(permission.getResourceType()))
         .build();
   }
 

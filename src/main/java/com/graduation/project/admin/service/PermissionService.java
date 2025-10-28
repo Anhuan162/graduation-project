@@ -1,4 +1,4 @@
-package com.graduation.project.common.service;
+package com.graduation.project.admin.service;
 
 import com.graduation.project.common.dto.PermissionRequest;
 import com.graduation.project.common.dto.PermissionResponse;

@@ -79,27 +79,25 @@ public class AuthController {
   }
 
   @Operation(
-          summary = "Làm mới access token",
-          description = """
+      summary = "Làm mới access token",
+      description =
+          """
             API dùng để tạo lại `accessToken` mới từ `refreshToken`.
             Hệ thống sẽ tự động lấy `refreshToken` từ cookie của request.
             Nếu token hợp lệ và chưa hết hạn, sẽ cấp mới `accessToken`.
-            """
-  )
+            """)
   @ApiResponses({
-          @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                  responseCode = "200",
-                  description = "Làm mới token thành công",
-                  content = @Content(schema = @Schema(implementation = RefreshTokenResponse.class))
-          ),
-          @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                  responseCode = "401",
-                  description = "Refresh token không hợp lệ hoặc đã hết hạn"
-          )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Làm mới token thành công",
+        content = @Content(schema = @Schema(implementation = RefreshTokenResponse.class))),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "Refresh token không hợp lệ hoặc đã hết hạn")
   })
   @PostMapping("/refresh")
   public ApiResponse<RefreshTokenResponse> refresh(HttpServletRequest request)
-      throws ParseException, JOSEException {
+      throws ParseException {
 
     String refreshToken = null;
     if (request.getCookies() != null) {
@@ -116,27 +114,32 @@ public class AuthController {
   }
 
   @Operation(
-          summary = "Đăng xuất",
-          description = """
+      summary = "Đăng xuất",
+      description =
+          """
             API dùng để đăng xuất khỏi hệ thống.
             Khi gọi, hệ thống sẽ thu hồi `refreshToken` khỏi danh sách hợp lệ.
             Sau khi logout, người dùng cần đăng nhập lại để lấy token mới.
-            """
-  )
+            """)
   @ApiResponses({
-          @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                  responseCode = "200",
-                  description = "Đăng xuất thành công"
-          ),
-          @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                  responseCode = "400",
-                  description = "Thiếu hoặc token không hợp lệ"
-          )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "Đăng xuất thành công"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "Thiếu hoặc token không hợp lệ")
   })
   @PostMapping("/logout")
-  public ApiResponse<Void> logout(@RequestBody Map<String, String> body)
-      throws ParseException, JOSEException {
-    String refreshToken = body.get("refreshToken");
+  public ApiResponse<Void> logout(HttpServletRequest request) throws ParseException {
+
+    String refreshToken = null;
+    if (request.getCookies() != null) {
+      for (Cookie cookie : request.getCookies()) {
+        if ("refreshToken".equals(cookie.getName())) {
+          refreshToken = cookie.getValue();
+        }
+      }
+    }
     authService.logout(refreshToken);
     return ApiResponse.<Void>builder().result(null).build();
   }

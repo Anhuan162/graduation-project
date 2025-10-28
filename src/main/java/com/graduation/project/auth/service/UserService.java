@@ -94,7 +94,7 @@ public class UserService {
     if (optionalUser.isPresent()) {
       User user = optionalUser.get();
       if (user.getEnabled()) {
-        throw new RuntimeException("Account is already verified");
+        throw new AppException(ErrorCode.ACCOUNT_VERIFIED);
       }
       verificationTokenRepository.deleteByUserId(user.getId());
       verificationTokenRepository.flush();
@@ -103,7 +103,7 @@ public class UserService {
       storeVerifyToken(user, token);
       sendVerificationEmail(user, token);
     } else {
-      throw new RuntimeException("User not found");
+      throw new AppException(ErrorCode.USER_NOT_FOUND);
     }
   }
 

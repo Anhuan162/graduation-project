@@ -17,6 +17,8 @@ public enum ErrorCode {
   ANNOUNCEMENT_NOT_FOUND(1007, "Announcement not found", HttpStatus.NOT_FOUND),
   FACULTY_NOT_FOUND(1008, "Faculty not found", HttpStatus.NOT_FOUND),
   UNAUTHENTICATED(1009, "Unauthenticated", HttpStatus.UNAUTHORIZED),
+  ACCOUNT_VERIFIED(1010, "Account is already verified.", HttpStatus.NOT_FOUND),
+  CLASS_CODE_EXISTED(1011, "Class code already exists", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;
