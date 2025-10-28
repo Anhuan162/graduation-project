@@ -2,6 +2,8 @@ package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,8 +13,8 @@ import lombok.Setter;
 @Table(name = "oauth_accounts")
 public class OauthAccount {
   @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
   @Enumerated(EnumType.STRING)
   private Provider provider; // GOOGLE, FACEBOOK
