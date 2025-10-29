@@ -15,15 +15,31 @@ services:
       timeout: 3s
       retries: 20
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+
   app:
     image: maven:3.9-eclipse-temurin-21
     working_dir: /app
     command: mvn -T 1C -DskipTests spring-boot:run
     ports:
       - "8080:8080"
-      - "5005:5005"  
+      - "5005:5005"
+    env_file:
+      - .env.docker
+
     environment:
-      SPRING_PROFILES_ACTIVE: dev
+      SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/authdb
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
@@ -45,7 +61,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   m2-cache:
   db-data:
+  redis-data:

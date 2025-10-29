@@ -1,0 +1,63 @@
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: project
+  datasource:
+    url: jdbc:mysql://localhost:3306/authdb
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: email, profile
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://www.googleapis.com/oauth2/v4/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+
+  # config to update db auto
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+# Config send verification token by email
+sendgrid:
+  api-key: ${SENDGRID_API_KEY}
+  from-email: huan1622k3@gmail.com
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    accessTokenExpirationMs: 15000     # 15 minutes
+    refreshTokenExpirationMs: 604800000 # 7 days
+  oauth2:
+    authorizedRedirectUri: http://localhost:3000/oauth2/redirect
+
+
+redis:
+  stream:
+    key: notification-stream
+    group: notification-group
