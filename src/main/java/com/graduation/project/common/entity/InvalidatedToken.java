@@ -1,9 +1,7 @@
 package com.graduation.project.common.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.*;
+
 import java.util.Date;
 import java.util.UUID;
 
@@ -15,6 +13,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
+@Table(name = "invalidated_tokens")
 public class InvalidatedToken {
   @Id private UUID id;
 

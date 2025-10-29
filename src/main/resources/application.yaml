@@ -6,12 +6,15 @@ spring:
   application:
     name: project
   datasource:
-    url: jdbc:mysql://localhost:3306/authdb
-    username: root
+    url: jdbc:postgresql://localhost:5432/authdb
+    username: postgres
     password: root
   jpa:
     hibernate:
       ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   security:
     oauth2:

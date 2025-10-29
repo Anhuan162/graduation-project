@@ -1,184 +1,213 @@
-CREATE TABLE `users`
+CREATE
+EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE public.users
 (
-    `id`           CHAR(36) NOT NULL,
-    `avatar_url`   varchar(255) DEFAULT NULL,
-    `email`        varchar(255) DEFAULT NULL,
-    `enabled`      bit(1)       DEFAULT NULL,
-    `full_name`    varchar(255) DEFAULT NULL,
-    `password`     varchar(255) DEFAULT NULL,
-    `phone`        varchar(255) DEFAULT NULL,
-    `provider`     enum('FACEBOOK','GOOGLE','LOCAL') NOT NULL,
-    `student_code` varchar(255) DEFAULT NULL,
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    avatar_url   VARCHAR(255),
+    email        VARCHAR(255),
+    enabled      BOOLEAN,
+    full_name    VARCHAR(255),
+    password     VARCHAR(255),
+    phone        VARCHAR(255),
+    provider     VARCHAR(50) NOT NULL,
+    student_code VARCHAR(255)
+);
 
-CREATE TABLE `announcements`
+
+CREATE TABLE public.announcements
 (
-    `id`                  CHAR(36) NOT NULL,
-    `announcement_status` bit(1)       DEFAULT NULL,
-    `announcement_type`   enum('CLASS_MEETING','PAY_FEE') DEFAULT NULL,
-    `content`             varchar(255) DEFAULT NULL,
-    `created_date`        date         DEFAULT NULL,
-    `modified_date`       date         DEFAULT NULL,
-    `title`               varchar(255) DEFAULT NULL,
-    `created_by`          CHAR(36) DEFAULT NULL,
-    `modified_by`         CHAR(36) DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    KEY                   `FKht7cvemps7a8tjylacwtyyckj` (`created_by`),
-    KEY                   `FKsjuhu87st1r2l90sisggru5xc` (`modified_by`),
-    CONSTRAINT `FKht7cvemps7a8tjylacwtyyckj` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
-    CONSTRAINT `FKsjuhu87st1r2l90sisggru5xc` FOREIGN KEY (`modified_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id                  UUID NOT NULL,
+    announcement_status BOOLEAN     DEFAULT NULL,
+    announcement_type   VARCHAR(50) DEFAULT NULL,
+    content             VARCHAR(255),
+    created_date        DATE,
+    modified_date       DATE,
+    title               VARCHAR(255),
+    created_by          UUID,
+    modified_by         UUID,
+    CONSTRAINT announcements_pkey PRIMARY KEY (id),
+    CONSTRAINT announcements_created_by_fkey FOREIGN KEY (created_by)
+        REFERENCES public.users (id),
+    CONSTRAINT announcements_modified_by_fkey FOREIGN KEY (modified_by)
+        REFERENCES public.users (id)
+);
+CREATE INDEX idx_announcements_created_by ON public.announcements (created_by);
+CREATE INDEX idx_announcements_modified_by ON public.announcements (modified_by);
 
-CREATE TABLE `audit_log`
+
+CREATE TABLE public.audit_logs
 (
-    `id`         CHAR(36) NOT NULL,
-    `action`     varchar(255) DEFAULT NULL,
-    `created_at` datetime(6) DEFAULT NULL,
-    `ip_address` varchar(255) DEFAULT NULL,
-    `user_id`    CHAR(36) DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    KEY          `FKk4alalwu62gj4tfbgfefll3tu` (`user_id`),
-    CONSTRAINT `FKk4alalwu62gj4tfbgfefll3tu` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id         UUID NOT NULL,
+    action     VARCHAR(255),
+    created_at TIMESTAMP(6),
+    ip_address VARCHAR(255),
+    user_id    UUID,
+    CONSTRAINT audit_log_pkey PRIMARY KEY (id),
+    CONSTRAINT audit_log_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES public.users (id)
+);
+CREATE INDEX idx_audit_log_user_id
+    ON public.audit_logs (user_id);
 
-CREATE TABLE `faculties`
+
+CREATE TABLE public.faculties
 (
-    `id`           CHAR(36) NOT NULL,
-    `description`  varchar(255) DEFAULT NULL,
-    `faculty_code` varchar(255) DEFAULT NULL,
-    `faculty_name` varchar(255) DEFAULT NULL,
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id           UUID NOT NULL,
+    description  VARCHAR(255),
+    faculty_code VARCHAR(255),
+    faculty_name VARCHAR(255),
+    CONSTRAINT faculties_pkey PRIMARY KEY (id)
+);
 
-CREATE TABLE `classrooms`
+
+CREATE TABLE public.classrooms
 (
-    `id`               CHAR(36) NOT NULL,
-    `class_code`       varchar(255) DEFAULT NULL,
-    `class_name`       varchar(255) DEFAULT NULL,
-    `ended_year`       int          DEFAULT NULL,
-    `school_year_code` varchar(255) DEFAULT NULL,
-    `started_year`     int          DEFAULT NULL,
-    `faculty_id`       CHAR(36) DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    KEY                `FKhv44pa95g81nv36f1m8lpny9d` (`faculty_id`),
-    CONSTRAINT `FKhv44pa95g81nv36f1m8lpny9d` FOREIGN KEY (`faculty_id`) REFERENCES `faculties` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    class_code       VARCHAR(255),
+    class_name       VARCHAR(255),
+    ended_year       INTEGER,
+    school_year_code VARCHAR(255),
+    started_year     INTEGER,
+    faculty_id       UUID,
+    CONSTRAINT classrooms_faculty_id_fkey FOREIGN KEY (faculty_id)
+        REFERENCES public.faculties (id)
+);
+CREATE INDEX idx_classrooms_faculty_id
+    ON public.classrooms (faculty_id);
 
-CREATE TABLE `announcement_targets`
+
+CREATE TABLE public.announcement_targets
 (
-    `id`              CHAR(36) NOT NULL,
-    `classroom_code`  varchar(255) DEFAULT NULL,
-    `announcement_id` CHAR(36) DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    KEY               `FK6i2lcfqud13ksff1q1qxt7vn2` (`announcement_id`),
-    CONSTRAINT `FK6i2lcfqud13ksff1q1qxt7vn2` FOREIGN KEY (`announcement_id`) REFERENCES `announcements` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    classroom_code  VARCHAR(255),
+    announcement_id UUID,
+    CONSTRAINT announcement_targets_announcement_id_fkey FOREIGN KEY (announcement_id)
+        REFERENCES public.announcements (id)
+);
+CREATE INDEX idx_announcement_targets_announcement_id
+    ON public.announcement_targets (announcement_id);
 
-CREATE TABLE `invalidated_token`
+
+CREATE TABLE public.invalidated_tokens
 (
-    `id`          CHAR(36) NOT NULL,
-    `expiry_time` datetime(6) DEFAULT NULL,
-    `issued_at`   datetime(6) DEFAULT NULL,
-    `jit`         varchar(255) DEFAULT NULL,
-    `user_id`     CHAR(36) NOT NULL,
-    PRIMARY KEY (`id`),
-    KEY           `FKpv7k1rtxl6wjqu8o05oachfp1` (`user_id`),
-    CONSTRAINT `FKpv7k1rtxl6wjqu8o05oachfp1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    expiry_time TIMESTAMP(6),
+    issued_at   TIMESTAMP(6),
+    jit         VARCHAR(255),
+    user_id     UUID NOT NULL,
+    CONSTRAINT invalidated_tokens_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES public.users (id)
+);
+CREATE INDEX idx_invalidated_tokens_user_id
+    ON public.invalidated_tokens (user_id);
 
-CREATE TABLE `notification_events`
+
+CREATE TABLE public.notification_events
 (
-    `id`         CHAR(36) NOT NULL,
-    `content`    text,
-    `created_at` datetime(6) DEFAULT NULL,
-    `related_id` CHAR(36) DEFAULT NULL,
-    `title`      varchar(255) DEFAULT NULL,
-    `type`       enum('ANNOUNCEMENT','COMMENT','POST') DEFAULT NULL,
-    `created_by` CHAR(36) DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    KEY          `FKo8x1wf7aqakauhj8iorlf9iyn` (`created_by`),
-    CONSTRAINT `FKo8x1wf7aqakauhj8iorlf9iyn` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    content    TEXT,
+    created_at TIMESTAMP(6),
+    related_id UUID,
+    title      VARCHAR(255),
+    type       VARCHAR(50)      DEFAULT NULL,
+    created_by UUID,
+    CONSTRAINT notification_events_created_by_fkey FOREIGN KEY (created_by)
+        REFERENCES public.users (id)
+);
+CREATE INDEX idx_notification_events_created_by
+    ON public.notification_events (created_by);
 
-CREATE TABLE `user_notifications`
+
+CREATE TABLE public.user_notifications
 (
-    `id`                    CHAR(36) NOT NULL,
-    `delivered_at`          datetime(6) DEFAULT NULL,
-    `is_read`               bit(1) NOT NULL,
-    `notification_status`   enum('DELETED','READ','SENT','UNREAD') DEFAULT NULL,
-    `read_at`               datetime(6) DEFAULT NULL,
-    `notification_event_id` CHAR(36) DEFAULT NULL,
-    `user_id`               CHAR(36) DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    KEY                     `FK9587ifdkk502aiwxb8tk5rrt2` (`notification_event_id`),
-    KEY                     `FK9f86wonnl11hos1cuf5fibutl` (`user_id`),
-    CONSTRAINT `FK9587ifdkk502aiwxb8tk5rrt2` FOREIGN KEY (`notification_event_id`) REFERENCES `notification_events` (`id`),
-    CONSTRAINT `FK9f86wonnl11hos1cuf5fibutl` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    delivered_at          TIMESTAMP(6),
+    is_read               BOOLEAN NOT NULL,
+    notification_status   VARCHAR(50)      DEFAULT NULL,
+    read_at               TIMESTAMP(6),
+    notification_event_id UUID,
+    user_id               UUID,
+    CONSTRAINT user_notifications_event_id_fkey FOREIGN KEY (notification_event_id)
+        REFERENCES public.notification_events (id),
+    CONSTRAINT user_notifications_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES public.users (id)
+);
+CREATE INDEX idx_user_notifications_event_id
+    ON public.user_notifications (notification_event_id);
+CREATE INDEX idx_user_notifications_user_id
+    ON public.user_notifications (user_id);
 
-CREATE TABLE `oauth_accounts`
+
+CREATE TABLE public.oauth_accounts
 (
-    `id`               CHAR(36)       NOT NULL,
-    `access_token`     varchar(255) DEFAULT NULL,
-    `expires_at`       datetime(6) DEFAULT NULL,
-    `provider`         enum('FACEBOOK','GOOGLE','LOCAL') DEFAULT NULL,
-    `provider_user_id` varchar(255) NOT NULL,
-    `refresh_token`    varchar(255) DEFAULT NULL,
-    `user_id`          CHAR(36) NOT NULL,
-    PRIMARY KEY (`id`),
-    KEY                `FKn6j2b3ur1fcj3vkodrmqtdxmi` (`user_id`),
-    CONSTRAINT `FKn6j2b3ur1fcj3vkodrmqtdxmi` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    access_token     VARCHAR(255),
+    expires_at       TIMESTAMP(6),
+    provider         VARCHAR(50)      DEFAULT NULL,
+    provider_user_id VARCHAR(255) NOT NULL,
+    refresh_token    VARCHAR(255),
+    user_id          UUID         NOT NULL,
+    CONSTRAINT oauth_accounts_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES public.users (id)
+);
+CREATE INDEX idx_oauth_accounts_user_id
+    ON public.oauth_accounts (user_id);
 
-CREATE TABLE `roles`
+
+CREATE TABLE public.roles
 (
-    `name`        varchar(255) NOT NULL,
-    `description` varchar(255) DEFAULT NULL,
-    PRIMARY KEY (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    name        VARCHAR(255) PRIMARY KEY,
+    description VARCHAR(255)
+);
 
-CREATE TABLE `permissions`
+
+CREATE TABLE public.permissions
 (
-    `name`            varchar(255) NOT NULL,
-    `permission_type` enum('create_all','create_any','delete_all','delete_any','read_all','read_any','update_all','update_any') DEFAULT NULL,
-    `resource_type`   enum('ANNOUNCEMENT','CLASSROOM','FACULTY','NOTIFICATION_EVENT','PERMISSION','ROLE','USER') DEFAULT NULL,
-    PRIMARY KEY (`name`),
-    UNIQUE KEY `UKhqg1lom4f2bv8tqincp1xdb38` (`resource_type`,`permission_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    name            VARCHAR(255) PRIMARY KEY,
+    permission_type VARCHAR(50) DEFAULT NULL,
+    resource_type   VARCHAR(50) DEFAULT NULL,
+    CONSTRAINT permissions_resource_permission_unique UNIQUE (resource_type, permission_type)
+);
 
-CREATE TABLE `roles_permissions`
+
+CREATE TABLE public.roles_permissions
 (
-    `role_name`        varchar(255) NOT NULL,
-    `permissions_name` varchar(255) NOT NULL,
-    PRIMARY KEY (`role_name`, `permissions_name`),
-    KEY                `FK9u1xpvjxbdnkca024o6fyr7uu` (`permissions_name`),
-    CONSTRAINT `FK6nw4jrj1tuu04j9rk7xwfssd6` FOREIGN KEY (`role_name`) REFERENCES `roles` (`name`),
-    CONSTRAINT `FK9u1xpvjxbdnkca024o6fyr7uu` FOREIGN KEY (`permissions_name`) REFERENCES `permissions` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    role_name        VARCHAR(255) NOT NULL,
+    permissions_name VARCHAR(255) NOT NULL,
+    CONSTRAINT roles_permissions_pkey PRIMARY KEY (role_name, permissions_name),
+    CONSTRAINT roles_permissions_role_name_fkey FOREIGN KEY (role_name)
+        REFERENCES public.roles (name),
+    CONSTRAINT roles_permissions_permissions_name_fkey FOREIGN KEY (permissions_name)
+        REFERENCES public.permissions (name)
+);
+CREATE INDEX idx_roles_permissions_permissions_name
+    ON public.roles_permissions (permissions_name);
 
 
-CREATE TABLE `user_roles`
+CREATE TABLE public.user_roles
 (
-    `user_id` CHAR(36) NOT NULL,
-    `role_id` varchar(255) NOT NULL,
-    PRIMARY KEY (`user_id`, `role_id`),
-    KEY       `FKh8ciramu9cc9q3qcqiv4ue8a6` (`role_id`),
-    CONSTRAINT `FKh8ciramu9cc9q3qcqiv4ue8a6` FOREIGN KEY (`role_id`) REFERENCES `roles` (`name`),
-    CONSTRAINT `FKhfh9dx7w3ubf1co1vdev94g3f` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    user_id UUID         NOT NULL,
+    role_id VARCHAR(255) NOT NULL,
+    CONSTRAINT user_roles_pkey PRIMARY KEY (user_id, role_id),
+    CONSTRAINT user_roles_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES public.users (id),
+    CONSTRAINT user_roles_role_id_fkey FOREIGN KEY (role_id)
+        REFERENCES public.roles (name)
+);
+CREATE INDEX idx_user_roles_role_id
+    ON public.user_roles (role_id);
 
 
-CREATE TABLE `verification_tokens`
+CREATE TABLE public.verification_tokens
 (
-    `id`          CHAR(36) NOT NULL,
-    `expiry_date` datetime(6) DEFAULT NULL,
-    `token`       varchar(255) DEFAULT NULL,
-    `user_id`     CHAR(36) DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `UKdqp95ggn6gvm865km5muba2o5` (`user_id`),
-    CONSTRAINT `FK54y8mqsnq1rtyf581sfmrbp4f` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    expiry_date TIMESTAMP(6),
+    token       VARCHAR(255),
+    user_id     UUID,
+    CONSTRAINT verification_tokens_user_id_key UNIQUE (user_id),
+    CONSTRAINT verification_tokens_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES public.users (id)
+);
 
 

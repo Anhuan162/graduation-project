@@ -1,16 +1,16 @@
 services:
   db:
-    image: mysql:8.4           
+    image: postgres:17
     environment:
-      MYSQL_DATABASE: authdb
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_ROOT_HOST: '%'
+      POSTGRES_DB: authdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
     ports:
-      - "3306:3306"             
+      - "5432:5432"
     volumes:
-      - db-data:/var/lib/mysql
+      - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -proot || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d authdb"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -40,8 +40,8 @@ services:
 
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/authdb
-      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/authdb
+      SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
 
       SPRING_BOOT_RUN_JVM_ARGUMENTS: >
@@ -51,9 +51,9 @@ services:
         -Djava.security.egd=file:/dev/./urandom
         -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
 
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      APP_JWT_SECRET: ${APP_JWT_SECRET}
+#      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+#      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+#      APP_JWT_SECRET: ${APP_JWT_SECRET}
 
     volumes:
       - ./:/app                 
