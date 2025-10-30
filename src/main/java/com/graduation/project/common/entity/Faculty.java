@@ -1,6 +1,7 @@
 package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
+import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,4 +22,7 @@ public class Faculty {
   private String facultyCode;
 
   private String description;
+
+  @OneToMany(mappedBy = "faculty", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<SubjectReference> subjectReferences;
 }
