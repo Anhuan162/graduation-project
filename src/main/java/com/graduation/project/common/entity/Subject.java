@@ -26,5 +26,8 @@ public class Subject {
   private LocalDateTime lastModifiedDate;
 
   @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true)
+  List<SubjectReference> subjectReferences;
+
+  @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true)
   List<Document> documents;
 }

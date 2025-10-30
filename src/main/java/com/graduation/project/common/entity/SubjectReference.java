@@ -1,10 +1,8 @@
 package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-
-import java.util.List;
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
