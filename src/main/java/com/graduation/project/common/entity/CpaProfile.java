@@ -1,6 +1,7 @@
 package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
+import java.util.List;
 import java.util.UUID;
 import lombok.*;
 
@@ -25,4 +26,6 @@ public class CpaProfile {
   private double letterCpaScore;
   private double numberCpaScore;
 
+  @OneToMany(mappedBy = "cpaProfile", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<GpaProfile> gpaProfiles;
 }
