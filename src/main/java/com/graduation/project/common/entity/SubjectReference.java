@@ -3,6 +3,8 @@ package com.graduation.project.common.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.UUID;
+
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 @Getter
@@ -31,4 +33,8 @@ public class SubjectReference {
   @ManyToOne
   @JoinColumn(name = "semester_id")
   private Semester semester;
+
+  @NotNull
+  @Enumerated(EnumType.STRING)
+  private CohortCode cohortCode;
 }
