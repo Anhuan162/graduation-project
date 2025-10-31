@@ -1,5 +1,6 @@
 package com.graduation.project.common.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.*;
@@ -16,13 +17,18 @@ public class SubjectReference {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @JsonIgnore
   @ManyToOne
   @JoinColumn(name = "subject_id")
   private Subject subject;
 
+  @JsonIgnore
   @ManyToOne
   @JoinColumn(name = "faculty_id")
   private Faculty faculty;
 
-  private SemesterType semesterType;
+  @JsonIgnore
+  @ManyToOne
+  @JoinColumn(name = "semester_id")
+  private Semester semester;
 }
