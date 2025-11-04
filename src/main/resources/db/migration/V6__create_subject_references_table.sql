@@ -22,8 +22,9 @@ CREATE TABLE subject_references
             REFERENCES semesters (id)
             ON DELETE CASCADE,
 
-    CONSTRAINT subject_references_subject_faculty_semester_unique UNIQUE (subject_id, faculty_id, semester_id)
+    CONSTRAINT subject_references_subject_faculty_semester_cohort_code_unique UNIQUE (subject_id, faculty_id, semester_id, cohort_code)
 );
 CREATE INDEX idx_subject_references_subject_id ON subject_references (subject_id);
 CREATE INDEX idx_subject_references_faculty_id ON subject_references (faculty_id);
 CREATE INDEX idx_subject_references_semester_id ON subject_references (semester_id);
+CREATE INDEX idx_subject_references_cohort_code ON subject_references (cohort_code);
