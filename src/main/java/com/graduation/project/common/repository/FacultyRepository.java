@@ -8,4 +8,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface FacultyRepository extends JpaRepository<Faculty, UUID> {
   boolean existsByFacultyCode(String facultyCode);
+
+  Faculty findByFacultyCode(String facultyCode);
 }

@@ -19,6 +19,8 @@ public enum ErrorCode {
   UNAUTHENTICATED(1009, "Unauthenticated", HttpStatus.UNAUTHORIZED),
   ACCOUNT_VERIFIED(1010, "Account is already verified.", HttpStatus.NOT_FOUND),
   CLASS_CODE_EXISTED(1011, "Class code already exists", HttpStatus.NOT_FOUND),
+  CPA_PROFILE_NAME_EXISTED(1012, "Cpa profile name already exists", HttpStatus.NOT_FOUND),
+  SEMESTER_NOT_FOUND(1012, "Semester not found", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;

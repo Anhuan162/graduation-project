@@ -2,9 +2,8 @@ package com.graduation.project.common.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.*;
-
 import java.util.UUID;
+import lombok.*;
 
 @Getter
 @Setter
@@ -18,8 +17,25 @@ public class GradeSubjectAverageProfile {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @Column(name = "letter_current_score")
+  private String letterCurrentScore;
+
+  @Column(name = "letter_improvement_score")
+  private String letterImprovementScore;
+
+  @Column(name = "current_score")
+  private double currentScore;
+
+  @Column(name = "improvement_score")
+  private double improvementScore;
+
   @JsonIgnore
-  @ManyToOne
-  @JoinColumn(name = "cpa_profile_id")
-  private CpaProfile cpaProfile;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "gpa_profile_id")
+  private GpaProfile gpaProfile;
+
+  @JsonIgnore
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "subject_reference_id")
+  private SubjectReference subjectReference;
 }

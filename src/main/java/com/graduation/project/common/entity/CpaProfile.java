@@ -17,14 +17,23 @@ public class CpaProfile {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @Column(name = "name_cpa_profile")
-  private String nameCpaProfile;
+  @Column(name = "cpa_profile_name")
+  private String cpaProfileName;
 
   @Column(name = "cpa_profile_code")
   private String cpaProfileCode;
 
+  @Column(name = "letter_cpa_score")
   private double letterCpaScore;
+
+  @Column(name = "number_cpa_score")
   private double numberCpaScore;
+
+  @Column(name = "previous_number_cpa_score")
+  private double previousNumberCpaScore;
+
+  @Column(name = "accumulated_credits")
+  private int accumulatedCredits;
 
   @OneToMany(mappedBy = "cpaProfile", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<GpaProfile> gpaProfiles;
