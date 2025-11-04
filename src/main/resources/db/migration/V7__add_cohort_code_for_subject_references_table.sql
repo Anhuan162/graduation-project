@@ -1,1 +1,0 @@
-ALTER TABLE subject_references ADD COLUMN cohort_code VARCHAR (255) NOT NULL;

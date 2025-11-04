@@ -13,7 +13,7 @@ import java.util.List;
 @Entity
 @Table(name = "semesters")
 public class Semester {
-  @Id private String id;
+  @Id private Integer id;
 
   @Enumerated(EnumType.STRING)
   private SemesterType semesterType;
