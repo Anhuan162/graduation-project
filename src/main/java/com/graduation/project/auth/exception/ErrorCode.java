@@ -19,6 +19,9 @@ public enum ErrorCode {
   UNAUTHENTICATED(1009, "Unauthenticated", HttpStatus.UNAUTHORIZED),
   ACCOUNT_VERIFIED(1010, "Account is already verified.", HttpStatus.NOT_FOUND),
   CLASS_CODE_EXISTED(1011, "Class code already exists", HttpStatus.NOT_FOUND),
+  SUBJECT_NOT_FOUND(1012, "Subject not found", HttpStatus.NOT_FOUND),
+  SEMESTER_NOT_FOUND(1013, "Semester not found", HttpStatus.NOT_FOUND),
+  SUBJECT_REFERENCE_NOT_FOUND(1014, "Subject reference not found", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;
