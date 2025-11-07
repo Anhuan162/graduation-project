@@ -24,7 +24,7 @@ public class CpaProfile {
   private String cpaProfileCode;
 
   @Column(name = "letter_cpa_score")
-  private double letterCpaScore;
+  private String letterCpaScore;
 
   @Column(name = "number_cpa_score")
   private double numberCpaScore;

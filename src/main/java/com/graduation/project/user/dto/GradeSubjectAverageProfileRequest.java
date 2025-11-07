@@ -6,8 +6,9 @@ import lombok.Value;
 @Value
 @Builder
 public class GradeSubjectAverageProfileRequest {
+  String gradeSubjectAverageProfileId;
   String letterCurrentScore;
   String letterImprovementScore;
-  double currentScore;
-  double improvementScore;
+  String currentScore;
+  String improvementScore;
 }

@@ -7,6 +7,7 @@ import lombok.Value;
 @Value
 @Builder
 public class GpaProfileRequest {
+  String gpaProfileId;
   String gpaProfileCode;
   double letterGpaScore;
   double numberGpaScore;

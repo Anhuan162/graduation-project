@@ -7,9 +7,10 @@ import lombok.Value;
 @Value
 @Builder
 public class CpaProfileRequest {
+  String cpaProfileId;
   String cpaProfileName;
   String cpaProfileCode;
-  double letterCpaScore;
+  String letterCpaScore;
   double numberCpaScore;
   double previousNumberCpaScore;
   int accumulatedCredits;

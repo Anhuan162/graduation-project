@@ -11,7 +11,7 @@ CREATE TABLE public.cpa_profiles
 CREATE INDEX idx_cpa_profiles_name
     ON public.cpa_profiles (cpa_profile_name);
 
-
+-
 CREATE TABLE public.gpa_profiles
 (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

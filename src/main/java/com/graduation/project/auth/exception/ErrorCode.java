@@ -21,6 +21,8 @@ public enum ErrorCode {
   CLASS_CODE_EXISTED(1011, "Class code already exists", HttpStatus.NOT_FOUND),
   CPA_PROFILE_NAME_EXISTED(1012, "Cpa profile name already exists", HttpStatus.NOT_FOUND),
   SEMESTER_NOT_FOUND(1012, "Semester not found", HttpStatus.NOT_FOUND),
+  CPA_PROFILE_NOT_FOUND(1012, "Cpa profile not found", HttpStatus.NOT_FOUND),
+  GPA_PROFILE_NOT_FOUND(1012, "Gpa profile not found", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;

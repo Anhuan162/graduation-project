@@ -7,14 +7,17 @@ import com.graduation.project.common.repository.FacultyRepository;
 import com.graduation.project.common.repository.GradeSubjectAverageProfileRepository;
 import com.graduation.project.common.repository.SemesterRepository;
 import com.graduation.project.common.repository.SubjectReferenceRepository;
-import com.graduation.project.user.dto.GradeSubjectAverageProfileResponse;
+import com.graduation.project.user.dto.GradeSubjectAverageProfileRequest;
 import com.graduation.project.user.mapper.GradeSubjectAverageProfileMapper;
+import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 
+@Transactional
 @RequiredArgsConstructor
 @Service
 @Log4j2
@@ -25,21 +28,22 @@ public class GradeSubjectAverageProfileService {
   private final SubjectReferenceRepository subjectReferenceRepository;
   private final GradeSubjectAverageProfileMapper gradeSubjectAverageProfileMapper;
 
-  public List<GradeSubjectAverageProfileResponse> findAllSubjectsBySemesterAndFacultyAndCohortCode(
-      int i, String facultyCode, String cohortCode) {
-    Faculty faculty = facultyRepository.findByFacultyCode(facultyCode);
+  public List<GradeSubjectAverageProfile> addGradeSubjectAverageProfileList(
+      int previousSemesterId, String facultyCode, String cohortCode) {
+    Faculty faculty =
+        facultyRepository
+            .findByFacultyCode(facultyCode)
+            .orElseThrow(() -> new AppException(ErrorCode.FACULTY_NOT_FOUND));
 
     Semester semester =
         semesterRepository
-            .findById(i)
+            .findById(previousSemesterId)
             .orElseThrow(() -> new AppException(ErrorCode.SEMESTER_NOT_FOUND));
 
     List<SubjectReference> subjectReferences =
         subjectReferenceRepository.findAllBySemesterAndFacultyAndCohortCode(
             semester, faculty, CohortCode.valueOf(cohortCode));
 
-    List<GradeSubjectAverageProfileResponse> gradeSubjectAverageProfileResponses =
-        new ArrayList<>();
     List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles = new ArrayList<>();
     subjectReferences.forEach(
         subjectReference -> {
@@ -47,20 +51,23 @@ public class GradeSubjectAverageProfileService {
           gradeSubjectAverageProfile.setSubjectReference(subjectReference);
           gradeSubjectAverageProfiles.add(gradeSubjectAverageProfile);
         });
+
     gradeSubjectAverageProfileRepository.saveAll(gradeSubjectAverageProfiles);
+    return gradeSubjectAverageProfiles;
+  }
 
-    gradeSubjectAverageProfiles.forEach(
-        gradeSubjectAverageProfile -> {
-          GradeSubjectAverageProfileResponse response =
-              gradeSubjectAverageProfileMapper.toGradeSubjectAverageProfileResponse(
-                  gradeSubjectAverageProfile);
-          response.setCredit(
-              gradeSubjectAverageProfile.getSubjectReference().getSubject().getCredit());
-          response.setSubjectName(
-              gradeSubjectAverageProfile.getSubjectReference().getSubject().getSubjectName());
-
-          gradeSubjectAverageProfileResponses.add(response);
-        });
-    return gradeSubjectAverageProfileResponses;
+  public GradeSubjectAverageProfile updateGradeAverageScoreProfile(
+      GradeSubjectAverageProfileRequest gradeSubjectAverageProfileRequest) {
+    GradeSubjectAverageProfile gradeSubjectAverageProfile =
+        gradeSubjectAverageProfileRepository
+            .findById(
+                UUID.fromString(
+                    gradeSubjectAverageProfileRequest.getGradeSubjectAverageProfileId()))
+            .orElseThrow();
+    gradeSubjectAverageProfile.setCurrentScore(
+        Double.parseDouble(gradeSubjectAverageProfileRequest.getCurrentScore()));
+    gradeSubjectAverageProfile.setImprovementScore(
+        Double.parseDouble(gradeSubjectAverageProfileRequest.getImprovementScore()));
+    return gradeSubjectAverageProfile;
   }
 }

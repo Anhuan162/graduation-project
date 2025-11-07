@@ -1,7 +1,6 @@
 package com.graduation.project.user.dto;
 
 import java.util.UUID;
-
 import lombok.*;
 
 @Getter
@@ -15,5 +14,7 @@ public class GradeSubjectAverageProfileResponse {
   double currentScore;
   double improvementScore;
   String subjectName;
+  String subjectCode;
+  UUID subjectId;
   int credit;
 }

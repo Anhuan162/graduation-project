@@ -22,7 +22,7 @@ public class GpaProfile {
   private String gpaProfileCode;
 
   @Column(name = "letter_gpa_score")
-  private double letterGpaScore;
+  private String letterGpaScore;
 
   @Column(name = "number_gpa_score")
   private double numberGpaScore;
@@ -32,6 +32,9 @@ public class GpaProfile {
 
   @Column(name = "passed_credits")
   private int passedCredits;
+
+  @Column(name = "total_gpa_score_multi_credit")
+  private double totalGpaScoreMultiCredit;
 
   @JsonIgnore
   @ManyToOne(fetch = FetchType.LAZY)

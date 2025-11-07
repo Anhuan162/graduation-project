@@ -3,9 +3,10 @@ package com.graduation.project.user.dto;
 import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
+import lombok.Data;
 import lombok.Value;
 
-@Value
+@Data
 @Builder
 public class CpaProfileResponse {
   UUID id;
