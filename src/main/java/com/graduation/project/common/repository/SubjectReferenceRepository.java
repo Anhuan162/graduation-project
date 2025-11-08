@@ -7,7 +7,9 @@ import com.graduation.project.common.entity.SubjectReference;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public interface SubjectReferenceRepository extends JpaRepository<SubjectReference, UUID> {
   List<SubjectReference> findAllBySemesterAndFacultyAndCohortCode(
       Semester semester, Faculty faculty, CohortCode cohortCode);
