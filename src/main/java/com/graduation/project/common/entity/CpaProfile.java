@@ -1,6 +1,8 @@
 package com.graduation.project.common.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.*;
@@ -27,14 +29,23 @@ public class CpaProfile {
   private String letterCpaScore;
 
   @Column(name = "number_cpa_score")
-  private double numberCpaScore;
+  private Double numberCpaScore;
 
   @Column(name = "previous_number_cpa_score")
-  private double previousNumberCpaScore;
+  private Double previousNumberCpaScore;
+
+  @Column(name = "total_accumulated_score")
+  private Double totalAccumulatedScore;
 
   @Column(name = "accumulated_credits")
   private int accumulatedCredits;
 
+  @Builder.Default
   @OneToMany(mappedBy = "cpaProfile", cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<GpaProfile> gpaProfiles;
+  private List<GpaProfile> gpaProfiles = new ArrayList<>();
+
+  @JsonIgnore
+  @ManyToOne
+  @JoinColumn(name = "user_id")
+  private User user;
 }

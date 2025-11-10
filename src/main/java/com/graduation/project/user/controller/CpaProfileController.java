@@ -4,6 +4,7 @@ import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.user.dto.CpaProfileRequest;
 import com.graduation.project.user.dto.CpaProfileResponse;
 import com.graduation.project.user.service.CpaProfileService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,19 +30,39 @@ public class CpaProfileController {
         .build();
   }
 
-  @PutMapping("/delete-gpa-profile/{cpaProfileId}")
+  @PutMapping("/{cpaProfileId}/gpa-profile/{gpaProfileId}")
   public ApiResponse<CpaProfileResponse> deleteGpaProfileInCpaProfile(
-      @PathVariable String cpaProfileId, @RequestParam String gpaProfileId) {
+      @PathVariable String cpaProfileId, @PathVariable String gpaProfileId) {
     return ApiResponse.<CpaProfileResponse>builder()
         .result(cpaProfileService.deleteGpaProfileInCpaProfile(cpaProfileId, gpaProfileId))
         .build();
   }
 
-  @PutMapping("/{cpaProfileId}}/add-score")
+  @PutMapping("/calculate-cpa-score/{cpaProfileId}")
   public ApiResponse<CpaProfileResponse> addScoreForGpaProfile(
       @PathVariable String cpaProfileId, @RequestBody CpaProfileRequest cpaProfileRequest) {
     return ApiResponse.<CpaProfileResponse>builder()
-        .result(cpaProfileService.calculateAverageScore(cpaProfileId, cpaProfileRequest))
+        .result(cpaProfileService.calculateCpaScore(cpaProfileId, cpaProfileRequest))
+        .build();
+  }
+
+  @DeleteMapping("/{cpaProfileId}")
+  public ApiResponse<Void> deleteCpaProfile(@PathVariable String cpaProfileId) {
+    cpaProfileService.deleteCpaProfile(cpaProfileId);
+    return ApiResponse.<Void>builder().result(null).build();
+  }
+
+  @GetMapping
+  public ApiResponse<List<CpaProfileResponse>> getCpaProfiles() {
+    return ApiResponse.<List<CpaProfileResponse>>builder()
+        .result(cpaProfileService.getCpaProfiles())
+        .build();
+  }
+
+  @GetMapping("/{cpaProfileId}")
+  public ApiResponse<CpaProfileResponse> getCpaProfile(@PathVariable String cpaProfileId) {
+    return ApiResponse.<CpaProfileResponse>builder()
+        .result(cpaProfileService.getCpaProfile(cpaProfileId))
         .build();
   }
 }

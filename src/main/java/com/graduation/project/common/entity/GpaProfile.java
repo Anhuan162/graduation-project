@@ -2,6 +2,7 @@ package com.graduation.project.common.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.*;
@@ -25,22 +26,23 @@ public class GpaProfile {
   private String letterGpaScore;
 
   @Column(name = "number_gpa_score")
-  private double numberGpaScore;
+  private Double numberGpaScore;
 
   @Column(name = "previous_number_gpa_score")
-  private double previousNumberGpaScore;
+  private Double previousNumberGpaScore;
 
   @Column(name = "passed_credits")
   private int passedCredits;
 
-  @Column(name = "total_gpa_score_multi_credit")
-  private double totalGpaScoreMultiCredit;
+  @Column(name = "total_weighted_score")
+  private Double totalWeightedScore;
 
   @JsonIgnore
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "cpa_profile_id")
   private CpaProfile cpaProfile;
 
+  @Builder.Default
   @OneToMany(mappedBy = "gpaProfile", cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles;
+  private List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles = new ArrayList<>();
 }

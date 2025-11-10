@@ -6,7 +6,7 @@ import com.graduation.project.user.dto.GpaProfileResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = GradeSubjectAverageProfileMapper.class)
 public interface GpaProfileMapper {
   @Mapping(target = "gradeSubjectAverageProfiles", source = "gradeSubjectAverageProfileRequests")
   GpaProfile toGpaProfile(GpaProfileRequest gpaProfileRequest);

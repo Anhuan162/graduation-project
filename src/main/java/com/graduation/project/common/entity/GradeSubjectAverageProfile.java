@@ -24,10 +24,10 @@ public class GradeSubjectAverageProfile {
   private String letterImprovementScore;
 
   @Column(name = "current_score")
-  private double currentScore;
+  private Double currentScore;
 
   @Column(name = "improvement_score")
-  private double improvementScore;
+  private Double improvementScore;
 
   @JsonIgnore
   @ManyToOne(fetch = FetchType.LAZY)

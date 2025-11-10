@@ -1,5 +1,7 @@
 package com.graduation.project.common.entity;
 
+import java.util.Objects;
+
 public enum Grade {
   A_PLUS(4.0),
   A(3.7),
@@ -21,8 +23,11 @@ public enum Grade {
     return score;
   }
 
-  public static double toScore(String letter) {
+  public static Double toScore(String letter) {
     try {
+      if (Objects.isNull(letter)) {
+        return null;
+      }
       return Grade.valueOf(letter.toUpperCase()).getScore();
     } catch (IllegalArgumentException e) {
       return 0.0;
@@ -33,12 +38,12 @@ public enum Grade {
     Grade closest = F;
     double minDiff = Double.MAX_VALUE;
     for (Grade grade : Grade.values()) {
-      double gradeDiff = grade.getScore() - score;
+      double gradeDiff = Math.abs(grade.getScore() - score);
       if (gradeDiff < minDiff) {
         minDiff = gradeDiff;
         closest = grade;
       }
     }
-    return closest.name();
+    return closest.toString();
   }
 }

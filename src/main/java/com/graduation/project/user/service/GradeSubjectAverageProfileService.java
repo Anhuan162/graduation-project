@@ -29,7 +29,7 @@ public class GradeSubjectAverageProfileService {
   private final GradeSubjectAverageProfileMapper gradeSubjectAverageProfileMapper;
 
   public List<GradeSubjectAverageProfile> addGradeSubjectAverageProfileList(
-      int previousSemesterId, String facultyCode, String cohortCode) {
+      int previousSemesterId, String facultyCode, String cohortCode, GpaProfile gpaProfile) {
     Faculty faculty =
         facultyRepository
             .findByFacultyCode(facultyCode)
@@ -49,10 +49,10 @@ public class GradeSubjectAverageProfileService {
         subjectReference -> {
           GradeSubjectAverageProfile gradeSubjectAverageProfile = new GradeSubjectAverageProfile();
           gradeSubjectAverageProfile.setSubjectReference(subjectReference);
+          gradeSubjectAverageProfile.setGpaProfile(gpaProfile);
           gradeSubjectAverageProfiles.add(gradeSubjectAverageProfile);
         });
 
-    gradeSubjectAverageProfileRepository.saveAll(gradeSubjectAverageProfiles);
     return gradeSubjectAverageProfiles;
   }
 
@@ -62,12 +62,16 @@ public class GradeSubjectAverageProfileService {
         gradeSubjectAverageProfileRepository
             .findById(
                 UUID.fromString(
-                    gradeSubjectAverageProfileRequest.getGradeSubjectAverageProfileId()))
+                    gradeSubjectAverageProfileRequest.getId()))
             .orElseThrow();
+    gradeSubjectAverageProfile.setLetterCurrentScore(
+        gradeSubjectAverageProfileRequest.getLetterCurrentScore());
+    gradeSubjectAverageProfile.setLetterImprovementScore(
+        gradeSubjectAverageProfileRequest.getLetterImprovementScore());
     gradeSubjectAverageProfile.setCurrentScore(
-        Double.parseDouble(gradeSubjectAverageProfileRequest.getCurrentScore()));
+        Grade.toScore(gradeSubjectAverageProfileRequest.getLetterCurrentScore()));
     gradeSubjectAverageProfile.setImprovementScore(
-        Double.parseDouble(gradeSubjectAverageProfileRequest.getImprovementScore()));
+        Grade.toScore(gradeSubjectAverageProfileRequest.getLetterImprovementScore()));
     return gradeSubjectAverageProfile;
   }
 }

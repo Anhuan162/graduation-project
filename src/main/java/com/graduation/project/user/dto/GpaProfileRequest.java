@@ -1,17 +1,18 @@
 package com.graduation.project.user.dto;
 
 import java.util.List;
-import lombok.Builder;
-import lombok.Value;
+import lombok.*;
 
-@Value
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class GpaProfileRequest {
-  String gpaProfileId;
+  String id;
   String gpaProfileCode;
-  double letterGpaScore;
-  double numberGpaScore;
-  double previousNumberGpaScore;
+  Double letterGpaScore;
+  Double numberGpaScore;
+  Double previousNumberGpaScore;
   int passedCredits;
   List<GradeSubjectAverageProfileRequest> gradeSubjectAverageProfileRequests;
 }

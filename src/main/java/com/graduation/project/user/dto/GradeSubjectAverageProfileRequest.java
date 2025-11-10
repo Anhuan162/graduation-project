@@ -1,14 +1,13 @@
 package com.graduation.project.user.dto;
 
-import lombok.Builder;
-import lombok.Value;
+import lombok.*;
 
-@Value
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class GradeSubjectAverageProfileRequest {
-  String gradeSubjectAverageProfileId;
+  String id;
   String letterCurrentScore;
   String letterImprovementScore;
-  String currentScore;
-  String improvementScore;
 }
