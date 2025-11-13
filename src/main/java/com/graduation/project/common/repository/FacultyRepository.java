@@ -1,6 +1,7 @@
 package com.graduation.project.common.repository;
 
 import com.graduation.project.common.entity.Faculty;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -8,4 +9,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface FacultyRepository extends JpaRepository<Faculty, UUID> {
   boolean existsByFacultyCode(String facultyCode);
+
+  Optional<Faculty> findByFacultyCode(String facultyCode);
 }

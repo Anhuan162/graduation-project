@@ -1,12 +1,12 @@
 package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-import lombok.Getter;
-import lombok.Setter;
+import java.util.*;
+import lombok.*;
 
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Getter
 @Setter
 @Entity
@@ -40,4 +40,8 @@ public class User {
       joinColumns = @JoinColumn(name = "user_id"),
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   private Set<Role> roles = new HashSet<>();
+
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Builder.Default
+  private List<CpaProfile> cpaProfiles = new ArrayList<>();
 }

@@ -22,6 +22,9 @@ public enum ErrorCode {
   SUBJECT_NOT_FOUND(1012, "Subject not found", HttpStatus.NOT_FOUND),
   SEMESTER_NOT_FOUND(1013, "Semester not found", HttpStatus.NOT_FOUND),
   SUBJECT_REFERENCE_NOT_FOUND(1014, "Subject reference not found", HttpStatus.NOT_FOUND),
+  CPA_PROFILE_NAME_EXISTED(1015, "Cpa profile name already exists", HttpStatus.NOT_FOUND),
+  CPA_PROFILE_NOT_FOUND(1016, "Cpa profile not found", HttpStatus.NOT_FOUND),
+  GPA_PROFILE_NOT_FOUND(1017, "Gpa profile not found", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;
