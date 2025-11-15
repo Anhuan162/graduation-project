@@ -34,6 +34,9 @@ public class User {
 
   private String studentCode;
 
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<FileMetadata> fileMetadata;
+
   @ManyToMany(fetch = FetchType.EAGER)
   @JoinTable(
       name = "user_roles",
