@@ -7,5 +7,6 @@ public enum ResourceType {
   USER,
   ROLE,
   NOTIFICATION_EVENT,
-  ANNOUNCEMENT
+  ANNOUNCEMENT,
+  FILE
 }

@@ -42,6 +42,10 @@ public class UserPrincipal implements UserDetails {
     return authorities.stream().anyMatch(a -> a.getAuthority().contains(roleName));
   }
 
+  public boolean hasAuthority(String authority) {
+    return authorities.stream().anyMatch(a -> a.getAuthority().equals(authority));
+  }
+
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
     return authorities;
