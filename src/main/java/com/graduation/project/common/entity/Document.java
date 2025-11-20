@@ -1,5 +1,6 @@
 package com.graduation.project.common.entity;
 
+import com.graduation.project.common.dto.DocumentResponse;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -53,4 +54,15 @@ public class Document {
   private LocalDateTime updatedAt;
   private LocalDateTime approvedAt;
   private LocalDateTime deletedAt;
+  private String imageUrl;
+
+  public DocumentResponse toDocumentResponse() {
+    return DocumentResponse.builder()
+            .title(this.title)
+            .description(this.description)
+            .documentType(this.documentType)
+            .urlDoc(this.filePath)
+            .urlImage(this.imageUrl)
+            .build();
+  }
 }

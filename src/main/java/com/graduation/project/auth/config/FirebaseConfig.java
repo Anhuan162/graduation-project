@@ -16,11 +16,14 @@ public class FirebaseConfig {
     String serviceAccountPath = System.getProperty("user.dir") + "/graduated-project-firebase-adminsdk-key.json";
     FileInputStream serviceAccountStream = new FileInputStream(serviceAccountPath);
 
-    FirebaseOptions options =
-        FirebaseOptions.builder()
-            .setCredentials(GoogleCredentials.fromStream(serviceAccountStream))
-            .setStorageBucket("graduated-project-17647.firebasestorage.app")
-            .build();
-    return FirebaseApp.initializeApp(options);
+    if(FirebaseApp.getApps().isEmpty()) {
+      FirebaseOptions options =
+              FirebaseOptions.builder()
+                      .setCredentials(GoogleCredentials.fromStream(serviceAccountStream))
+                      .setStorageBucket("graduated-project-17647.firebasestorage.app")
+                      .build();
+      return FirebaseApp.initializeApp(options);
+    }
+    return FirebaseApp.getInstance();
   }
 }
