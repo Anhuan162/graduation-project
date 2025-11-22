@@ -24,12 +24,12 @@ public class FileMetadataPermissionHandler implements EntityPermissionHandler<Fi
       return switch (action) {
         case "VIEW" -> true;
         case "UPDATE" ->
-            user.hasAuthority("UPDATE_ALL_FILES")
-                || (user.hasAuthority("UPDATE_ANY_FILES")
+            user.hasAuthority("UPDATE_ANY_FILES")
+                || (user.hasAuthority("UPDATE_OWN_FILE")
                     && fileMetadata.getUser().getId().equals(user.getId()));
         case "DELETE" ->
-            user.hasAuthority("DELETE_ALL_FILES")
-                || (user.hasAuthority("DELETE_ANY_FILES")
+            user.hasAuthority("DELETE_ANY_FILES")
+                || (user.hasAuthority("DELETE_OWN_FILE")
                     && fileMetadata.getUser().getId().equals(user.getId()));
         default -> false;
       };

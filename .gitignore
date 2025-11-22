@@ -32,3 +32,8 @@ build/
 
 ### VS Code ###
 .vscode/
+/graduated-project-firebase-adminsdk-key.json
+/.env.docker
+/.env
+/docker
+/config-firebase

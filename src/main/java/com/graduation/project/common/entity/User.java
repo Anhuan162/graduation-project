@@ -1,5 +1,6 @@
 package com.graduation.project.common.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.*;
 import lombok.*;
@@ -47,4 +48,21 @@ public class User {
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   @Builder.Default
   private List<CpaProfile> cpaProfiles = new ArrayList<>();
+
+  @OneToMany(mappedBy = "creator", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Builder.Default
+  private List<Category> categories = new ArrayList<>();
+
+  @OneToMany(mappedBy = "createdBy", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Builder.Default
+  private List<Topic> topics = new ArrayList<>();
+
+  @ManyToMany(mappedBy = "managers")
+  @JsonIgnore
+  @Builder.Default
+  private Set<Category> managedCategories = new HashSet<>();
+
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Builder.Default
+  private Set<TopicMember> topicMembers = new HashSet<>();
 }

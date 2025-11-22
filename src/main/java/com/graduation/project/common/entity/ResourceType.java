@@ -8,5 +8,6 @@ public enum ResourceType {
   ROLE,
   NOTIFICATION_EVENT,
   ANNOUNCEMENT,
-  FILE
+  FILE,
+  POST
 }
