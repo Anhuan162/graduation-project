@@ -36,6 +36,15 @@ public class FileController {
     return ApiResponse.<FileMetadataResponse>builder().result(metadata).build();
   }
 
+  @PostMapping("/upload-multiple-files")
+  public List<FileMetadataResponse> uploadMultipleFiles(
+      @RequestParam("files") List<MultipartFile> files, @RequestParam String folderName)
+      throws IOException {
+
+    List<FileMetadataResponse> responses = fileService.uploadMultipleFiles(files, folderName);
+    return responses;
+  }
+
   @PutMapping("/{fileId}/replace")
   public ApiResponse<FileMetadataResponse> replaceFile(
       @PathVariable UUID fileId, @RequestParam("file") MultipartFile newFile) throws IOException {
@@ -55,6 +64,12 @@ public class FileController {
   @DeleteMapping("/{fileId}")
   public ApiResponse<?> deleteFile(@PathVariable UUID fileId) {
     fileService.deleteFile(fileId);
+    return ApiResponse.builder().result(null).build();
+  }
+
+  @DeleteMapping("/delete-all-files")
+  public ApiResponse<?> deleteAllFiles(@RequestParam List<String> fileIds) {
+    fileService.deleteAllFiles(fileIds);
     return ApiResponse.builder().result(null).build();
   }
 }
