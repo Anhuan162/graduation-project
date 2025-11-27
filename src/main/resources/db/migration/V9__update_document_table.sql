@@ -1,2 +1,2 @@
 alter  table documents
-    add column image_url varchar;
+    add column if not exists image_url varchar;
