@@ -35,7 +35,10 @@ public class Document {
   private User approvedBy;
 
   private DocumentStatus documentStatus;
+
+  @Enumerated(EnumType.STRING)
   private DocumentType documentType;
+
   private int size;
 
   private String originalFilename;

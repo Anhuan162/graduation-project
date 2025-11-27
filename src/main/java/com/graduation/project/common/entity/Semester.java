@@ -1,5 +1,6 @@
 package com.graduation.project.common.entity;
 
+import com.graduation.project.admin.dto.SemesterResponse;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,4 +23,14 @@ public class Semester {
 
   @OneToMany(mappedBy = "semester", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<SubjectReference> subjectReferences;
+
+//  ThieuNN
+  public SemesterResponse toResponse() {
+    return SemesterResponse.builder()
+            .id(this.id)
+            .schoolYear(this.schoolYear)
+            .semesterType(this.semesterType.toString())
+            .build();
+
+  }
 }
