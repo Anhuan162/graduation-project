@@ -6,6 +6,5 @@ import lombok.Data;
 public class TopicRequest {
   private String title;
   private String content;
-  private String createdBy;
   private String topicVisibility;
 }

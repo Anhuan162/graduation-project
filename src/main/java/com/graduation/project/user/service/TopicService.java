@@ -13,6 +13,7 @@ import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.user.dto.TopicRequest;
 import com.graduation.project.user.dto.TopicResponse;
 import com.graduation.project.user.mapper.TopicMapper;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,7 @@ public class TopicService {
     Category category =
         categoryRepository
             .findById(categoryId)
-            .orElseThrow(() -> new RuntimeException("Category not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
     authorizationService.checkCanCreateTopic(category, user);
 
@@ -59,7 +60,7 @@ public class TopicService {
     Topic topic =
         topicRepository
             .findById(topicId)
-            .orElseThrow(() -> new RuntimeException("Topic not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     return topicMapper.toTopicResponse(topic);
   }
 
@@ -77,13 +78,15 @@ public class TopicService {
     Topic topic =
         topicRepository
             .findById(topicId)
-            .orElseThrow(() -> new RuntimeException("Topic not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (authorizationService.canNotManageTopic(user, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
     topic.setTitle(request.getTitle());
     topic.setContent(request.getContent());
+    topic.setTopicVisibility(TopicVisibility.valueOf(request.getTopicVisibility()));
+//    topic.setLastModifiedDateTime(LocalDateTime.now());
 
     topicRepository.save(topic);
     return topicMapper.toTopicResponse(topic);
@@ -91,7 +94,7 @@ public class TopicService {
 
   public void delete(UUID id) {
     Topic topic =
-        topicRepository.findById(id).orElseThrow(() -> new RuntimeException("Topic not found"));
+        topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (authorizationService.canNotManageTopic(user, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
