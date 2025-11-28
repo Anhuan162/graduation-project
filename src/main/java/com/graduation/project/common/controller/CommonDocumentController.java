@@ -3,11 +3,8 @@ package com.graduation.project.common.controller;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.common.dto.DocumentRequest;
 import com.graduation.project.common.dto.DocumentResponse;
-import com.graduation.project.common.dto.FileMetadataResponse;
-import com.graduation.project.common.entity.AccessType;
 import com.graduation.project.common.entity.DocumentType;
 import com.graduation.project.common.service.DocumentService;
-import com.graduation.project.common.service.FileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,7 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/document")
 @RequiredArgsConstructor
-public class DocumentController {
+public class CommonDocumentController {
 
     private final DocumentService documentService;
     @PreAuthorize("hasAuthority('CREATE_ANY_FILES') or hasAuthority('CREATE_ALL_FILES')")
@@ -28,21 +25,39 @@ public class DocumentController {
     public ApiResponse<DocumentResponse> createDocument(
             @RequestParam("document") MultipartFile document,
             @RequestParam("image") MultipartFile image,
-            @RequestParam() DocumentRequest documentRequest
+            @RequestParam() UUID subjectId,
+            @RequestParam() String title,
+            @RequestParam(required = false, defaultValue = "") String description,
+            @RequestParam(required = false) DocumentType documentType
             ) throws IOException {
+        DocumentRequest documentRequest = DocumentRequest.builder().title(title)
+                .documentType(documentType)
+                .description(description)
+                .subjectId(subjectId)
+                .build();
         DocumentResponse res = documentService.uploadDocument(document, image, documentRequest);
         return  ApiResponse.<DocumentResponse>builder().result(res).build();
     }
 
     @GetMapping("/search")
     public ApiResponse<Page<DocumentResponse>> searchDocumentBySubjectIdAndTitleAndDocumentType(
-            @RequestParam() UUID subjectId,
+            @RequestParam() String subjectId,
             @RequestParam() String title,
-            @RequestParam() DocumentType documentType,
+            @RequestParam() String documentType,
             @RequestParam() Integer pageNumber,
             @RequestParam() Integer pageSize
             ) {
-        Page<DocumentResponse> res = documentService.searchDocuments(subjectId, title, documentType, pageNumber, pageSize);
+        UUID UUIDSubjectId = null;
+        DocumentType EdocumentType = null;
+        try {
+            UUIDSubjectId = UUID.fromString(subjectId);
+        } catch (Exception e){
+        }
+        try {
+            EdocumentType = DocumentType.valueOf(documentType);
+        } catch (Exception e){
+        }
+        Page<DocumentResponse> res = documentService.searchDocuments(UUIDSubjectId, title, EdocumentType, pageNumber, pageSize);
         return ApiResponse.<Page<DocumentResponse>>builder().result(res).build();
     }
 }

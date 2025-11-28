@@ -1,5 +1,6 @@
 package com.graduation.project.common.entity;
 
+import com.graduation.project.admin.dto.FacultyResponse;
 import jakarta.persistence.*;
 import java.util.List;
 import java.util.UUID;
@@ -25,4 +26,14 @@ public class Faculty {
 
   @OneToMany(mappedBy = "faculty", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<SubjectReference> subjectReferences;
+
+//  ThieuNN
+  public FacultyResponse toFacultyResponse() {
+    return FacultyResponse.builder()
+            .id(this.id.toString())
+            .facultyName(this.facultyName)
+            .facultyCode(this.facultyCode)
+            .description(this.description)
+            .build();
+  }
 }

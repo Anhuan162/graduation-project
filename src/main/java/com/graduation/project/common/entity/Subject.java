@@ -1,5 +1,6 @@
 package com.graduation.project.common.entity;
 
+import com.graduation.project.admin.dto.SubjectResponse;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,4 +31,15 @@ public class Subject {
 
   @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true)
   List<Document> documents;
+
+//  ThieuNN
+  public SubjectResponse toSubjectResponse() {
+    return SubjectResponse.builder()
+            .id(this.id)
+            .subjectName(this.subjectName)
+            .subjectCode(this.subjectCode)
+            .description(this.description)
+            .createdDate(this.createdDate)
+            .lastModifiedDate(this.lastModifiedDate).build();
+  }
 }
