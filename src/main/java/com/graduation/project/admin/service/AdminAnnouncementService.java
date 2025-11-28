@@ -11,8 +11,9 @@ import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.AnnouncementRepository;
 import com.graduation.project.common.repository.AnnouncementTargetRepository;
 import com.graduation.project.common.repository.ClassroomRepository;
-import com.graduation.project.notification.NotificationMessageDTO;
-import com.graduation.project.notification.NotificationStreamProducer;
+import com.graduation.project.event.dto.EventEnvelope;
+import com.graduation.project.event.dto.NotificationMessageDTO;
+import com.graduation.project.event.producer.StreamProducer;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,7 +30,7 @@ public class AdminAnnouncementService {
   private final AnnouncementRepository announcementRepository;
   private final AnnouncementTargetRepository announcementTargetRepository;
   private final ClassroomRepository classroomRepository;
-  private final NotificationStreamProducer producer;
+  private final StreamProducer producer;
   private final UserRepository userRepository;
 
   public CreatedAnnonucementResponse createAnnouncement(
@@ -59,7 +60,8 @@ public class AdminAnnouncementService {
             .receiverIds(receiverUserIds) // build list of UUID receivers
             .createdAt(LocalDateTime.now())
             .build();
-    producer.publish(dto);
+    EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "ANNOUNCEMENT");
+    producer.publish(eventEnvelope);
 
     return CreatedAnnonucementResponse.from(announcement);
   }
@@ -104,7 +106,7 @@ public class AdminAnnouncementService {
   }
 
   public AnnouncementResponse updateAnnouncement(
-          String announcementId, UpdatedAnnouncementRequest request, User user) {
+      String announcementId, UpdatedAnnouncementRequest request, User user) {
     Announcement announcement =
         announcementRepository
             .findById(announcementId)

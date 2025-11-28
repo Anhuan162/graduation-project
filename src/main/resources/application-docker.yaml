@@ -62,5 +62,12 @@ app:
 
 redis:
   stream:
-    key: notification-stream
-    group: notification-group
+    key: events-stream
+    notification-group: notification-group
+    activity-group: activity-group
+  stream-dlq-suffix: "-dlq"
+  retry:
+    max-attempts: 3
+    pending-scan-interval-ms: 10000
+    base-backoff-ms: 5000
+    processed-ttl-seconds: 86400

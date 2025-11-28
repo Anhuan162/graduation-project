@@ -5,6 +5,7 @@ import com.graduation.project.user.dto.CategoryRequest;
 import com.graduation.project.user.dto.CategoryResponse;
 import com.graduation.project.user.service.CategoryService;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +26,7 @@ public class CategoryController {
   }
 
   @GetMapping("/{categoryId}")
-  public ApiResponse<CategoryResponse> getOne(@PathVariable String categoryId) {
+  public ApiResponse<CategoryResponse> getOne(@PathVariable UUID categoryId) {
     return ApiResponse.<CategoryResponse>builder()
         .result(categoryService.getOne(categoryId))
         .build();
@@ -34,7 +35,7 @@ public class CategoryController {
   @PutMapping("/{categoryId}")
   @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<CategoryResponse> update(
-      @PathVariable String categoryId, @RequestBody CategoryRequest request) {
+      @PathVariable UUID categoryId, @RequestBody CategoryRequest request) {
     return ApiResponse.<CategoryResponse>builder()
         .result(categoryService.update(categoryId, request))
         .build();
@@ -42,7 +43,7 @@ public class CategoryController {
 
   @DeleteMapping("/{categoryId}")
   @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<String> delete(@PathVariable String categoryId) {
+  public ApiResponse<String> delete(@PathVariable UUID categoryId) {
     categoryService.delete(categoryId);
     return ApiResponse.<String>builder().result("Deleted successfully").build();
   }

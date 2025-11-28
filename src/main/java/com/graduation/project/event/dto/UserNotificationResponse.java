@@ -1,13 +1,13 @@
-package com.graduation.project.notification;
+package com.graduation.project.event.dto;
 
 import com.graduation.project.common.entity.UserNotification;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
 
 @Builder
-@Value
+@Data
 public class UserNotificationResponse {
   private UUID id;
   private UUID notificationEventId;

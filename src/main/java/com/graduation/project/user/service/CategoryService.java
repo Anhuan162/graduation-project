@@ -1,13 +1,15 @@
 package com.graduation.project.user.service;
 
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.common.entity.Category;
-import com.graduation.project.common.entity.CategoryType;
-import com.graduation.project.common.entity.User;
+import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.CategoryRepository;
-import com.graduation.project.user.dto.CategoryResponse;
+import com.graduation.project.event.dto.ActivityLogDTO;
+import com.graduation.project.event.dto.EventEnvelope;
+import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.user.dto.CategoryRequest;
+import com.graduation.project.user.dto.CategoryResponse;
 import com.graduation.project.user.mapper.CategoryMapper;
+import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,18 +22,34 @@ public class CategoryService {
   private final CategoryRepository categoryRepository;
   private final CategoryMapper categoryMapper;
   private final CurrentUserService currentUserService;
+  private final StreamProducer streamProducer;
 
+  @Transactional
   public CategoryResponse createCategory(CategoryRequest categoryRequest) {
     User user = currentUserService.getCurrentUserEntity();
     Category category = categoryMapper.toCategory(categoryRequest, user);
     categoryRepository.save(category);
+
+    ActivityLogDTO activityLogDTO =
+        ActivityLogDTO.from(
+            user.getId(),
+            "CREATE",
+            "FORUM",
+            ResourceType.CATEGORY,
+            category.getId(),
+            "User " + user.getEmail() + " created new category: " + category.getName(),
+            "1270.0.0.1");
+
+    EventEnvelope eventEnvelope =
+        EventEnvelope.from(EventType.ACTIVITY_LOG, activityLogDTO, "CATEGORY");
+    streamProducer.publish(eventEnvelope);
     return categoryMapper.toCategoryResponse(category);
   }
 
-  public CategoryResponse getOne(String id) {
+  public CategoryResponse getOne(UUID id) {
     Category category =
         categoryRepository
-            .findById(UUID.fromString(id))
+            .findById(id)
             .orElseThrow(() -> new RuntimeException("Category not found"));
     return categoryMapper.toCategoryResponse(category);
   }
@@ -40,10 +58,10 @@ public class CategoryService {
     return categoryRepository.findAll().stream().map(categoryMapper::toCategoryResponse).toList();
   }
 
-  public CategoryResponse update(String id, CategoryRequest updateReq) {
+  public CategoryResponse update(UUID id, CategoryRequest updateReq) {
     Category category =
         categoryRepository
-            .findById(UUID.fromString(id))
+            .findById(id)
             .orElseThrow(() -> new RuntimeException("Category not found"));
 
     category.setName(updateReq.getName());
@@ -54,10 +72,10 @@ public class CategoryService {
     return categoryMapper.toCategoryResponse(category);
   }
 
-  public void delete(String id) {
+  public void delete(UUID id) {
     Category category =
         categoryRepository
-            .findById(UUID.fromString(id))
+            .findById(id)
             .orElseThrow(() -> new RuntimeException("Category not found"));
     categoryRepository.delete(category);
   }

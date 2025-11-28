@@ -14,5 +14,5 @@ import lombok.NoArgsConstructor;
 public class PostRequest {
   private String title;
   private String content;
-  private List<String> fileMetadataIds;
+  private List<UUID> fileMetadataIds;
 }

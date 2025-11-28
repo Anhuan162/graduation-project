@@ -1,4 +1,4 @@
-package com.graduation.project.notification;
+package com.graduation.project.event.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.MessageMapping;

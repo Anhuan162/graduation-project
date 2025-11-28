@@ -1,5 +1,7 @@
-package com.graduation.project.notification;
+package com.graduation.project.event.config;
 
+import com.graduation.project.event.service.JwtHandshakeHandler;
+import com.graduation.project.event.service.JwtService;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;

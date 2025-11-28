@@ -1,4 +1,4 @@
-package com.graduation.project.notification;
+package com.graduation.project.event.config;
 
 import java.security.Principal;
 

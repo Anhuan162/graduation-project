@@ -21,7 +21,8 @@ public class Category {
 
   private String name;
   private String description;
-  private LocalDateTime createdAt = LocalDateTime.now();
+
+  @Builder.Default private LocalDateTime createdAt = LocalDateTime.now();
 
   @Enumerated(EnumType.STRING)
   private CategoryType categoryType;

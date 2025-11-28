@@ -1,4 +1,4 @@
-package com.graduation.project.notification;
+package com.graduation.project.event.service;
 
 import com.graduation.project.auth.config.CustomJwtDecoder;
 import com.graduation.project.auth.repository.UserRepository;

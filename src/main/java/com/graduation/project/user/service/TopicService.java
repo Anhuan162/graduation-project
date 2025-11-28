@@ -7,6 +7,9 @@ import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.CategoryRepository;
 import com.graduation.project.common.repository.TopicRepository;
 import com.graduation.project.common.service.AuthorizationService;
+import com.graduation.project.event.dto.ActivityLogDTO;
+import com.graduation.project.event.dto.EventEnvelope;
+import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.user.dto.TopicRequest;
 import com.graduation.project.user.dto.TopicResponse;
 import com.graduation.project.user.mapper.TopicMapper;
@@ -24,6 +27,7 @@ public class TopicService {
   private final CurrentUserService currentUserService;
   private final TopicMapper topicMapper;
   private final AuthorizationService authorizationService;
+  private final StreamProducer streamProducer;
 
   public TopicResponse create(UUID categoryId, TopicRequest request) {
     Category category =
@@ -35,14 +39,26 @@ public class TopicService {
 
     Topic topic = topicMapper.toTopic(request, category, user);
     topicRepository.save(topic);
-
+    ActivityLogDTO activityLogDTO =
+        ActivityLogDTO.from(
+            user.getId(),
+            "CREATE",
+            "FORUM",
+            ResourceType.TOPIC,
+            topic.getId(),
+            "User " + user.getEmail() + " created new topic: " + topic.getTitle(),
+            "127.0.0.1");
+    EventEnvelope eventEnvelope =
+        EventEnvelope.from(
+            EventType.ACTIVITY_LOG, activityLogDTO, String.valueOf(ResourceType.TOPIC));
+    streamProducer.publish(eventEnvelope);
     return topicMapper.toTopicResponse(topic);
   }
 
-  public TopicResponse getOneTopic(String topicId) {
+  public TopicResponse getOneTopic(UUID topicId) {
     Topic topic =
         topicRepository
-            .findById(UUID.fromString(topicId))
+            .findById(topicId)
             .orElseThrow(() -> new RuntimeException("Topic not found"));
     return topicMapper.toTopicResponse(topic);
   }
@@ -57,10 +73,10 @@ public class TopicService {
         .toList();
   }
 
-  public TopicResponse update(String topicId, TopicRequest request) {
+  public TopicResponse update(UUID topicId, TopicRequest request) {
     Topic topic =
         topicRepository
-            .findById(UUID.fromString(topicId))
+            .findById(topicId)
             .orElseThrow(() -> new RuntimeException("Topic not found"));
     User user = currentUserService.getCurrentUserEntity();
     if (authorizationService.canNotManageTopic(user, topic)) {
@@ -73,11 +89,9 @@ public class TopicService {
     return topicMapper.toTopicResponse(topic);
   }
 
-  public void delete(String id) {
+  public void delete(UUID id) {
     Topic topic =
-        topicRepository
-            .findById(UUID.fromString(id))
-            .orElseThrow(() -> new RuntimeException("Topic not found"));
+        topicRepository.findById(id).orElseThrow(() -> new RuntimeException("Topic not found"));
     User user = currentUserService.getCurrentUserEntity();
     if (authorizationService.canNotManageTopic(user, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);

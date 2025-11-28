@@ -71,6 +71,8 @@ public class SecurityConfig {
                         "/swagger-ui/**",
                         "/swagger-ui.html")
                     .permitAll()
+                    .requestMatchers("/ws/notification/**")
+                    .permitAll()
                     .requestMatchers(HttpMethod.GET, "/public/**")
                     .permitAll()
                     .requestMatchers("/admin/**")

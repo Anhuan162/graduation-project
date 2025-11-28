@@ -138,8 +138,7 @@ public class FileService {
   }
 
   public List<FileMetadata> updateFileMetadataList(
-      List<String> strFileMetadataIds, Post save, UUID userId) {
-    List<UUID> fileMetadataIds = strFileMetadataIds.stream().map(UUID::fromString).toList();
+      List<UUID> fileMetadataIds, Post save, UUID userId) {
     List<FileMetadata> fileMetadataList = fileMetadataRepository.findAllByIdIn(fileMetadataIds);
 
     fileMetadataList.forEach(

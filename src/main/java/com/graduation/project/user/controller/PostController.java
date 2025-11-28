@@ -18,20 +18,20 @@ public class PostController {
 
   @PostMapping("/topic/{topicId}")
   public ApiResponse<PostResponse> createPost(
-      @PathVariable String topicId, @RequestBody PostRequest request) {
+      @PathVariable UUID topicId, @RequestBody PostRequest request) {
     return ApiResponse.<PostResponse>builder()
         .result(postService.createPost(topicId, request))
         .build();
   }
 
   @GetMapping("/{postId}")
-  public ApiResponse<PostResponse> getOne(@PathVariable String postId) {
+  public ApiResponse<PostResponse> getOne(@PathVariable UUID postId) {
     return ApiResponse.<PostResponse>builder().result(postService.getOne(postId)).build();
   }
 
   @PutMapping("/{postId}")
   public ApiResponse<PostResponse> update(
-      @PathVariable String postId, @RequestBody PostRequest request) {
+      @PathVariable UUID postId, @RequestBody PostRequest request) {
     return ApiResponse.<PostResponse>builder().result(postService.update(postId, request)).build();
   }
 
@@ -47,7 +47,7 @@ public class PostController {
   }
 
   @GetMapping("/topic/{topicId}")
-  public ApiResponse<List<PostResponse>> getByTopic(@PathVariable String topicId) {
+  public ApiResponse<List<PostResponse>> getByTopic(@PathVariable UUID topicId) {
     return ApiResponse.<List<PostResponse>>builder()
         .result(postService.getByTopic(topicId))
         .build();
