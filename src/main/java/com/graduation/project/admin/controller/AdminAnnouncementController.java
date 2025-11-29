@@ -10,7 +10,10 @@ import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.common.entity.User;
 import java.util.List;
+
+import io.swagger.v3.oas.annotations.Parameter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -56,8 +59,21 @@ public class AdminAnnouncementController {
         .build();
   }
 
-  @GetMapping
-  public List<AnnouncementResponse> getAnnouncements() {
-    return adminAnnouncementService.getAnnouncements();
-  }
+//  ThieuNN
+ @GetMapping("/all")
+ public  ApiResponse<Page<AnnouncementResponse>> getAllAnnouncements(
+         @RequestParam Integer page,
+         @RequestParam Integer size
+ )
+ {
+     Page<AnnouncementResponse> announcementResponses = adminAnnouncementService.getAnnouncements(page, size);
+     return ApiResponse.<Page<AnnouncementResponse>>builder()
+             .result(announcementResponses)
+             .build();
+ }
+
+//  @GetMapping
+//  public List<AnnouncementResponse> getAnnouncements() {
+//    return adminAnnouncementService.getAnnouncements();
+//  }
 }
