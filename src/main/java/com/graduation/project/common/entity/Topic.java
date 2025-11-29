@@ -25,6 +25,7 @@ public class Topic {
 
   private String title;
   private LocalDateTime createdAt = LocalDateTime.now();
+  private LocalDateTime lastModifiedAt = LocalDateTime.now();
 
   @Column(columnDefinition = "TEXT")
   private String content;

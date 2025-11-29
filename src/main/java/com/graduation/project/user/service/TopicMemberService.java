@@ -128,9 +128,9 @@ public class TopicMemberService {
     User currentUser = currentUserService.getCurrentUserEntity();
 
     // --- chỉ creator hoặc admin mới được add ---
-    boolean canNotEditTopic = canManageTopic(currentUser, topic);
+    boolean canEditTopic = canManageTopic(currentUser, topic);
 
-    if (canNotEditTopic) {
+    if (!canEditTopic) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
     TopicMember topicMember = new TopicMember();

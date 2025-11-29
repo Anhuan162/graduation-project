@@ -23,8 +23,6 @@ public class Post {
   @Column(columnDefinition = "TEXT")
   private String content;
 
-  private boolean isPublished = true;
-
   private LocalDateTime createdDateTime = LocalDateTime.now();
   private LocalDateTime lastModifiedDateTime = LocalDateTime.now();
 

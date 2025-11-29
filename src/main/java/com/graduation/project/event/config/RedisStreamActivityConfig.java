@@ -1,0 +1,62 @@
+package com.graduation.project.event.config;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.graduation.project.event.consumer.NotificationStreamConsumer;
+import java.time.Duration;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.stream.Consumer;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.data.redis.stream.StreamMessageListenerContainer;
+import org.springframework.data.redis.stream.StreamMessageListenerContainer.StreamMessageListenerContainerOptions;
+import org.springframework.data.redis.stream.Subscription;
+
+@Log4j2
+@Configuration
+public class RedisStreamActivityConfig extends RedisConfig {
+
+  @Value("${redis.stream.activity-group}")
+  private String groupName;
+
+  public RedisStreamActivityConfig(RedisConnectionFactory factory) {
+    super(factory);
+  }
+
+  @Bean
+  public StreamMessageListenerContainer<String, MapRecord<String, Object, Object>>
+      activityListenerContainer(
+          RedisConnectionFactory factory, NotificationStreamConsumer consumer, ObjectMapper redisObjectMapper) {
+    initGroupIfNeeded(groupName);
+
+    var options =
+        StreamMessageListenerContainerOptions.builder()
+            .pollTimeout(Duration.ofSeconds(1))
+            .hashKeySerializer(new StringRedisSerializer())
+            .hashValueSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper))
+            .build();
+
+    StreamMessageListenerContainer<String, MapRecord<String, Object, Object>> container =
+        StreamMessageListenerContainer.create(factory, options);
+
+    Subscription subscription =
+        container.register(
+            StreamMessageListenerContainer.StreamReadRequest.builder(
+                    StreamOffset.create(streamKey, ReadOffset.lastConsumed()))
+                .consumer(Consumer.from(groupName, "activity-consumer-1"))
+                .autoAcknowledge(false)
+                .build(),
+            consumer);
+
+    log.info("🚀 Activity Log consumer registered: {}", consumer.getClass().getSimpleName());
+    container.start();
+
+    return container;
+  }
+}

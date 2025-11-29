@@ -18,27 +18,27 @@ public class TopicController {
 
   @PostMapping("/category/{categoryId}")
   public ApiResponse<TopicResponse> create(
-      @PathVariable String categoryId, @RequestBody TopicRequest request) {
+      @PathVariable UUID categoryId, @RequestBody TopicRequest request) {
     return ApiResponse.<TopicResponse>builder()
-        .result(topicService.create(UUID.fromString(categoryId), request))
+        .result(topicService.create(categoryId, request))
         .build();
   }
 
   @GetMapping("/{topicId}")
-  public ApiResponse<TopicResponse> getOneTopic(@PathVariable String topicId) {
+  public ApiResponse<TopicResponse> getOneTopic(@PathVariable UUID topicId) {
     return ApiResponse.<TopicResponse>builder().result(topicService.getOneTopic(topicId)).build();
   }
 
   @PutMapping("/{topicId}")
   public ApiResponse<TopicResponse> update(
-      @PathVariable String topicId, @RequestBody TopicRequest request) {
+      @PathVariable UUID topicId, @RequestBody TopicRequest request) {
     return ApiResponse.<TopicResponse>builder()
         .result(topicService.update(topicId, request))
         .build();
   }
 
   @DeleteMapping("/{categoryId}")
-  public ApiResponse<String> delete(@PathVariable String categoryId) {
+  public ApiResponse<String> delete(@PathVariable UUID categoryId) {
     topicService.delete(categoryId);
     return ApiResponse.<String>builder().result("Deleted successfully").build();
   }
@@ -49,9 +49,9 @@ public class TopicController {
   }
 
   @GetMapping("/category/{categoryId}")
-  public ApiResponse<List<TopicResponse>> getByCategory(@PathVariable String categoryId) {
+  public ApiResponse<List<TopicResponse>> getByCategory(@PathVariable UUID categoryId) {
     return ApiResponse.<List<TopicResponse>>builder()
-        .result(topicService.getByCategory(UUID.fromString(categoryId)))
+        .result(topicService.getByCategory(categoryId))
         .build();
   }
 }

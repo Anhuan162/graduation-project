@@ -9,5 +9,7 @@ public enum ResourceType {
   NOTIFICATION_EVENT,
   ANNOUNCEMENT,
   FILE,
-  POST
+  POST,
+  CATEGORY,
+  TOPIC
 }

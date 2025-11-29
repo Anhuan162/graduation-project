@@ -30,10 +30,10 @@ public class PostService {
   private final AuthorizationService authorizationService;
 
   @Transactional
-  public PostResponse createPost(String topicId, PostRequest request) {
+  public PostResponse createPost(UUID topicId, PostRequest request) {
     Topic topic =
         topicRepository
-            .findById(UUID.fromString(topicId))
+            .findById(topicId)
             .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
     if (!canCreatePost(topic, user)) {
@@ -58,11 +58,9 @@ public class PostService {
         .anyMatch(m -> m.getUser().getId().equals(user.getId()) && m.isApproved());
   }
 
-  public PostResponse getOne(String id) {
+  public PostResponse getOne(UUID id) {
     Post post =
-        postRepository
-            .findById(UUID.fromString(id))
-            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+        postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.canViewTopic(post.getTopic(), user)) {
@@ -85,17 +83,17 @@ public class PostService {
         .toList();
   }
 
-  public List<PostResponse> getByTopic(String topicId) {
+  public List<PostResponse> getByTopic(UUID topicId) {
     Topic topic =
         topicRepository
-            .findById(UUID.fromString(topicId))
+            .findById(topicId)
             .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canViewTopic(topic, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    return postRepository.findByTopicId(UUID.fromString(topicId)).stream()
+    return postRepository.findByTopicId(topicId).stream()
         .map(
             post -> {
               List<String> urls = fileService.getFileMetadataIds(post.getId(), ResourceType.POST);
@@ -105,10 +103,10 @@ public class PostService {
   }
 
   @Transactional
-  public PostResponse update(String id, PostRequest request) {
+  public PostResponse update(UUID id, PostRequest request) {
     Post post =
         postRepository
-            .findById(UUID.fromString(id))
+            .findById(id)
             .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     post.setTitle(request.getTitle());
     post.setContent(request.getContent());

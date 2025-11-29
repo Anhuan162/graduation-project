@@ -1,4 +1,4 @@
-package com.graduation.project.notification;
+package com.graduation.project.event.service;
 
 // -------------------- src/main/java/com/graduation/project/security/JwtService.java --------------------
 

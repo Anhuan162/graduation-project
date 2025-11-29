@@ -1,10 +1,13 @@
-package com.graduation.project.notification;
+package com.graduation.project.event.service;
 
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
+import com.graduation.project.event.dto.UserNotificationResponse;
+import com.graduation.project.event.dto.NotificationMessageDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -13,7 +16,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class NotificationService {
+public class NotificationHandler {
 
   private final NotificationEventRepository notificationEventRepository;
   private final UserNotificationRepository userNotificationRepository;
