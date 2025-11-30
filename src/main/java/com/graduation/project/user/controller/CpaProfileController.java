@@ -16,9 +16,9 @@ public class CpaProfileController {
   public final CpaProfileService cpaProfileService;
 
   @PostMapping
-  public ApiResponse<CpaProfileResponse> initializeCpaProfile(@RequestParam String cpaProfileName) {
+  public ApiResponse<CpaProfileResponse> initializeCpaProfile() {
     return ApiResponse.<CpaProfileResponse>builder()
-        .result(cpaProfileService.initializeCpaProfile(cpaProfileName))
+        .result(cpaProfileService.initializeCpaProfile())
         .build();
   }
 

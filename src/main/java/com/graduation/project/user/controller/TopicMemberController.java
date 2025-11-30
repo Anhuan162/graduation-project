@@ -1,8 +1,8 @@
 package com.graduation.project.user.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.common.entity.TopicMember;
 import com.graduation.project.common.entity.TopicRole;
+import com.graduation.project.user.dto.TopicMemberResponse;
 import com.graduation.project.user.service.TopicMemberService;
 import java.util.List;
 import java.util.UUID;
@@ -20,18 +20,20 @@ public class TopicMemberController {
   private final TopicMemberService topicMemberService;
 
   @GetMapping("/topic/{topicId}")
-  public ResponseEntity<List<TopicMember>> getMembers(@PathVariable UUID topicId) {
+  public ResponseEntity<List<TopicMemberResponse>> getMembers(@PathVariable UUID topicId) {
     return ResponseEntity.ok(topicMemberService.getMembers(topicId));
   }
 
   @PostMapping("/join/{topicId}")
-  public ResponseEntity<TopicMember> join(@PathVariable UUID topicId) {
+  public ResponseEntity<TopicMemberResponse> join(@PathVariable UUID topicId) {
     return ResponseEntity.ok(topicMemberService.joinTopic(topicId));
   }
 
   @PostMapping("/approve/{memberId}")
-  public ResponseEntity<TopicMember> approve(@PathVariable UUID memberId) {
-    return ResponseEntity.ok(topicMemberService.approveJoin(memberId));
+  public ApiResponse<TopicMemberResponse> approve(@PathVariable UUID memberId) {
+    return ApiResponse.<TopicMemberResponse>builder()
+        .result(topicMemberService.approveJoin(memberId))
+        .build();
   }
 
   @DeleteMapping("/{topicId}/kick/{userId}")
@@ -41,15 +43,15 @@ public class TopicMemberController {
   }
 
   @GetMapping("/unapproved-member")
-  public ApiResponse<Page<TopicMember>> getUnapprovedMembers(Pageable pageable) {
-    return ApiResponse.<Page<TopicMember>>builder()
+  public ApiResponse<Page<TopicMemberResponse>> getUnapprovedMembers(Pageable pageable) {
+    return ApiResponse.<Page<TopicMemberResponse>>builder()
         .result(topicMemberService.findUnapprovedMember(pageable))
         .build();
   }
 
   @GetMapping("/approved-member")
-  public ApiResponse<Page<TopicMember>> getApprovedMembers(Pageable pageable) {
-    return ApiResponse.<Page<TopicMember>>builder()
+  public ApiResponse<Page<TopicMemberResponse>> getApprovedMembers(Pageable pageable) {
+    return ApiResponse.<Page<TopicMemberResponse>>builder()
         .result(topicMemberService.findApprovedMember(pageable))
         .build();
   }

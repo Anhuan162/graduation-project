@@ -11,8 +11,8 @@ public class GradeSubjectAverageProfileResponse {
   UUID id;
   String letterCurrentScore;
   String letterImprovementScore;
-  double currentScore;
-  double improvementScore;
+  Double currentScore;
+  Double improvementScore;
   String subjectName;
   String subjectCode;
   UUID subjectId;

@@ -1,7 +1,6 @@
 package com.graduation.project.user.dto;
 
 import java.util.List;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,5 +16,5 @@ public class PostResponse {
   private String content;
   private String topicId;
   private String createdById;
-  private List<UUID> fileMetadataIds;
+  private List<String> urls;
 }

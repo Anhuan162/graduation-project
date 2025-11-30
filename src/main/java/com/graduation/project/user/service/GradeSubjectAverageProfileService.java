@@ -8,7 +8,6 @@ import com.graduation.project.common.repository.GradeSubjectAverageProfileReposi
 import com.graduation.project.common.repository.SemesterRepository;
 import com.graduation.project.common.repository.SubjectReferenceRepository;
 import com.graduation.project.user.dto.GradeSubjectAverageProfileRequest;
-import com.graduation.project.user.mapper.GradeSubjectAverageProfileMapper;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,10 +25,9 @@ public class GradeSubjectAverageProfileService {
   private final SemesterRepository semesterRepository;
   private final FacultyRepository facultyRepository;
   private final SubjectReferenceRepository subjectReferenceRepository;
-  private final GradeSubjectAverageProfileMapper gradeSubjectAverageProfileMapper;
 
   public List<GradeSubjectAverageProfile> addGradeSubjectAverageProfileList(
-      int previousSemesterId, String facultyCode, String cohortCode, GpaProfile gpaProfile) {
+      int currentSemesterId, String facultyCode, String cohortCode, GpaProfile gpaProfile) {
     Faculty faculty =
         facultyRepository
             .findByFacultyCode(facultyCode)
@@ -37,7 +35,7 @@ public class GradeSubjectAverageProfileService {
 
     Semester semester =
         semesterRepository
-            .findById(previousSemesterId)
+            .findById(currentSemesterId)
             .orElseThrow(() -> new AppException(ErrorCode.SEMESTER_NOT_FOUND));
 
     List<SubjectReference> subjectReferences =
@@ -60,9 +58,7 @@ public class GradeSubjectAverageProfileService {
       GradeSubjectAverageProfileRequest gradeSubjectAverageProfileRequest) {
     GradeSubjectAverageProfile gradeSubjectAverageProfile =
         gradeSubjectAverageProfileRepository
-            .findById(
-                UUID.fromString(
-                    gradeSubjectAverageProfileRequest.getId()))
+            .findById(UUID.fromString(gradeSubjectAverageProfileRequest.getId()))
             .orElseThrow();
     gradeSubjectAverageProfile.setLetterCurrentScore(
         gradeSubjectAverageProfileRequest.getLetterCurrentScore());

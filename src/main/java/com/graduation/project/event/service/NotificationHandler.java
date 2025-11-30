@@ -3,11 +3,9 @@ package com.graduation.project.event.service;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.*;
-import java.time.LocalDateTime;
-import java.util.UUID;
-
-import com.graduation.project.event.dto.UserNotificationResponse;
 import com.graduation.project.event.dto.NotificationMessageDTO;
+import com.graduation.project.event.dto.UserNotificationResponse;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -41,7 +39,7 @@ public class NotificationHandler {
         .forEach(
             userId ->
                 userRepository
-                    .findById(UUID.fromString(userId))
+                    .findById(userId)
                     .ifPresent(
                         user -> {
                           UserNotification userNotif =
@@ -57,7 +55,7 @@ public class NotificationHandler {
 
                           try {
                             messagingTemplate.convertAndSendToUser(
-                                userId, "/queue/notifications", response);
+                                String.valueOf(userId), "/queue/notifications", response);
                           } catch (Exception e) {
                             log.error(
                                 "Failed to send STOMP message to {}: {}", response, e.getMessage());

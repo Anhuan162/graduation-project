@@ -3,5 +3,6 @@ package com.graduation.project.common.entity;
 public enum NotificationType {
   ANNOUNCEMENT,
   POST,
-  COMMENT
+  COMMENT,
+  TOPIC_MEMBER,
 }

@@ -7,6 +7,7 @@ import com.graduation.project.user.service.PostService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -41,6 +42,7 @@ public class PostController {
     return ApiResponse.<String>builder().result("Deleted successfully").build();
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
   public ApiResponse<List<PostResponse>> getAll() {
     return ApiResponse.<List<PostResponse>>builder().result(postService.getAll()).build();

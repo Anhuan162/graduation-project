@@ -6,7 +6,6 @@ import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.GpaProfileRepository;
 import com.graduation.project.user.dto.GpaProfileRequest;
 import com.graduation.project.user.dto.GradeSubjectAverageProfileRequest;
-import com.graduation.project.user.mapper.GpaProfileMapper;
 import jakarta.transaction.Transactional;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -21,12 +20,11 @@ public class GpaProfileService {
   private final GpaProfileRepository gpaProfileRepository;
 
   private final GradeSubjectAverageProfileService gradeSubjectAverageProfileService;
-  private final GpaProfileMapper gpaProfileMapper;
 
-  public GpaProfile addGpaProfile(String cpaProfileCode, int semesterId, CpaProfile cpaProfile) {
-    String gpaProfileCode = cpaProfileCode + semesterId;
-    String cohortCode = "D" + cpaProfileCode.substring(4, 6);
-    String facultyCode = cpaProfileCode.substring(8, 10);
+  public GpaProfile addGpaProfile(String studentCode, int semesterId, CpaProfile cpaProfile) {
+    String gpaProfileCode = "GPA" + studentCode + semesterId;
+    String cohortCode = "D" + studentCode.substring(1, 3);
+    String facultyCode = studentCode.substring(5, 7);
     GpaProfile gpaProfile = GpaProfile.builder().gpaProfileCode(gpaProfileCode).build();
 
     List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles =

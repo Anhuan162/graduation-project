@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface GradeSubjectAverageProfileMapper {
 
+
   GradeSubjectAverageProfile toGradeSubjectAverageProfile(
       GradeSubjectAverageProfileRequest gradeSubjectAverageProfileRequest);
 

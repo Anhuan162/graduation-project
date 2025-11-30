@@ -7,6 +7,10 @@ import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.TopicMemberRepository;
 import com.graduation.project.common.repository.TopicRepository;
+import com.graduation.project.event.dto.EventEnvelope;
+import com.graduation.project.event.dto.NotificationMessageDTO;
+import com.graduation.project.event.producer.StreamProducer;
+import com.graduation.project.user.dto.TopicMemberResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -24,13 +28,16 @@ public class TopicMemberService {
   private final TopicRepository topicRepository;
   private final CurrentUserService currentUserService;
   private final UserRepository userRepository;
+  private final StreamProducer streamProducer;
 
-  public List<TopicMember> getMembers(UUID topicId) {
-    return topicMemberRepository.findByTopicId(topicId);
+  public List<TopicMemberResponse> getMembers(UUID topicId) {
+    return topicMemberRepository.findByTopicId(topicId).stream()
+        .map(TopicMemberResponse::toTopicMemberResponse)
+        .toList();
   }
 
   @Transactional
-  public TopicMember joinTopic(UUID topicId) {
+  public TopicMemberResponse joinTopic(UUID topicId) {
     Topic topic =
         topicRepository
             .findById(topicId)
@@ -47,26 +54,45 @@ public class TopicMemberService {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    TopicMember.TopicMemberBuilder builder =
+    TopicMember topicMember =
         TopicMember.builder()
             .topic(topic)
             .user(user)
             .topicRole(TopicRole.MEMBER)
-            .joinedAt(LocalDateTime.now());
+            .joinedAt(LocalDateTime.now())
+            .build();
 
     // PUBLIC → join ngay
     if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) {
-      builder.approved(true);
-      return topicMemberRepository.save(builder.build());
+      topicMember.setApproved(true);
+      return TopicMemberResponse.toTopicMemberResponse(topicMemberRepository.save(topicMember));
     }
-
+    List<UUID> managerIds =
+        topic.getTopicMembers().stream()
+            .filter(t -> t.getTopicRole().equals(TopicRole.MANAGER))
+            .map(TopicMember::getId)
+            .toList();
     // PRIVATE → pending approval
-    builder.approved(false);
-    return topicMemberRepository.save(builder.build());
+    topicMember.setApproved(false);
+    topicMemberRepository.save(topicMember);
+    NotificationMessageDTO dto =
+        NotificationMessageDTO.builder()
+            .relatedId(topicMember.getId())
+            .type(NotificationType.TOPIC_MEMBER)
+            .title("Join Topic")
+            .content(user.getFullName() + "want to join your topic")
+            .senderId(user.getId())
+            .senderName(user.getEmail())
+            .receiverIds(managerIds) // build list of UUID receivers
+            .createdAt(LocalDateTime.now())
+            .build();
+    EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
+    streamProducer.publish(eventEnvelope);
+    return TopicMemberResponse.toTopicMemberResponse(topicMember);
   }
 
   @Transactional
-  public TopicMember approveJoin(UUID topicMemberId) {
+  public TopicMemberResponse approveJoin(UUID topicMemberId) {
     TopicMember tm =
         topicMemberRepository
             .findById(topicMemberId)
@@ -79,7 +105,21 @@ public class TopicMemberService {
     }
 
     tm.setApproved(true);
-    return topicMemberRepository.save(tm);
+    TopicMember save = topicMemberRepository.save(tm);
+    NotificationMessageDTO dto =
+        NotificationMessageDTO.builder()
+            .relatedId(topicMemberId)
+            .type(NotificationType.TOPIC_MEMBER)
+            .title("Approve Member")
+            .content("Bạn đã được chấp thuận là thành viên của Topic")
+            .senderId(current.getId())
+            .senderName(current.getEmail())
+            .receiverIds(List.of(tm.getUser().getId())) // build list of UUID receivers
+            .createdAt(LocalDateTime.now())
+            .build();
+    EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
+    streamProducer.publish(eventEnvelope);
+    return TopicMemberResponse.toTopicMemberResponse(save);
   }
 
   @Transactional
@@ -103,14 +143,14 @@ public class TopicMemberService {
     topicMemberRepository.delete(tm);
   }
 
-  public Page<TopicMember> findUnapprovedMember(Pageable pageable) {
+  public Page<TopicMemberResponse> findUnapprovedMember(Pageable pageable) {
     Page<TopicMember> page = topicMemberRepository.findAllByApprovedIsFalse(pageable);
-    return page;
+    return page.map(TopicMemberResponse::toTopicMemberResponse);
   }
 
-  public Page<TopicMember> findApprovedMember(Pageable pageable) {
+  public Page<TopicMemberResponse> findApprovedMember(Pageable pageable) {
     Page<TopicMember> page = topicMemberRepository.findAllByApprovedIsTrue(pageable);
-    return page;
+    return page.map(TopicMemberResponse::toTopicMemberResponse);
   }
 
   @Transactional

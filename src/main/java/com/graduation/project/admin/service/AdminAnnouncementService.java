@@ -48,7 +48,7 @@ public class AdminAnnouncementService {
     announcementRepository.save(announcement);
 
     List<User> receivedUsers = userRepository.findAllByRoleName("USER");
-    List<String> receiverUserIds = receivedUsers.stream().map(re -> re.getId().toString()).toList();
+    List<UUID> receiverUserIds = receivedUsers.stream().map(User::getId).toList();
     NotificationMessageDTO dto =
         NotificationMessageDTO.builder()
             .relatedId(announcement.getId())

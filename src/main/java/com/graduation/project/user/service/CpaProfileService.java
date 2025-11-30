@@ -32,22 +32,21 @@ public class CpaProfileService {
   private final GpaProfileService gpaProfileService;
   private final GpaProfileRepository gpaProfileRepository;
 
-  public CpaProfileResponse initializeCpaProfile(String cpaProfileName) {
-    boolean isExistedCpaProfileName = cpaProfileRepository.existsByCpaProfileName(cpaProfileName);
-    if (isExistedCpaProfileName) {
-      throw new AppException(ErrorCode.CPA_PROFILE_NAME_EXISTED);
-    }
+  public CpaProfileResponse initializeCpaProfile() {
     User user = currentUserService.getCurrentUserEntity();
 
     String studentCode = user.getStudentCode();
-    String cpaProfileCode = "CPA" + studentCode + cpaProfileName;
+    if (studentCode == null) {
+      throw new AppException(ErrorCode.STUDENT_CODE_NULL);
+    }
+    String cpaProfileCode = "CPA" + studentCode;
     CpaProfile cpaProfile =
         CpaProfile.builder()
             .cpaProfileCode(cpaProfileCode)
             .cpaProfileName(studentCode)
             .user(user)
             .build();
-    GpaProfile gpaProfile = gpaProfileService.addGpaProfile(cpaProfileCode, 1, cpaProfile);
+    GpaProfile gpaProfile = gpaProfileService.addGpaProfile(studentCode, 1, cpaProfile);
 
     cpaProfile.getGpaProfiles().add(gpaProfile);
     cpaProfileRepository.save(cpaProfile);
@@ -62,7 +61,9 @@ public class CpaProfileService {
             .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
     GpaProfile gpaProfile =
         gpaProfileService.addGpaProfile(
-            cpaProfile.getCpaProfileCode(), cpaProfile.getGpaProfiles().size() + 1, cpaProfile);
+            cpaProfile.getUser().getStudentCode(),
+            cpaProfile.getGpaProfiles().size() + 1,
+            cpaProfile);
     cpaProfile.getGpaProfiles().add(gpaProfile);
     cpaProfileRepository.save(cpaProfile);
 

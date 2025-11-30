@@ -19,7 +19,7 @@ public class NotificationMessageDTO {
   private String content;
   private UUID senderId;
   private String senderName;
-  private List<String> receiverIds; // Danh sách user nhận thông báo
+  private List<UUID> receiverIds; // Danh sách user nhận thông báo
 
   // ✅ format rõ ràng để Redis JSON serializer đọc được
   @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")

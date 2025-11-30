@@ -18,7 +18,6 @@ public interface PostMapper {
   @Mapping(target = "content", source = "request.content")
   @Mapping(target = "comments", ignore = true)
   @Mapping(target = "id", ignore = true)
-  @Mapping(target = "isPublished", ignore = true)
   @Mapping(target = "createdDateTime", ignore = true)
   @Mapping(target = "lastModifiedDateTime", ignore = true)
   @Mapping(target = "postStatus", ignore = true)
@@ -31,6 +30,6 @@ public interface PostMapper {
   @Mapping(target = "id", source = "post.id")
   @Mapping(target = "title", source = "post.title")
   @Mapping(target = "content", source = "post.content")
-  @Mapping(target = "fileMetadataIds", source = "fileMetadataIds")
-  PostResponse toPostResponse(Post post, List<String> fileMetadataIds);
+  @Mapping(target = "urls", source = "urls")
+  PostResponse toPostResponse(Post post, List<String> urls);
 }

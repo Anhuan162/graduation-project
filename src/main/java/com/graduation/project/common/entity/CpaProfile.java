@@ -1,6 +1,5 @@
 package com.graduation.project.common.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,8 +43,7 @@ public class CpaProfile {
   @OneToMany(mappedBy = "cpaProfile", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<GpaProfile> gpaProfiles = new ArrayList<>();
 
-  @JsonIgnore
-  @ManyToOne
+  @OneToOne
   @JoinColumn(name = "user_id")
   private User user;
 }
