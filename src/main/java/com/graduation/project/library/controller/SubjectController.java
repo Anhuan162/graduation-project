@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/admin/subjects")
+@RequestMapping("/api/admin/subjects")
 public class SubjectController {
 
   private final SubjectService subjectService;

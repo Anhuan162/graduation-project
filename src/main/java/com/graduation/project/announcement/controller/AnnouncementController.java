@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/user/announcements")
+@RequestMapping("api/announcements")
 public class AnnouncementController {
 
   private final AnnouncementService announcementService;

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/user/cpa-profile")
+@RequestMapping("/api/cpa-profiles")
 public class CpaProfileController {
 
   public final CpaProfileService cpaProfileService;

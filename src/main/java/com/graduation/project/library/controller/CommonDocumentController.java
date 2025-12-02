@@ -15,7 +15,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/document")
+@RequestMapping("/api/documents")
 @RequiredArgsConstructor
 public class CommonDocumentController {
 

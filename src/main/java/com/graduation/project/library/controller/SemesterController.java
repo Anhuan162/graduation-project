@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/admin/semesters")
+@RequestMapping("/api/admin/semesters")
 public class SemesterController {
 
   private final SemesterService semesterService;

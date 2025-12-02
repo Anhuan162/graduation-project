@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/admin/subject-references")
+@RequestMapping("/api/admin/subject-references")
 public class SubjectReferenceController {
   private final SubjectReferenceService subjectReferenceService;
 

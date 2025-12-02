@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/semester")
+@RequestMapping("/api/semesters")
 @RequiredArgsConstructor
 public class CommonSemesterController {
 

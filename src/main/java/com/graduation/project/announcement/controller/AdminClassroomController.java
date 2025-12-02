@@ -18,7 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/admin/classroom")
+@RequestMapping("api/admin/classrooms")
 @RequiredArgsConstructor
 public class AdminClassroomController {
   private final AdminClassroomService adminClassroomService;
