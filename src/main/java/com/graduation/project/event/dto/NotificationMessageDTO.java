@@ -1,7 +1,7 @@
 package com.graduation.project.event.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.graduation.project.common.entity.NotificationType;
+import com.graduation.project.event.constant.NotificationType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -12,7 +12,6 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NotificationMessageDTO {
-  private UUID eventId;
   private UUID relatedId; // Liên kết đến Announcement/Post
   private NotificationType type; // Loại thông báo
   private String title;

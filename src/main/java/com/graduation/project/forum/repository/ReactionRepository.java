@@ -1,0 +1,23 @@
+package com.graduation.project.forum.repository;
+
+import com.graduation.project.forum.entity.Reaction;
+import com.graduation.project.forum.constant.ReactionType;
+import com.graduation.project.forum.constant.TargetType;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
+
+  // Tìm xem user này đã thả tim vào đối tượng này chưa
+  Optional<Reaction> findByUserIdAndTargetIdAndTargetType(
+      UUID userId, UUID targetId, TargetType targetType);
+
+  // Đếm số lượng cảm xúc (Ví dụ: Bài post này có bao nhiêu TIM?)
+  long countByTargetIdAndTargetTypeAndType(UUID targetId, TargetType targetType, ReactionType type);
+
+  // Đếm tổng số cảm xúc của bài viết
+  long countByTargetIdAndTargetType(UUID targetId, TargetType targetType);
+}

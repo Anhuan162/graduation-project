@@ -1,5 +1,6 @@
 package com.graduation.project.common.entity;
 
+import com.graduation.project.common.constant.Provider;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;

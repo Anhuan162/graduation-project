@@ -1,5 +1,7 @@
 package com.graduation.project.common.entity;
 
+import com.graduation.project.common.constant.PermissionType;
+import com.graduation.project.common.constant.ResourceType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;

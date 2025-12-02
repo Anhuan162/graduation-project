@@ -1,6 +1,6 @@
 package com.graduation.project.event.controller;
 
-import com.graduation.project.common.entity.EventType;
+import com.graduation.project.event.constant.EventType;
 import com.graduation.project.event.dto.EventEnvelope;
 import com.graduation.project.event.producer.StreamProducer;
 import java.time.LocalDateTime;

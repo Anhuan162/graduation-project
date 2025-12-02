@@ -9,6 +9,7 @@ import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.common.dto.PermissionResponse;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.repository.InvalidatedTokenRepository;
+import com.graduation.project.common.entity.User;
 import com.nimbusds.jose.*;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.transaction.Transactional;

@@ -1,0 +1,63 @@
+package com.graduation.project.forum.entity;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.graduation.project.forum.constant.PostStatus;
+import com.graduation.project.common.entity.User;
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.*;
+import lombok.*;
+
+@Entity
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Table(name = "posts")
+public class Post {
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
+
+  private String title;
+
+  @Column(columnDefinition = "TEXT")
+  private String content;
+
+  private LocalDateTime createdDateTime = LocalDateTime.now();
+  private LocalDateTime lastModifiedDateTime = LocalDateTime.now();
+
+  @Builder.Default private PostStatus postStatus = PostStatus.PENDING;
+
+  @ManyToOne
+  @JoinColumn(name = "approved_by")
+  @JsonIgnore
+  private User approvedBy;
+
+  private LocalDateTime approvedAt;
+
+  @JsonIgnore
+  @ManyToOne
+  @JoinColumn(name = "topic_id")
+  private Topic topic;
+
+  @JsonIgnore
+  @ManyToOne
+  @JoinColumn(name = "author_id")
+  private User author;
+
+  @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<Comment> comments = new ArrayList<>();
+
+  @Column(name = "reaction_count")
+  private Long reactionCount = 0L;
+
+  private boolean isDeleted;
+  //  @ManyToMany
+  //  @JoinTable(
+  //      name = "post_tags",
+  //      joinColumns = @JoinColumn(name = "post_id"),
+  //      inverseJoinColumns = @JoinColumn(name = "tag_id"))
+  //  private Set<Tag> tags = new HashSet<>();
+}

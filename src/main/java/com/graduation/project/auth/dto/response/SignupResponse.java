@@ -1,6 +1,6 @@
 package com.graduation.project.auth.dto.response;
 
-import com.graduation.project.common.entity.Provider;
+import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.User;
 import java.util.UUID;
 import lombok.Builder;

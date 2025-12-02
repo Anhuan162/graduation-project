@@ -1,6 +1,8 @@
 package com.graduation.project.common.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.graduation.project.common.constant.AccessType;
+import com.graduation.project.common.constant.ResourceType;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;

@@ -1,8 +1,8 @@
 package com.graduation.project.common.dto;
 
 import com.graduation.project.common.entity.Permission;
-import com.graduation.project.common.entity.PermissionType;
-import com.graduation.project.common.entity.ResourceType;
+import com.graduation.project.common.constant.PermissionType;
+import com.graduation.project.common.constant.ResourceType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

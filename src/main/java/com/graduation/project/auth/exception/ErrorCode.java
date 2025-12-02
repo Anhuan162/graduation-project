@@ -31,6 +31,9 @@ public enum ErrorCode {
   COMMENT_NOT_FOUND(1021, "Comment not found", HttpStatus.NOT_FOUND),
   TOPIC_MEMBER_NOT_FOUND(1022, "Topic member not found", HttpStatus.NOT_FOUND),
   TOPIC_MEMBER_EXISTED(1023, "Topic member existed", HttpStatus.NOT_FOUND),
+  FILE_NOT_FOUND(1024, "File not found", HttpStatus.NOT_FOUND),
+  INVALID_REPORT_TARGET(1025, "Invalid report target", HttpStatus.NOT_FOUND),
+  REPORT_ALREADY_EXISTED(1026, "Report already existed", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;

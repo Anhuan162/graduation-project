@@ -4,7 +4,7 @@ import com.graduation.project.auth.repository.OauthAccountRepository;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.service.TokenService;
 import com.graduation.project.common.entity.OauthAccount;
-import com.graduation.project.common.entity.Provider;
+import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.Role;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.repository.RoleRepository;

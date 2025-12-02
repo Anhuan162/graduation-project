@@ -1,7 +1,7 @@
 package com.graduation.project.auth.repository;
 
 import com.graduation.project.common.entity.OauthAccount;
-import com.graduation.project.common.entity.Provider;
+import com.graduation.project.common.constant.Provider;
 import java.util.Optional;
 import java.util.UUID;
 

@@ -1,6 +1,6 @@
 package com.graduation.project.event.dto;
 
-import com.graduation.project.common.entity.EventType;
+import com.graduation.project.event.constant.EventType;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AllArgsConstructor;

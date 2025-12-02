@@ -9,7 +9,7 @@ import com.graduation.project.auth.exception.AppException;
 import com.graduation.project.auth.exception.ErrorCode;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.repository.VerificationTokenRepository;
-import com.graduation.project.common.entity.Provider;
+import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.Role;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.entity.VerificationToken;

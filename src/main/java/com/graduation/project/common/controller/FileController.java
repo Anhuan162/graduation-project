@@ -2,7 +2,7 @@ package com.graduation.project.common.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.common.dto.FileMetadataResponse;
-import com.graduation.project.common.entity.AccessType;
+import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.service.FileService;
 import java.io.IOException;
 import java.util.List;

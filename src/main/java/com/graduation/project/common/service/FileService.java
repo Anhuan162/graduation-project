@@ -6,6 +6,8 @@ import com.graduation.project.auth.permission_handler.FileMetadataPermissionHand
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.auth.service.FirebaseService;
+import com.graduation.project.common.constant.AccessType;
+import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.mapper.FileMetadataMapper;
@@ -15,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
+import com.graduation.project.common.entity.User;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -138,18 +142,23 @@ public class FileService {
   }
 
   public List<FileMetadata> updateFileMetadataList(
-      List<UUID> fileMetadataIds, Post save, UUID userId) {
+      List<UUID> fileMetadataIds, UUID resourceId, ResourceType resourceType, UUID userId) {
     List<FileMetadata> fileMetadataList = fileMetadataRepository.findAllByIdIn(fileMetadataIds);
 
     fileMetadataList.forEach(
         fileMetadata -> {
-          if (!fileMetadata.getUser().getId().equals(userId)) {
-            throw new AppException(ErrorCode.UNAUTHENTICATED);
-          }
-          fileMetadata.setResourceType(ResourceType.POST);
-          fileMetadata.setResourceId(save.getId());
+          updateResourceTarget(resourceId, resourceType, userId, fileMetadata);
         });
     return fileMetadataRepository.saveAll(fileMetadataList);
+  }
+
+  public void updateResourceTarget(
+      UUID resourceId, ResourceType resourceType, UUID userId, FileMetadata fileMetadata) {
+    if (!fileMetadata.getUser().getId().equals(userId)) {
+      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
+    fileMetadata.setResourceType(resourceType);
+    fileMetadata.setResourceId(resourceId);
   }
 
   public void deleteFile(UUID fileId) {
@@ -187,5 +196,10 @@ public class FileService {
           }
           deleteFileFromDbAndStorage(fileMetadata, currentUserService.getCurrentUserEntity());
         });
+  }
+
+  public List<FileMetadata> findFileMetadataByResourceTarget(
+      UUID resourceId, ResourceType resourceType) {
+    return fileMetadataRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
   }
 }

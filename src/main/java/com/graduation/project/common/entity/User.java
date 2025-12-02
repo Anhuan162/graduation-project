@@ -1,6 +1,11 @@
 package com.graduation.project.common.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.graduation.project.common.constant.Provider;
+import com.graduation.project.cpa.entity.CpaProfile;
+import com.graduation.project.forum.entity.Category;
+import com.graduation.project.forum.entity.Topic;
+import com.graduation.project.forum.entity.TopicMember;
 import jakarta.persistence.*;
 import java.util.*;
 import lombok.*;

@@ -1,11 +1,16 @@
 package com.graduation.project.event.service;
 
 import com.graduation.project.auth.repository.UserRepository;
-import com.graduation.project.common.entity.*;
-import com.graduation.project.common.repository.*;
+import com.graduation.project.event.constant.NotificationStatus;
 import com.graduation.project.event.dto.NotificationMessageDTO;
 import com.graduation.project.event.dto.UserNotificationResponse;
 import java.time.LocalDateTime;
+
+import com.graduation.project.event.entity.NotificationEvent;
+import com.graduation.project.event.entity.UserNotification;
+import com.graduation.project.event.repository.NotificationEventRepository;
+import com.graduation.project.event.repository.UserNotificationRepository;
+import com.graduation.project.common.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
