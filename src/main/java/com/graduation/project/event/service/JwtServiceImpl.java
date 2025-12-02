@@ -1,6 +1,6 @@
 package com.graduation.project.event.service;
 
-import com.graduation.project.auth.config.CustomJwtDecoder;
+import com.graduation.project.security.config.CustomJwtDecoder;
 import com.graduation.project.auth.repository.UserRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;

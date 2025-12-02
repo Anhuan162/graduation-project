@@ -1,7 +1,7 @@
 package com.graduation.project.auth.service;
 
-import com.graduation.project.auth.exception.AppException;
-import com.graduation.project.auth.exception.ErrorCode;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.common.entity.User;

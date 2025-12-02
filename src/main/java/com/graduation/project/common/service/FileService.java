@@ -1,11 +1,10 @@
 package com.graduation.project.common.service;
 
-import com.graduation.project.auth.exception.AppException;
-import com.graduation.project.auth.exception.ErrorCode;
-import com.graduation.project.auth.permission_handler.FileMetadataPermissionHandler;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
+import com.graduation.project.common.permission_handler.FileMetadataPermissionHandler;
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.auth.service.FirebaseService;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;

@@ -1,6 +1,6 @@
 package com.graduation.project.library.service;
 
-import com.graduation.project.auth.service.FirebaseService;
+import com.graduation.project.common.service.FirebaseService;
 import com.graduation.project.library.dto.DocumentRequest;
 import com.graduation.project.library.dto.DocumentResponse;
 import com.graduation.project.library.entity.Document;

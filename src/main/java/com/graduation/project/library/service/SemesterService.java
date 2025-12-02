@@ -1,7 +1,7 @@
 package com.graduation.project.library.service;
 
-import com.graduation.project.auth.exception.AppException;
-import com.graduation.project.auth.exception.ErrorCode;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.library.entity.Semester;
 import com.graduation.project.library.repository.SemesterRepository;
 import com.graduation.project.library.dto.SemesterRequest;

@@ -1,6 +1,5 @@
 package com.graduation.project.auth.dto.response;
 
-import com.graduation.project.common.dto.PermissionResponse;
 import java.util.List;
 import lombok.*;
 import lombok.experimental.FieldDefaults;

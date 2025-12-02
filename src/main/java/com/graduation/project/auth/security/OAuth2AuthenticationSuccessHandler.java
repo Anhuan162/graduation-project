@@ -7,7 +7,7 @@ import com.graduation.project.common.entity.OauthAccount;
 import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.Role;
 import com.graduation.project.common.entity.User;
-import com.graduation.project.common.repository.RoleRepository;
+import com.graduation.project.auth.repository.RoleRepository;
 import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.util.List;

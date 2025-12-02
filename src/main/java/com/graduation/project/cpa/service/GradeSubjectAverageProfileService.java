@@ -1,8 +1,8 @@
 package com.graduation.project.cpa.service;
 
 import com.graduation.project.announcement.entity.Faculty;
-import com.graduation.project.auth.exception.AppException;
-import com.graduation.project.auth.exception.ErrorCode;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.cpa.constant.CohortCode;
 import com.graduation.project.cpa.constant.Grade;
 import com.graduation.project.announcement.repository.FacultyRepository;

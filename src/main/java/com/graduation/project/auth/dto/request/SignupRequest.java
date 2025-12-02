@@ -1,7 +1,7 @@
 package com.graduation.project.auth.dto.request;
 
-import com.graduation.project.common.validation.PasswordMatches;
-import com.graduation.project.common.validation.StrongPassword;
+import com.graduation.project.auth.validation.PasswordMatches;
+import com.graduation.project.auth.validation.StrongPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;

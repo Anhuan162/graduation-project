@@ -1,9 +1,9 @@
 package com.graduation.project.auth.service;
 
-import com.graduation.project.auth.exception.AppException;
-import com.graduation.project.auth.exception.ErrorCode;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.common.entity.User;
-import com.graduation.project.common.repository.InvalidatedTokenRepository;
+import com.graduation.project.auth.repository.InvalidatedTokenRepository;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
