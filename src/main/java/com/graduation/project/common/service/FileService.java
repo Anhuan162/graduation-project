@@ -1,23 +1,22 @@
 package com.graduation.project.common.service;
 
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
-import com.graduation.project.common.permission_handler.FileMetadataPermissionHandler;
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;
 import com.graduation.project.common.entity.*;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.common.mapper.FileMetadataMapper;
+import com.graduation.project.common.permission_handler.FileMetadataPermissionHandler;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-
-import com.graduation.project.common.entity.User;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -165,8 +164,8 @@ public class FileService {
         fileMetadataRepository
             .findById(fileId)
             .orElseThrow(() -> new RuntimeException("File not found"));
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (!fileMetadataPermissionHandler.hasPermission(auth, metadata, "DELETE")) {
+    User user = currentUserService.getCurrentUserEntity();
+    if (!user.getId().equals(metadata.getUser().getId())) {
       throw new AccessDeniedException("No permission to delete this file");
     }
     User current = currentUserService.getCurrentUserEntity();
@@ -187,10 +186,11 @@ public class FileService {
   public void deleteAllFiles(List<String> fileIds) {
     List<UUID> fileMetadataIds = fileIds.stream().map(UUID::fromString).toList();
     List<FileMetadata> fileMetadataList = fileMetadataRepository.findAllByIdIn(fileMetadataIds);
+    User user = currentUserService.getCurrentUserEntity();
+
     fileMetadataList.forEach(
         fileMetadata -> {
-          Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-          if (!fileMetadataPermissionHandler.hasPermission(auth, fileMetadata, "DELETE")) {
+          if (!user.getId().equals(fileMetadata.getUser().getId())) {
             throw new AccessDeniedException("No permission to delete this file");
           }
           deleteFileFromDbAndStorage(fileMetadata, currentUserService.getCurrentUserEntity());

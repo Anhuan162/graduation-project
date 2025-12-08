@@ -1,33 +1,29 @@
 package com.graduation.project.announcement.service;
 
-import com.graduation.project.announcement.dto.AnnouncementResponse;
-import com.graduation.project.announcement.dto.CreatedAnnonucementResponse;
-import com.graduation.project.announcement.dto.CreatedAnnouncementRequest;
-import com.graduation.project.announcement.dto.UpdatedAnnouncementRequest;
+import com.graduation.project.announcement.dto.*;
 import com.graduation.project.announcement.entity.Announcement;
 import com.graduation.project.announcement.entity.AnnouncementTarget;
 import com.graduation.project.announcement.entity.Classroom;
+import com.graduation.project.announcement.repository.AnnouncementRepository;
+import com.graduation.project.announcement.repository.ClassroomRepository;
+import com.graduation.project.auth.service.CurrentUserService;
+import com.graduation.project.common.constant.ResourceType;
+import com.graduation.project.common.entity.FileMetadata;
+import com.graduation.project.common.entity.User;
+import com.graduation.project.common.service.FileService;
+import com.graduation.project.cpa.constant.CohortCode;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import com.graduation.project.auth.repository.UserRepository;
-import com.graduation.project.event.constant.EventType;
-import com.graduation.project.event.constant.NotificationType;
-import com.graduation.project.announcement.repository.AnnouncementRepository;
-import com.graduation.project.announcement.repository.AnnouncementTargetRepository;
-import com.graduation.project.announcement.repository.ClassroomRepository;
-import com.graduation.project.event.dto.EventEnvelope;
-import com.graduation.project.event.dto.NotificationMessageDTO;
-import com.graduation.project.event.producer.StreamProducer;
-import com.graduation.project.common.entity.User;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 @RequiredArgsConstructor
@@ -36,42 +32,42 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class AdminAnnouncementService {
   private final AnnouncementRepository announcementRepository;
-  private final AnnouncementTargetRepository announcementTargetRepository;
   private final ClassroomRepository classroomRepository;
-  private final StreamProducer producer;
-  private final UserRepository userRepository;
+  private final CurrentUserService currentUserService;
+  private final ApplicationEventPublisher publisher;
+  private final FileService fileService;
 
+  @Transactional
   public CreatedAnnonucementResponse createAnnouncement(
       CreatedAnnouncementRequest request, User user) {
     Announcement announcement = CreatedAnnouncementRequest.toAnnouncement(request, user);
+    announcementRepository.save(announcement);
 
+    List<FileMetadata> fileMetadataList =
+        fileService.updateFileMetadataList(
+            request.getFileMetadataIds(),
+            announcement.getId(),
+            ResourceType.ANNOUNCEMENT,
+            user.getId());
+    List<String> urls = fileMetadataList.stream().map(FileMetadata::getUrl).toList();
+    return CreatedAnnonucementResponse.from(announcement, urls);
+  }
+
+  public void releaseAnnouncement(UUID announcementId, ReleaseAnnouncementRequest request) {
+    Announcement announcement = announcementRepository.findById(announcementId).orElseThrow();
     Set<String> allClassroomCodes =
         getAllClassroomCodes(
             request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
 
     List<AnnouncementTarget> announcementTargets =
         generateAnnouncementTargets(allClassroomCodes, announcement);
-
-    announcement.setTargets(announcementTargets);
+    announcement.getTargets().addAll(announcementTargets);
     announcementRepository.save(announcement);
 
-    List<User> receivedUsers = userRepository.findAllByRoleName("USER");
-    List<UUID> receiverUserIds = receivedUsers.stream().map(User::getId).toList();
-    NotificationMessageDTO dto =
-        NotificationMessageDTO.builder()
-            .relatedId(announcement.getId())
-            .type(NotificationType.ANNOUNCEMENT)
-            .title(announcement.getTitle())
-            .content(announcement.getContent())
-            .senderId(user.getId())
-            .senderName(user.getEmail())
-            .receiverIds(receiverUserIds) // build list of UUID receivers
-            .createdAt(LocalDateTime.now())
-            .build();
-    EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "ANNOUNCEMENT");
-    producer.publish(eventEnvelope);
+    AnnouncementCreatedEvent announcementCreatedEvent =
+        AnnouncementCreatedEvent.from(announcement, allClassroomCodes);
 
-    return CreatedAnnonucementResponse.from(announcement);
+    publisher.publishEvent(announcementCreatedEvent);
   }
 
   private static List<AnnouncementTarget> generateAnnouncementTargets(
@@ -81,7 +77,6 @@ public class AdminAnnouncementService {
             classroomCode -> {
               return AnnouncementTarget.builder()
                   .classroomCode(classroomCode)
-                  .id(UUID.randomUUID())
                   .announcement(announcement)
                   .build();
             })
@@ -89,7 +84,7 @@ public class AdminAnnouncementService {
   }
 
   private Set<String> getAllClassroomCodes(
-      List<String> schoolYearCodes, List<UUID> facultyIds, List<String> classCodes) {
+      List<CohortCode> schoolYearCodes, List<UUID> facultyIds, List<String> classCodes) {
     Set<String> allClassroomCodes = new HashSet<>();
     if (Objects.nonNull(schoolYearCodes)) {
       List<String> classroomCodeBySchoolYearCodes =
@@ -117,7 +112,7 @@ public class AdminAnnouncementService {
       String announcementId, UpdatedAnnouncementRequest request, User user) {
     Announcement announcement =
         announcementRepository
-            .findById(announcementId)
+            .findById(UUID.fromString(announcementId))
             .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
     announcement.setTitle(request.getTitle());
@@ -137,15 +132,61 @@ public class AdminAnnouncementService {
   public AnnouncementResponse getAnnouncement(String announcementId) {
     var announcement =
         announcementRepository
-            .findById(announcementId)
+            .findById(UUID.fromString(announcementId))
             .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
     return AnnouncementResponse.from(announcement);
   }
 
-//  ThieuNN
-  public Page<AnnouncementResponse> getAnnouncements(Integer pageNumber, Integer pageSize) {
-    Pageable pageable = PageRequest.of(pageNumber, pageSize);
-    Page<Announcement> announcementPage = announcementRepository.findAll(pageable);
+  //  ThieuNN
+  public Page<AnnouncementResponse> searchAnnouncement(
+      SearchAnnouncementRequest request, Pageable pageable) {
+    Specification<Announcement> specification =
+        (root, query, cb) -> {
+          List<Predicate> predicates = new ArrayList<>();
+
+          if (Objects.nonNull(request.getTitle())) {
+            predicates.add(
+                cb.like(root.get("title").as(String.class), "%" + request.getTitle() + "%"));
+          }
+
+          if (Objects.nonNull(request.getAnnouncementType())) {
+            predicates.add(
+                cb.equal(
+                    root.get("announcementType").as(String.class), request.getAnnouncementType()));
+          }
+
+          if (Objects.nonNull(request.getAnnouncementStatus())) {
+            predicates.add(
+                cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
+          }
+
+          if (Objects.nonNull(request.getFromDate())) {
+            predicates.add(
+                cb.greaterThanOrEqualTo(
+                    root.get("createdDate"), request.getFromDate().atStartOfDay()));
+          }
+
+          if (Objects.nonNull(request.getToDate())) {
+            predicates.add(
+                cb.lessThanOrEqualTo(
+                    root.get("createdDate"), request.getToDate().atTime(23, 59, 59)));
+          }
+
+          Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDate")));
+
+          return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+    Page<Announcement> announcementPage = announcementRepository.findAll(specification, pageable);
     return announcementPage.map(AnnouncementResponse::from);
+  }
+
+  public void deleteAnnouncement(String announcementId) {
+    Announcement announcement =
+        announcementRepository
+            .findById(UUID.fromString(announcementId))
+            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+
+    announcementRepository.delete(announcement);
   }
 }

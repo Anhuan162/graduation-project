@@ -1,40 +1,37 @@
 package com.graduation.project.library.controller;
 
-import com.graduation.project.library.dto.SubjectResponse;
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.library.service.CommonSubjectService;
+import com.graduation.project.cpa.constant.CohortCode;
+import com.graduation.project.library.dto.SubjectResponse;
+import com.graduation.project.library.service.SubjectService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/subjects")
 @RequiredArgsConstructor
 public class CommonSubjectController {
 
-    private final CommonSubjectService subjectService;
+  private final SubjectService subjectService;
 
-    @GetMapping("/search")
-    public ApiResponse<List<SubjectResponse>> search(
-            @RequestParam()String facultyId,
-            @RequestParam()String semesterId
-            ) {
-        UUID UUIDfacultyId = null;
-        UUID UUIDsemesterId = null;
-        try {
-            UUIDsemesterId = UUID.fromString(semesterId);
-        } catch (Exception e) {}
-
-        try {
-            UUIDfacultyId = UUID.fromString(facultyId);
-        } catch (Exception e) {}
-        List<SubjectResponse> res =
-                subjectService.searchSubjectByFacultyIdAndSemesterId(UUIDfacultyId, UUIDsemesterId);
-        return ApiResponse.<List<SubjectResponse>>builder().result(res).build();
-    }
+  @GetMapping("/search")
+  public ApiResponse<Page<SubjectResponse>> search(
+      @RequestParam(required = false) UUID facultyId,
+      @RequestParam(required = false) Integer semesterId,
+      @RequestParam(required = false) CohortCode cohortCode,
+      @RequestParam(required = false) String subjectName,
+      @PageableDefault(page = 0, size = 10, sort = "createdDate", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    Page<SubjectResponse> res =
+        subjectService.searchSubjects(facultyId, semesterId, cohortCode, subjectName, pageable);
+    return ApiResponse.<Page<SubjectResponse>>builder().result(res).build();
+  }
 }

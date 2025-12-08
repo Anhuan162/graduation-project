@@ -4,8 +4,12 @@ import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.cpa.dto.CpaProfileRequest;
 import com.graduation.project.cpa.dto.CpaProfileResponse;
 import com.graduation.project.cpa.service.CpaProfileService;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
@@ -53,9 +57,12 @@ public class CpaProfileController {
   }
 
   @GetMapping
-  public ApiResponse<List<CpaProfileResponse>> getCpaProfiles() {
-    return ApiResponse.<List<CpaProfileResponse>>builder()
-        .result(cpaProfileService.getCpaProfiles())
+  @PreAuthorize("hasRole('ADMIN')")
+  public ApiResponse<Page<CpaProfileResponse>> getCpaProfiles(
+      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ApiResponse.<Page<CpaProfileResponse>>builder()
+        .result(cpaProfileService.getCpaProfiles(pageable))
         .build();
   }
 

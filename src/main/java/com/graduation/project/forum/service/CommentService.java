@@ -1,18 +1,12 @@
 package com.graduation.project.forum.service;
 
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.event.constant.EventType;
-import com.graduation.project.event.constant.NotificationType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.*;
-import com.graduation.project.forum.entity.Comment;
-import com.graduation.project.forum.entity.Post;
-import com.graduation.project.forum.repository.CommentRepository;
-import com.graduation.project.forum.repository.PostRepository;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
+import com.graduation.project.event.constant.EventType;
 import com.graduation.project.event.dto.ActivityLogDTO;
 import com.graduation.project.event.dto.EventEnvelope;
 import com.graduation.project.event.dto.NotificationMessageDTO;
@@ -20,14 +14,21 @@ import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.forum.dto.CommentRequest;
 import com.graduation.project.forum.dto.CommentResponse;
 import com.graduation.project.forum.dto.CommentWithReplyCountResponse;
+import com.graduation.project.forum.dto.SearchCommentRequest;
+import com.graduation.project.forum.entity.Comment;
+import com.graduation.project.forum.entity.Post;
+import com.graduation.project.forum.repository.CommentRepository;
+import com.graduation.project.forum.repository.PostRepository;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
+import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import com.graduation.project.common.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +56,9 @@ public class CommentService {
             .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
-    validateViewPermission(post, user);
+    if (authorizationService.canViewTopic(post.getTopic(), user)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
 
     Comment comment = buildComment(post, null, user, request.getContent());
     commentRepository.save(comment);
@@ -66,7 +69,7 @@ public class CommentService {
     sendNotification(
         comment,
         user,
-        List.of(post.getAuthor().getId()),
+        Set.of(post.getAuthor().getId()),
         NOTI_TITLE_COMMENT,
         user.getFullName() + " đã bình luận vào bài viết của bạn");
 
@@ -87,7 +90,9 @@ public class CommentService {
             .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
-
+    if (authorizationService.canViewTopic(parent.getPost().getTopic(), user)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
     // Reply vẫn thuộc về Post của parent
     Comment reply = buildComment(parent.getPost(), parent, user, request.getContent());
     commentRepository.save(reply);
@@ -101,7 +106,7 @@ public class CommentService {
       sendNotification(
           reply,
           user,
-          List.of(parent.getPost().getAuthor().getId()),
+          Set.of(parent.getPost().getAuthor().getId()),
           NOTI_TITLE_COMMENT,
           user.getFullName() + " đã bình luận vào bài viết của bạn");
     }
@@ -111,7 +116,7 @@ public class CommentService {
       sendNotification(
           reply,
           user,
-          List.of(parent.getAuthor().getId()),
+          Set.of(parent.getAuthor().getId()),
           NOTI_TITLE_COMMENT,
           user.getFullName() + " đã phản hồi bình luận của bạn");
     }
@@ -144,12 +149,6 @@ public class CommentService {
     return comments.map(c -> toResponse(c, fileMap.get(c.getId())));
   }
 
-  private void validateViewPermission(Post post, User user) {
-    if (authorizationService.canViewTopic(post.getTopic(), user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
-  }
-
   private Comment buildComment(Post post, Comment parent, User user, String content) {
     return Comment.builder()
         .post(post)
@@ -157,6 +156,7 @@ public class CommentService {
         .author(user)
         .content(content)
         .createdDateTime(LocalDateTime.now())
+        .reactionCount(0L)
         .build();
   }
 
@@ -174,13 +174,13 @@ public class CommentService {
   }
 
   private void sendNotification(
-      Comment comment, User sender, List<UUID> receiverIds, String title, String content) {
+      Comment comment, User sender, Set<UUID> receiverIds, String title, String content) {
     if (receiverIds.isEmpty()) return;
 
     NotificationMessageDTO dto =
         NotificationMessageDTO.builder()
             .relatedId(comment.getId())
-            .type(NotificationType.COMMENT)
+            .type(ResourceType.COMMENT)
             .title(title)
             .content(content)
             .senderId(sender.getId())
@@ -205,27 +205,79 @@ public class CommentService {
         .authorId(c.getAuthor().getId())
         .createdDateTime(c.getCreatedDateTime())
         .url(url)
+        .reactionCount(c.getReactionCount())
         .build();
+  }
+
+  @Transactional
+  public CommentResponse updateComment(String commentId, CommentRequest request) {
+    Comment comment =
+        commentRepository
+            .findById(UUID.fromString(commentId))
+            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    User user = currentUserService.getCurrentUserEntity();
+    if (!authorizationService.isCommentCreator(comment, user)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+    comment.setContent(request.getContent());
+    commentRepository.save(comment);
+
+    String fileUrl = handleFileMetadata(request.getFileMetadataId(), comment, user);
+
+    return toResponse(comment, fileUrl);
   }
 
   // updateComment và deleteComment giữ nguyên logic nhưng nên dùng helper
   // sendNotification/logActivity
   @Transactional
-  public void deleteComment(String commentId) {
+  public void softDeleteComment(String commentId) {
     Comment comment =
         commentRepository
             .findById(UUID.fromString(commentId))
             .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
 
-    if (!comment.getAuthor().getId().equals(user.getId()) && !authorizationService.isAdmin(user)) {
+    if (!authorizationService.canSoftDeleteComment(comment, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-
-    // Soft delete bằng flag (Recommended)
-    // comment.setDeleted(true);
-    // Nếu giữ logic cũ:
-    comment.setContent("[Comment này đã bị xóa]");
+    comment.setDeleted(true);
     // Nên xóa luôn liên kết file nếu cần
+    commentRepository.save(comment);
+  }
+
+  @Transactional
+  public Page<CommentResponse> searchComments(SearchCommentRequest request, Pageable pageable) {
+    Specification<Comment> spec =
+        (root, query, cb) -> {
+          List<Predicate> predicates = new ArrayList<>();
+
+          if (Objects.nonNull(request.getAuthorId())) {
+            predicates.add(cb.equal(root.get("user").get("id"), request.getAuthorId()));
+          }
+
+          if (Objects.nonNull(request.getIsDeleted())) {
+            predicates.add(cb.equal(root.get("isDeleted"), request.getIsDeleted()));
+          }
+
+          if (Objects.nonNull(request.getPostId())) {
+            predicates.add(cb.equal(root.get("post").get("id"), request.getPostId()));
+          }
+
+          if (request.getFromDate() != null) {
+            predicates.add(
+                cb.greaterThanOrEqualTo(
+                    root.get("createdDateTime"), request.getFromDate().atStartOfDay()));
+          }
+          if (request.getToDate() != null) {
+            predicates.add(
+                cb.lessThanOrEqualTo(
+                    root.get("createdDateTime"), request.getToDate().atTime(23, 59, 59)));
+          }
+
+          Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDateTime")));
+
+          return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    return commentRepository.findAll(spec, pageable);
   }
 }

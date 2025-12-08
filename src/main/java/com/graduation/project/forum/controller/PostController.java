@@ -7,6 +7,8 @@ import com.graduation.project.forum.service.PostService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,6 +44,12 @@ public class PostController {
     return ApiResponse.<String>builder().result("Deleted successfully").build();
   }
 
+  @DeleteMapping("soft-delete/{postId}")
+  public ApiResponse<String> softDelete(@PathVariable String postId) {
+    postService.softDelete(postId);
+    return ApiResponse.<String>builder().result("Deleted successfully").build();
+  }
+
   @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
   public ApiResponse<List<PostResponse>> getAll() {
@@ -49,9 +57,10 @@ public class PostController {
   }
 
   @GetMapping("/topic/{topicId}")
-  public ApiResponse<List<PostResponse>> getByTopic(@PathVariable UUID topicId) {
-    return ApiResponse.<List<PostResponse>>builder()
-        .result(postService.getByTopic(topicId))
+  public ApiResponse<Page<PostResponse>> getPostsByTopic(
+      @PathVariable UUID topicId, Pageable pageable) {
+    return ApiResponse.<Page<PostResponse>>builder()
+        .result(postService.getPostsByTopic(topicId, pageable))
         .build();
   }
 

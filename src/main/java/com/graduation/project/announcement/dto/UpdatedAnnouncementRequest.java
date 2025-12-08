@@ -5,6 +5,8 @@ import com.graduation.project.common.entity.User;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+
+import com.graduation.project.cpa.constant.CohortCode;
 import lombok.Builder;
 import lombok.Value;
 
@@ -17,7 +19,7 @@ public class UpdatedAnnouncementRequest {
   String announcementType;
   List<UUID> facultyIds;
   List<String> classCodes;
-  List<String> schoolYearCodes;
+  List<CohortCode> schoolYearCodes;
 
   public static Announcement toAnnouncement(UpdatedAnnouncementRequest request, User user) {
     return Announcement.builder()

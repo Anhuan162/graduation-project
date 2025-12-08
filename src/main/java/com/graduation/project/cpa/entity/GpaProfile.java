@@ -2,6 +2,7 @@ package com.graduation.project.cpa.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +37,8 @@ public class GpaProfile {
 
   @Column(name = "total_weighted_score")
   private Double totalWeightedScore;
+
+  private LocalDateTime createdAt;
 
   @JsonIgnore
   @ManyToOne(fetch = FetchType.LAZY)

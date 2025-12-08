@@ -13,4 +13,7 @@ public enum ResourceType {
   CATEGORY,
   TOPIC,
   COMMENT,
+  TOPIC_MEMBER,
+  REACTION,
+  REPORT,
 }

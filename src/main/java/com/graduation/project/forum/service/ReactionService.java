@@ -1,28 +1,32 @@
 package com.graduation.project.forum.service;
 
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.service.CurrentUserService;
+import com.graduation.project.common.constant.ResourceType;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.event.constant.EventType;
-import com.graduation.project.event.constant.NotificationType;
+import com.graduation.project.event.dto.EventEnvelope;
+import com.graduation.project.event.dto.NotificationMessageDTO;
+import com.graduation.project.event.producer.StreamProducer;
+import com.graduation.project.forum.constant.ReactionType;
 import com.graduation.project.forum.constant.TargetType;
+import com.graduation.project.forum.dto.ReactionDetailResponse;
+import com.graduation.project.forum.dto.ReactionRequest;
+import com.graduation.project.forum.dto.ReactionSummary;
 import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Reaction;
 import com.graduation.project.forum.repository.CommentRepository;
 import com.graduation.project.forum.repository.PostRepository;
+import com.graduation.project.forum.repository.ReactionCountProjection;
 import com.graduation.project.forum.repository.ReactionRepository;
-import com.graduation.project.event.dto.EventEnvelope;
-import com.graduation.project.event.dto.NotificationMessageDTO;
-import com.graduation.project.event.producer.StreamProducer;
-import com.graduation.project.forum.dto.ReactionRequest;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.UUID;
-
-import com.graduation.project.common.entity.User;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -129,12 +133,12 @@ public class ReactionService {
         NotificationMessageDTO dto =
             NotificationMessageDTO.builder()
                 .relatedId(request.getTargetId()) // ID bài viết hoặc comment
-                .type(NotificationType.REACTION) // Hoặc tạo thêm NotificationType.REACTION
+                .type(ResourceType.REACTION) // Hoặc tạo thêm NotificationType.REACTION
                 .title(title)
                 .content(content)
                 .senderId(sender.getId())
                 .senderName(sender.getFullName()) // Hoặc email
-                .receiverIds(Collections.singletonList(receiver.getId())) // List chứa 1 người
+                .receiverIds(Collections.singleton(receiver.getId())) // List chứa 1 người
                 .createdAt(java.time.LocalDateTime.now())
                 .build();
 
@@ -149,5 +153,71 @@ public class ReactionService {
       // Log lỗi nhưng KHÔNG throw exception để tránh rollback transaction của việc Like
       log.error("Failed to send reaction notification", e);
     }
+  }
+
+  @Transactional(readOnly = true)
+  public ReactionSummary getReactionSummary(UUID targetId, TargetType targetType) {
+    // 1. Lấy thống kê số lượng (Group by Type)
+    List<ReactionCountProjection> projections =
+        reactionRepository.countReactionsByTarget(targetId, targetType);
+
+    // Convert List Projection sang Map<Type, Long>
+    Map<ReactionType, Long> counts =
+        projections.stream()
+            .collect(
+                Collectors.toMap(
+                    ReactionCountProjection::getType, ReactionCountProjection::getCount));
+
+    // Tính tổng số reaction
+    long total = counts.values().stream().mapToLong(Long::longValue).sum();
+
+    // 2. Kiểm tra user hiện tại đã thả gì chưa (để highlight nút like)
+    ReactionType currentUserReaction = null;
+    try {
+      UUID currentUserId = currentUserService.getCurrentUserId();
+      // Nếu user chưa login thì currentUserId có thể null hoặc throw exception, cần handle tùy
+      // logic auth của bạn
+      if (currentUserId != null) {
+        Optional<Reaction> myReaction =
+            reactionRepository.findByUserIdAndTargetIdAndTargetType(
+                currentUserId, targetId, targetType);
+        if (myReaction.isPresent()) {
+          currentUserReaction = myReaction.get().getType();
+        }
+      }
+    } catch (Exception e) {
+      // User chưa login, bỏ qua
+    }
+
+    return ReactionSummary.builder()
+        .targetId(targetId)
+        .counts(counts)
+        .totalReactions(total)
+        .userReaction(currentUserReaction)
+        .build();
+  }
+
+  @Transactional(readOnly = true)
+  public Page<ReactionDetailResponse> getReactions(
+      UUID targetId, TargetType targetType, ReactionType filterType, Pageable pageable) {
+    Page<Reaction> page;
+
+    if (filterType != null) {
+      page =
+          reactionRepository.findAllByTargetIdAndTargetTypeAndType(
+              targetId, targetType, filterType, pageable);
+    } else {
+      page = reactionRepository.findAllByTargetIdAndTargetType(targetId, targetType, pageable);
+    }
+
+    // Map Entity sang DTO
+    return page.map(
+        reaction ->
+            ReactionDetailResponse.builder()
+                .userId(reaction.getUser().getId())
+                .username(reaction.getUser().getFullName()) // Giả sử User entity có field này
+                //                .avatarUrl(reaction.getUser().getAvatarUrl()) // Giả sử User
+                .type(reaction.getType())
+                .build());
   }
 }

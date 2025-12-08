@@ -1,10 +1,13 @@
 package com.graduation.project.announcement.controller;
 
-import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.announcement.dto.FullAnnouncementResponse;
+import com.graduation.project.announcement.dto.AnnouncementResponse;
 import com.graduation.project.announcement.service.AnnouncementService;
-import java.util.List;
+import com.graduation.project.auth.dto.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,9 +20,11 @@ public class AnnouncementController {
   private final AnnouncementService announcementService;
 
   @GetMapping
-  public ApiResponse<List<FullAnnouncementResponse>> getAnnouncements() {
-    return ApiResponse.<List<FullAnnouncementResponse>>builder()
-        .result(announcementService.getAllAnnouncements())
+  public ApiResponse<Page<AnnouncementResponse>> searchAnnouncements(
+      @PageableDefault(page = 0, size = 10, sort = "createdDate", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ApiResponse.<Page<AnnouncementResponse>>builder()
+        .result(announcementService.searchAnnouncements(pageable))
         .build();
   }
 }

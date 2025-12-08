@@ -5,11 +5,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.*;
 
-import lombok.Builder;
-import lombok.Value;
-
-@Value
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
 @Builder
 public class AnnouncementResponse {
   UUID id;
@@ -17,6 +17,8 @@ public class AnnouncementResponse {
   String content;
   String announcementType;
   Boolean announcementStatus;
+  String createdBy;
+  LocalDate createdDate;
   String modifiedBy;
   LocalDate modifiedDate;
 
@@ -25,12 +27,15 @@ public class AnnouncementResponse {
         .id(announcement.getId())
         .title(announcement.getTitle())
         .content(announcement.getContent())
+        .announcementStatus(announcement.getAnnouncementStatus())
+        .announcementType(String.valueOf(announcement.getAnnouncementType()))
+        .createdBy(announcement.getCreatedBy().getEmail())
+        .createdDate(announcement.getCreatedDate())
         .modifiedBy(
             Objects.nonNull(announcement.getModifiedBy())
                 ? announcement.getModifiedBy().getFullName()
                 : "")
         .modifiedDate(announcement.getModifiedDate())
-        .announcementStatus(announcement.getAnnouncementStatus())
         .build();
   }
 

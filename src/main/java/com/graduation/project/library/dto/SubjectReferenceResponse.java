@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SubjectReferenceResponse {
+  private String subjectReferenceId;
   private String subjectId;
   private String facultyId;
   private Integer semesterId;
@@ -19,6 +20,7 @@ public class SubjectReferenceResponse {
   public static SubjectReferenceResponse toSubjectReferenceResponse(
       SubjectReference subjectReference) {
     return SubjectReferenceResponse.builder()
+        .subjectReferenceId(String.valueOf(subjectReference.getId()))
         .facultyId(String.valueOf(subjectReference.getFaculty().getId()))
         .semesterId(subjectReference.getSemester().getId())
         .subjectId(String.valueOf(subjectReference.getSubject().getId()))

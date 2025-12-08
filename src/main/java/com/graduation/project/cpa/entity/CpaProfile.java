@@ -2,6 +2,7 @@ package com.graduation.project.cpa.entity;
 
 import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,6 +40,8 @@ public class CpaProfile {
 
   @Column(name = "accumulated_credits")
   private int accumulatedCredits;
+
+  private LocalDateTime createdAt;
 
   @Builder.Default
   @OneToMany(mappedBy = "cpaProfile", cascade = CascadeType.ALL, orphanRemoval = true)

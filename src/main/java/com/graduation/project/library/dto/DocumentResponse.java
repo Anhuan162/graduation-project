@@ -4,6 +4,8 @@ import com.graduation.project.library.constant.DocumentType;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 @Builder
 public class DocumentResponse {
@@ -12,4 +14,5 @@ public class DocumentResponse {
     private DocumentType documentType;
     private String urlDoc;
     private String urlImage;
+    private UUID subjectId;
 }

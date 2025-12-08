@@ -1,15 +1,14 @@
 package com.graduation.project.forum.service;
 
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.service.CurrentUserService;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.forum.constant.CategoryType;
 import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.forum.constant.TopicVisibility;
 import com.graduation.project.forum.entity.Category;
+import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Topic;
-import com.graduation.project.common.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -19,22 +18,28 @@ public class AuthorizationService {
 
   private final CurrentUserService currentUserService;
 
-  public boolean canNotManageTopic(User currentUser, Topic topic) {
+  public boolean canManageTopic(User currentUser, Topic topic) {
     boolean isAdmin = isAdmin(currentUser);
     boolean isCreator = isTopicCreator(currentUser, topic);
-    return !isAdmin && !isCreator;
+    return isAdmin || isCreator;
   }
 
-  public void checkCanCreateTopic(Category category, User user) {
+  public boolean canCreateTopic(Category category, User user) {
     if (category.getCategoryType() == CategoryType.CLUB
         || category.getCategoryType() == CategoryType.CLASSROOM) {
-      if (!isAdmin(user)) {
-        throw new AppException(ErrorCode.UNAUTHORIZED);
-      }
+      return isAdmin(user);
     }
+    return false;
   }
 
-  public boolean canDeletePost(Post p, User u) {
+  public boolean canCreatePost(Topic topic, User user) {
+    if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) {
+      return true;
+    }
+    return isTopicMember(user, topic);
+  }
+
+  public boolean canSoftDeletePost(Post p, User u) {
     if (isAdmin(u)) return true;
     if (isPostCreator(p, u)) return true;
     if (isTopicCreator(u, p.getTopic())) return true;
@@ -47,7 +52,11 @@ public class AuthorizationService {
 
   public boolean canViewTopic(Topic topic, User user) {
     if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) return true;
-    return isTopicMember(user, topic) || isAdmin(user);
+    return isTopicMember(user, topic) || canManageTopic(user, topic);
+  }
+
+  public boolean canSoftDeleteComment(Comment comment, User user) {
+    return isCommentCreator(comment, user) || canSoftDeletePost(comment.getPost(), user);
   }
 
   private static boolean isTopicCreator(User currentUser, Topic topic) {
@@ -70,5 +79,9 @@ public class AuthorizationService {
   private boolean isTopicMember(User user, Topic topic) {
     return topic.getTopicMembers().stream()
         .anyMatch(m -> m.getUser().getId().equals(user.getId()) && m.isApproved());
+  }
+
+  public boolean isCommentCreator(Comment comment, User user) {
+    return comment.getAuthor().getId().equals(user.getId());
   }
 }

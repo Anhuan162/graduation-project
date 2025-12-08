@@ -40,6 +40,8 @@ public class User {
 
   private String studentCode;
 
+  private String classCode;
+
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<FileMetadata> fileMetadata;
 

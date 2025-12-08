@@ -17,4 +17,5 @@ public class CommentResponse {
   private UUID authorId;
   private LocalDateTime createdDateTime;
   private String url;
+  private Long reactionCount;
 }

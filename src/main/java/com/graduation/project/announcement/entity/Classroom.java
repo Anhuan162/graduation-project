@@ -1,5 +1,6 @@
 package com.graduation.project.announcement.entity;
 
+import com.graduation.project.cpa.constant.CohortCode;
 import jakarta.persistence.*;
 import java.util.UUID;
 import lombok.Getter;
@@ -30,6 +31,7 @@ public class Classroom {
   @Column(name = "ended_year")
   private int endedYear;
 
+  @Enumerated(EnumType.STRING)
   @Column(name = "school_year_code")
-  private String schoolYearCode;
+  private CohortCode schoolYearCode;
 }

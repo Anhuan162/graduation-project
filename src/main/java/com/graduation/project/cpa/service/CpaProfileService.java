@@ -1,24 +1,26 @@
 package com.graduation.project.cpa.service;
 
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.cpa.entity.CpaProfile;
-import com.graduation.project.cpa.entity.GpaProfile;
-import com.graduation.project.cpa.constant.Grade;
 import com.graduation.project.common.entity.User;
-import com.graduation.project.cpa.repository.CpaProfileRepository;
-import com.graduation.project.cpa.repository.GpaProfileRepository;
+import com.graduation.project.cpa.constant.Grade;
 import com.graduation.project.cpa.dto.CpaProfileRequest;
 import com.graduation.project.cpa.dto.CpaProfileResponse;
 import com.graduation.project.cpa.dto.GpaProfileRequest;
+import com.graduation.project.cpa.entity.CpaProfile;
+import com.graduation.project.cpa.entity.GpaProfile;
 import com.graduation.project.cpa.mapper.CpaProfileMapper;
+import com.graduation.project.cpa.repository.CpaProfileRepository;
+import com.graduation.project.cpa.repository.GpaProfileRepository;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Transactional
@@ -139,10 +141,9 @@ public class CpaProfileService {
     cpaProfileRepository.deleteById(UUID.fromString(cpaProfileId));
   }
 
-  public List<CpaProfileResponse> getCpaProfiles() {
-    User user = currentUserService.getCurrentUserEntity();
-    List<CpaProfile> cpaProfiles = cpaProfileRepository.findAllByUserId(user.getId());
-    return cpaProfiles.stream().map(cpaProfileMapper::toCpaProfileInfoResponse).toList();
+  public Page<CpaProfileResponse> getCpaProfiles(Pageable pageable) {
+    Page<CpaProfile> cpaProfiles = cpaProfileRepository.findAll(pageable);
+    return cpaProfiles.map(cpaProfileMapper::toCpaProfileInfoResponse);
   }
 
   public CpaProfileResponse getCpaProfile(String cpaProfileId) {

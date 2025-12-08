@@ -1,12 +1,13 @@
 package com.graduation.project.announcement.service;
 
-import com.graduation.project.announcement.repository.AnnouncementRepository;
-import com.graduation.project.announcement.dto.FullAnnouncementResponse;
+import com.graduation.project.announcement.dto.AnnouncementResponse;
+import com.graduation.project.announcement.entity.Announcement;
 import com.graduation.project.announcement.mapper.AnnouncementMapper;
-import java.util.List;
-
+import com.graduation.project.announcement.repository.AnnouncementRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @RequiredArgsConstructor
@@ -16,7 +17,8 @@ public class AnnouncementService {
   private final AnnouncementRepository announcementRepository;
   private final AnnouncementMapper announcementMapper;
 
-  public List<FullAnnouncementResponse> getAllAnnouncements() {
-    return announcementMapper.toResponseList(announcementRepository.findAll());
+  public Page<AnnouncementResponse> searchAnnouncements(Pageable pageable) {
+    Page<Announcement> announcementPage = announcementRepository.findAll(pageable);
+    return announcementPage.map(announcementMapper::toResponse);
   }
 }

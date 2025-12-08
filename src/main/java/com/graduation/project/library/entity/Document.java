@@ -1,10 +1,10 @@
 package com.graduation.project.library.entity;
 
+import com.graduation.project.common.entity.User;
 import com.graduation.project.library.constant.DocumentStatus;
 import com.graduation.project.library.constant.DocumentType;
 import com.graduation.project.library.constant.VisibilityStatus;
 import com.graduation.project.library.dto.DocumentResponse;
-import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -65,11 +65,12 @@ public class Document {
 
   public DocumentResponse toDocumentResponse() {
     return DocumentResponse.builder()
-            .title(this.title)
-            .description(this.description)
-            .documentType(this.documentType)
-            .urlDoc(this.filePath)
-            .urlImage(this.imageUrl)
-            .build();
+        .title(this.title)
+        .description(this.description)
+        .documentType(this.documentType)
+        .urlDoc(this.filePath)
+        .urlImage(this.imageUrl)
+        .subjectId(this.id)
+        .build();
   }
 }

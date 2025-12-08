@@ -45,5 +45,6 @@ public class Announcement {
       cascade = CascadeType.ALL,
       orphanRemoval = true,
       fetch = FetchType.LAZY)
+  @Builder.Default
   private List<AnnouncementTarget> targets = new ArrayList<>();
 }

@@ -2,19 +2,16 @@ package com.graduation.project.announcement.controller;
 
 import com.graduation.project.announcement.dto.ClassroomResponse;
 import com.graduation.project.announcement.dto.CreatedClassroomRequest;
+import com.graduation.project.announcement.dto.FilterClassroomResponse;
 import com.graduation.project.announcement.dto.UpdatedClassroomRequest;
 import com.graduation.project.announcement.service.AdminClassroomService;
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.announcement.entity.Classroom;
-import com.graduation.project.common.entity.User;
+import com.graduation.project.cpa.constant.CohortCode;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -41,9 +38,24 @@ public class AdminClassroomController {
   }
 
   @GetMapping
-  public ApiResponse<List<ClassroomResponse>> getAllClassrooms() {
-    return ApiResponse.<List<ClassroomResponse>>builder()
-        .result(adminClassroomService.getAllClassrooms())
+  public ApiResponse<Page<ClassroomResponse>> searchAllClassrooms(
+      @RequestParam(required = false) String classCode,
+      @RequestParam(required = false) UUID facultyId,
+      @RequestParam(required = false) CohortCode schoolYearCode,
+      Pageable pageable) {
+    return ApiResponse.<Page<ClassroomResponse>>builder()
+        .result(
+            adminClassroomService.searchAllClassrooms(
+                classCode, facultyId, schoolYearCode, pageable))
+        .build();
+  }
+
+  @GetMapping("/classroom-codes")
+  public ApiResponse<List<FilterClassroomResponse>> getClassroomsByFacultyIdAndSchoolYearCode(
+      @RequestParam(required = false) UUID facultyId,
+      @RequestParam(required = false) CohortCode schoolYearCode) {
+    return ApiResponse.<List<FilterClassroomResponse>>builder()
+        .result(adminClassroomService.getClassroomsForFilter(facultyId, schoolYearCode))
         .build();
   }
 
@@ -53,12 +65,12 @@ public class AdminClassroomController {
     return ApiResponse.<Void>builder().message("Deleted successfully").build();
   }
 
-  @GetMapping("/search")
-  public ResponseEntity<?> search(
-      @RequestParam Map<String, String> params,
-      Pageable pageable,
-      @AuthenticationPrincipal User user) {
-    Page<Classroom> page = adminClassroomService.search(params, pageable, user);
-    return ResponseEntity.ok(page);
-  }
+  //  @GetMapping("/search")
+  //  public ResponseEntity<?> search(
+  //      @RequestParam Map<String, String> params,
+  //      Pageable pageable,
+  //      @AuthenticationPrincipal User user) {
+  //    Page<Classroom> page = adminClassroomService.search(params, pageable, user);
+  //    return ResponseEntity.ok(page);
+  //  }
 }

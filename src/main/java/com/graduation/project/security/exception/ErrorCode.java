@@ -34,6 +34,7 @@ public enum ErrorCode {
   FILE_NOT_FOUND(1024, "File not found", HttpStatus.NOT_FOUND),
   INVALID_REPORT_TARGET(1025, "Invalid report target", HttpStatus.NOT_FOUND),
   REPORT_ALREADY_EXISTED(1026, "Report already existed", HttpStatus.NOT_FOUND),
+  REPORT_NOT_FOUND(1026, "Report not found", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;

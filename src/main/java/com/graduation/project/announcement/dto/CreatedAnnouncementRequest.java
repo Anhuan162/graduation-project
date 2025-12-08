@@ -1,7 +1,7 @@
 package com.graduation.project.announcement.dto;
 
-import com.graduation.project.announcement.entity.Announcement;
 import com.graduation.project.announcement.constant.AnnouncementType;
+import com.graduation.project.announcement.entity.Announcement;
 import com.graduation.project.common.entity.User;
 import java.time.LocalDate;
 import java.util.List;
@@ -19,9 +19,7 @@ public class CreatedAnnouncementRequest {
   String title;
   String content;
   String announcementType;
-  List<UUID> facultyIds;
-  List<String> classCodes;
-  List<String> schoolYearCodes;
+  List<UUID> fileMetadataIds;
 
   public static Announcement toAnnouncement(CreatedAnnouncementRequest request, User user) {
     return Announcement.builder()

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/admin/semesters")
-public class SemesterController {
+public class AdminSemesterController {
 
   private final SemesterService semesterService;
 

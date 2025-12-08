@@ -1,10 +1,13 @@
 package com.graduation.project.library.dto;
 
+import com.graduation.project.cpa.constant.CohortCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.UUID;
 
 @Data
 @Builder
@@ -12,14 +15,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SubjectReferenceRequest {
   @NotNull(message = "subjectId không được để trống")
-  private String subjectId;
+  private UUID subjectId;
 
   @NotNull(message = "facultyId không được để trống")
-  private String facultyId;
+  private UUID facultyId;
 
   @NotNull(message = "semesterId không được để trống")
   private Integer semesterId;
 
   @NotNull(message = "cohortCode không được để trống")
-  private String cohortCode;
+  private CohortCode cohortCode;
 }

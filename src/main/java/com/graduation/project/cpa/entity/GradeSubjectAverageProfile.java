@@ -3,6 +3,7 @@ package com.graduation.project.cpa.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.graduation.project.library.entity.SubjectReference;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.*;
 
@@ -29,6 +30,8 @@ public class GradeSubjectAverageProfile {
 
   @Column(name = "improvement_score")
   private Double improvementScore;
+
+  private LocalDateTime createdAt;
 
   @JsonIgnore
   @ManyToOne(fetch = FetchType.LAZY)

@@ -35,7 +35,8 @@ public class Topic {
   @Enumerated(EnumType.STRING)
   private TopicVisibility topicVisibility = TopicVisibility.PUBLIC;
 
-  private boolean isDeleted;
+  @Builder.Default
+  private boolean isDeleted = Boolean.FALSE;
 
   @JsonIgnore
   @ManyToOne

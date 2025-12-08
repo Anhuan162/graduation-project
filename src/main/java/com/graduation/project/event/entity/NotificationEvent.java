@@ -1,5 +1,6 @@
 package com.graduation.project.event.entity;
 
+import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.event.constant.NotificationType;
 import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
@@ -32,7 +33,7 @@ public class NotificationEvent {
   private User createdBy;
 
   @Enumerated(EnumType.STRING)
-  private NotificationType type; // ANNOUNCEMENT, SYSTEM...
+  private ResourceType type; // ANNOUNCEMENT, SYSTEM...
 
   private UUID relatedId; // annoucmentId, postId
 }

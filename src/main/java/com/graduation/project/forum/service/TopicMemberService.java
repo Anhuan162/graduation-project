@@ -1,5 +1,6 @@
 package com.graduation.project.forum.service;
 
+import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.repository.UserRepository;
@@ -18,7 +19,9 @@ import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.forum.dto.TopicMemberResponse;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.graduation.project.common.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -74,18 +77,18 @@ public class TopicMemberService {
       topicMember.setApproved(true);
       return TopicMemberResponse.toTopicMemberResponse(topicMemberRepository.save(topicMember));
     }
-    List<UUID> managerIds =
+    Set<UUID> managerIds =
         topic.getTopicMembers().stream()
             .filter(t -> t.getTopicRole().equals(TopicRole.MANAGER))
             .map(TopicMember::getId)
-            .toList();
+            .collect(Collectors.toSet());
     // PRIVATE → pending approval
     topicMember.setApproved(false);
     topicMemberRepository.save(topicMember);
     NotificationMessageDTO dto =
         NotificationMessageDTO.builder()
             .relatedId(topicMember.getId())
-            .type(NotificationType.TOPIC_MEMBER)
+            .type(ResourceType.TOPIC_MEMBER)
             .title("Join Topic")
             .content(user.getFullName() + "want to join your topic")
             .senderId(user.getId())
@@ -116,12 +119,12 @@ public class TopicMemberService {
     NotificationMessageDTO dto =
         NotificationMessageDTO.builder()
             .relatedId(topicMemberId)
-            .type(NotificationType.TOPIC_MEMBER)
+            .type(ResourceType.TOPIC_MEMBER)
             .title("Approve Member")
             .content("Bạn đã được chấp thuận là thành viên của Topic")
             .senderId(current.getId())
             .senderName(current.getEmail())
-            .receiverIds(List.of(tm.getUser().getId())) // build list of UUID receivers
+            .receiverIds(Set.of(tm.getUser().getId())) // build list of UUID receivers
             .createdAt(LocalDateTime.now())
             .build();
     EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");

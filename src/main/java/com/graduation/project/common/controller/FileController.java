@@ -1,11 +1,12 @@
 package com.graduation.project.common.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.common.dto.FileMetadataResponse;
 import com.graduation.project.common.constant.AccessType;
+import com.graduation.project.common.dto.FileMetadataResponse;
 import com.graduation.project.common.service.FileService;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -37,12 +38,12 @@ public class FileController {
   }
 
   @PostMapping("/upload-multiple-files")
-  public List<FileMetadataResponse> uploadMultipleFiles(
+  public ApiResponse<List<FileMetadataResponse>> uploadMultipleFiles(
       @RequestParam("files") List<MultipartFile> files, @RequestParam String folderName)
       throws IOException {
 
     List<FileMetadataResponse> responses = fileService.uploadMultipleFiles(files, folderName);
-    return responses;
+    return ApiResponse.<List<FileMetadataResponse>>builder().result(responses).build();
   }
 
   @PutMapping("/{fileId}/replace")
@@ -67,9 +68,10 @@ public class FileController {
     return ApiResponse.builder().result(null).build();
   }
 
-  @DeleteMapping("/delete-all-files")
-  public ApiResponse<?> deleteAllFiles(@RequestParam List<String> fileIds) {
-    fileService.deleteAllFiles(fileIds);
+  @PostMapping("/delete-all-files")
+  public ApiResponse<?> deleteAllFiles(@RequestBody Map<String, List<String>> request) {
+    // Lấy value theo key "fileIds"
+    fileService.deleteAllFiles(request.get("fileIds"));
     return ApiResponse.builder().result(null).build();
   }
 }

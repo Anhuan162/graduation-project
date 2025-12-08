@@ -1,26 +1,24 @@
 package com.graduation.project.forum.service;
 
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.event.constant.EventType;
 import com.graduation.project.common.constant.ResourceType;
-import com.graduation.project.forum.constant.TopicVisibility;
-import com.graduation.project.forum.entity.Category;
-import com.graduation.project.forum.entity.Topic;
-import com.graduation.project.forum.repository.CategoryRepository;
-import com.graduation.project.forum.repository.TopicRepository;
+import com.graduation.project.common.entity.User;
+import com.graduation.project.event.constant.EventType;
 import com.graduation.project.event.dto.ActivityLogDTO;
 import com.graduation.project.event.dto.EventEnvelope;
 import com.graduation.project.event.producer.StreamProducer;
+import com.graduation.project.forum.constant.TopicVisibility;
 import com.graduation.project.forum.dto.TopicRequest;
 import com.graduation.project.forum.dto.TopicResponse;
+import com.graduation.project.forum.entity.Category;
+import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.mapper.TopicMapper;
-
+import com.graduation.project.forum.repository.CategoryRepository;
+import com.graduation.project.forum.repository.TopicRepository;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import java.util.List;
 import java.util.UUID;
-
-import com.graduation.project.common.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -41,7 +39,10 @@ public class TopicService {
             .findById(categoryId)
             .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
-    authorizationService.checkCanCreateTopic(category, user);
+
+    if (!authorizationService.canCreateTopic(category, user)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
 
     Topic topic = topicMapper.toTopic(request, category, user);
     topicRepository.save(topic);
@@ -85,13 +86,13 @@ public class TopicService {
             .findById(topicId)
             .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
-    if (authorizationService.canNotManageTopic(user, topic)) {
+    if (!authorizationService.canManageTopic(user, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
     topic.setTitle(request.getTitle());
     topic.setContent(request.getContent());
     topic.setTopicVisibility(TopicVisibility.valueOf(request.getTopicVisibility()));
-//    topic.setLastModifiedDateTime(LocalDateTime.now());
+    //    topic.setLastModifiedDateTime(LocalDateTime.now());
 
     topicRepository.save(topic);
     return topicMapper.toTopicResponse(topic);
@@ -101,9 +102,20 @@ public class TopicService {
     Topic topic =
         topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
-    if (authorizationService.canNotManageTopic(user, topic)) {
+    if (authorizationService.isAdmin(user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
     topicRepository.delete(topic);
+  }
+
+  public void softDelete(UUID id) {
+    Topic topic =
+        topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    User user = currentUserService.getCurrentUserEntity();
+    if (!authorizationService.canManageTopic(user, topic)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+    topic.setDeleted(true);
+    topicRepository.save(topic);
   }
 }

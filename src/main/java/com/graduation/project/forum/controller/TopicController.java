@@ -37,10 +37,16 @@ public class TopicController {
         .build();
   }
 
-  @DeleteMapping("/{categoryId}")
-  public ApiResponse<String> delete(@PathVariable UUID categoryId) {
-    topicService.delete(categoryId);
+  @DeleteMapping("/{topicId}")
+  public ApiResponse<String> delete(@PathVariable UUID topicId) {
+    topicService.delete(topicId);
     return ApiResponse.<String>builder().result("Deleted successfully").build();
+  }
+
+  @DeleteMapping("soft-delete/{topicId}")
+  public ApiResponse<String> softDelete(@PathVariable UUID topicId) {
+    topicService.softDelete(topicId);
+    return ApiResponse.<String>builder().result("Soft deleted successfully").build();
   }
 
   @GetMapping

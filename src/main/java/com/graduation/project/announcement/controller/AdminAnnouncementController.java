@@ -1,17 +1,15 @@
 package com.graduation.project.announcement.controller;
 
-import com.graduation.project.announcement.dto.AnnouncementResponse;
-import com.graduation.project.announcement.dto.CreatedAnnonucementResponse;
-import com.graduation.project.announcement.dto.CreatedAnnouncementRequest;
-import com.graduation.project.announcement.dto.UpdatedAnnouncementRequest;
+import com.graduation.project.announcement.dto.*;
 import com.graduation.project.announcement.service.AdminAnnouncementService;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.common.entity.User;
-
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,6 +34,13 @@ public class AdminAnnouncementController {
         .build();
   }
 
+  @PostMapping("release-announcement/{announcementId}")
+  public ApiResponse<String> releaseAnnouncement(
+      @PathVariable UUID announcementId, @RequestBody ReleaseAnnouncementRequest request) {
+    adminAnnouncementService.releaseAnnouncement(announcementId, request);
+    return ApiResponse.<String>builder().result("Release announcement successfully").build();
+  }
+
   @PutMapping("/{announcementId}")
   public ApiResponse<AnnouncementResponse> updateAnnouncement(
       @PathVariable String announcementId,
@@ -57,21 +62,18 @@ public class AdminAnnouncementController {
         .build();
   }
 
-//  ThieuNN
- @GetMapping("/all")
- public  ApiResponse<Page<AnnouncementResponse>> getAllAnnouncements(
-         @RequestParam Integer page,
-         @RequestParam Integer size
- )
- {
-     Page<AnnouncementResponse> announcementResponses = adminAnnouncementService.getAnnouncements(page, size);
-     return ApiResponse.<Page<AnnouncementResponse>>builder()
-             .result(announcementResponses)
-             .build();
- }
+  //  ThieuNN
+  @GetMapping("/all")
+  public ApiResponse<Page<AnnouncementResponse>> searchAnnouncements(
+      @ModelAttribute SearchAnnouncementRequest request, Pageable pageable) {
+    Page<AnnouncementResponse> announcementResponses =
+        adminAnnouncementService.searchAnnouncement(request, pageable);
+    return ApiResponse.<Page<AnnouncementResponse>>builder().result(announcementResponses).build();
+  }
 
-//  @GetMapping
-//  public List<AnnouncementResponse> getAnnouncements() {
-//    return adminAnnouncementService.getAnnouncements();
-//  }
+  @DeleteMapping("/{announcementId}")
+  public ApiResponse<String> deleteAnnouncement(@PathVariable String announcementId) {
+    adminAnnouncementService.deleteAnnouncement(announcementId);
+    return ApiResponse.<String>builder().result("Deleted announcement successfully").build();
+  }
 }
