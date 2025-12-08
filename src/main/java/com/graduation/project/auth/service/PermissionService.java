@@ -2,13 +2,14 @@ package com.graduation.project.auth.service;
 
 import com.graduation.project.auth.dto.request.PermissionRequest;
 import com.graduation.project.auth.dto.response.PermissionResponse;
-import com.graduation.project.common.entity.Permission;
 import com.graduation.project.auth.repository.PermissionRepository;
-import java.util.List;
+import com.graduation.project.common.entity.Permission;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -27,9 +28,9 @@ public class PermissionService {
   }
 
   @PreAuthorize("hasRole('ADMIN')")
-  public List<PermissionResponse> getAll() {
-    var permissions = permissionRepository.findAll();
-    return permissions.stream().map(PermissionResponse::from).toList();
+  public Page<PermissionResponse> getAll(String name, Pageable pageable) {
+    Page<Permission> permissions = permissionRepository.findAll(name, pageable);
+    return permissions.map(PermissionResponse::from);
   }
 
   public void delete(String permission) {

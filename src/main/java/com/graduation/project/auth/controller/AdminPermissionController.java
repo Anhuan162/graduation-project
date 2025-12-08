@@ -1,16 +1,16 @@
 package com.graduation.project.auth.controller;
 
-import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.auth.dto.request.PermissionRequest;
+import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.auth.dto.response.PermissionResponse;
 import com.graduation.project.auth.service.PermissionService;
-import java.util.List;
-
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,9 +29,10 @@ public class AdminPermissionController {
   }
 
   @GetMapping
-  ApiResponse<List<PermissionResponse>> getAll() {
-    return ApiResponse.<List<PermissionResponse>>builder()
-        .result(permissionService.getAll())
+  ApiResponse<Page<PermissionResponse>> getAll(
+      @RequestParam(required = false) String name, Pageable pageable) {
+    return ApiResponse.<Page<PermissionResponse>>builder()
+        .result(permissionService.getAll(name, pageable))
         .build();
   }
 

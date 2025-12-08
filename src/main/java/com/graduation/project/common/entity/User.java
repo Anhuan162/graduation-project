@@ -7,6 +7,7 @@ import com.graduation.project.forum.entity.Category;
 import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.entity.TopicMember;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.*;
 import lombok.*;
 
@@ -41,6 +42,7 @@ public class User {
   private String studentCode;
 
   private String classCode;
+  private LocalDateTime registrationDate;
 
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<FileMetadata> fileMetadata;

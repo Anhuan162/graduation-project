@@ -1,16 +1,19 @@
 package com.graduation.project.auth.controller;
 
 import com.graduation.project.auth.dto.VerifyUserDto;
+import com.graduation.project.auth.dto.request.SearchUserRequest;
 import com.graduation.project.auth.dto.request.SignupRequest;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.auth.dto.response.SignupResponse;
 import com.graduation.project.auth.dto.response.UserResponse;
 import com.graduation.project.auth.service.UserService;
-import java.util.List;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,9 +25,7 @@ public class UserController {
 
   @PostMapping("/register")
   public ApiResponse<SignupResponse> register(@Valid @RequestBody SignupRequest request) {
-    return ApiResponse.<SignupResponse>builder()
-        .result(userService.register(request))
-        .build();
+    return ApiResponse.<SignupResponse>builder().result(userService.register(request)).build();
   }
 
   @PostMapping("/verify")
@@ -39,16 +40,27 @@ public class UserController {
     return ApiResponse.<Void>builder().result(null).build();
   }
 
-  @GetMapping
-  ApiResponse<List<UserResponse>> getUsers() {
-    return ApiResponse.<List<UserResponse>>builder().result(userService.getUsers()).build();
-  }
-
   @GetMapping("/{userId}")
   ApiResponse<UserResponse> getUser(@PathVariable("userId") String userId) {
     return ApiResponse.<UserResponse>builder().result(userService.getUser(userId)).build();
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
+  @GetMapping
+  ApiResponse<Page<UserResponse>> searchUsers(
+      @ModelAttribute SearchUserRequest searchUserRequest,
+      @PageableDefault(
+              page = 0,
+              size = 10,
+              sort = "registrationDate",
+              direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ApiResponse.<Page<UserResponse>>builder()
+        .result(userService.searchUsers(searchUserRequest, pageable))
+        .build();
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
   @DeleteMapping("/{userId}")
   ApiResponse<String> deleteUser(@PathVariable String userId) {
     userService.deleteUser(userId);

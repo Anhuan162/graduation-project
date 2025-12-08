@@ -2,6 +2,7 @@ package com.graduation.project.auth.dto.response;
 
 import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.User;
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
 import lombok.*;
@@ -22,6 +23,7 @@ public class UserResponse {
   String phone;
   Provider provider;
   String studentCode;
+  LocalDateTime registrationDate;
   Set<RoleResponse> roles;
 
   public static UserResponse from(User user) {

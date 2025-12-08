@@ -2,24 +2,28 @@ package com.graduation.project.auth.service;
 
 import com.graduation.project.auth.constant.PredefinedRole;
 import com.graduation.project.auth.dto.VerifyUserDto;
+import com.graduation.project.auth.dto.request.SearchUserRequest;
 import com.graduation.project.auth.dto.request.SignupRequest;
 import com.graduation.project.auth.dto.response.SignupResponse;
 import com.graduation.project.auth.dto.response.UserResponse;
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
+import com.graduation.project.auth.repository.RoleRepository;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.repository.VerificationTokenRepository;
 import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.Role;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.entity.VerificationToken;
-import com.graduation.project.auth.repository.RoleRepository;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -51,6 +55,7 @@ public class UserService {
     user.setProvider(Provider.LOCAL);
     user.setEnabled(false);
     user.setRoles(roles);
+    user.setRegistrationDate(LocalDateTime.now());
     userRepository.save(user);
     String token = generateVerificationCode();
     storeVerifyToken(user, token);
@@ -134,22 +139,63 @@ public class UserService {
     return String.valueOf(code);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
-  public void deleteUser(String userId) {
-    userRepository.deleteById(UUID.fromString(userId));
-  }
-
-  @PreAuthorize("hasRole('ADMIN')")
-  public List<UserResponse> getUsers() {
+  public Page<UserResponse> searchUsers(SearchUserRequest searchUserRequest, Pageable pageable) {
     log.info("In method get Users");
-    return userRepository.findAll().stream().map(UserResponse::from).toList();
+
+    Specification<User> spec =
+        (root, query, cb) -> {
+          List<Predicate> predicates = new ArrayList<>();
+
+          if (searchUserRequest.getEmail() != null
+              && !searchUserRequest.getEmail().trim().isEmpty()) {
+            predicates.add(
+                cb.like(
+                    cb.lower(root.get("email")),
+                    "%" + searchUserRequest.getEmail().toLowerCase() + "%"));
+          }
+
+          if (searchUserRequest.getFullName() != null
+              && !searchUserRequest.getFullName().trim().isEmpty()) {
+            predicates.add(
+                cb.like(
+                    cb.lower(root.get("fullName")),
+                    "%" + searchUserRequest.getFullName().toLowerCase() + "%"));
+          }
+
+          if (searchUserRequest.getStudentCode() != null
+              && !searchUserRequest.getStudentCode().trim().isEmpty()) {
+            predicates.add(
+                cb.like(
+                    cb.lower(root.get("studentCode")),
+                    "%" + searchUserRequest.getStudentCode().toLowerCase() + "%"));
+          }
+
+          if (searchUserRequest.getClassCode() != null
+              && !searchUserRequest.getClassCode().trim().isEmpty()) {
+            predicates.add(
+                cb.like(
+                    cb.lower(root.get("classCode")),
+                    "%" + searchUserRequest.getClassCode().toLowerCase() + "%"));
+          }
+
+          if (searchUserRequest.getEnable() != null) {
+            predicates.add(cb.equal(root.get("enable"), searchUserRequest.getEnable()));
+          }
+
+          return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+    return userRepository.findAll(spec, pageable).map(UserResponse::from);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
   public UserResponse getUser(String id) {
     return UserResponse.from(
         userRepository
             .findById(UUID.fromString(id))
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND)));
+  }
+
+  public void deleteUser(String userId) {
+    userRepository.deleteById(UUID.fromString(userId));
   }
 }
