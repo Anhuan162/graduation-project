@@ -1,7 +1,6 @@
 package com.graduation.project.event.entity;
 
 import com.graduation.project.common.constant.ResourceType;
-import com.graduation.project.event.constant.NotificationType;
 import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -20,6 +19,15 @@ public class NotificationEvent {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  private UUID referenceId;
+
+  @Enumerated(EnumType.STRING)
+  private ResourceType type;
+
+  private UUID parentReferenceId;
+
+  private UUID relatedId;
+
   private String title;
 
   @Column(columnDefinition = "TEXT")
@@ -31,9 +39,4 @@ public class NotificationEvent {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "created_by")
   private User createdBy;
-
-  @Enumerated(EnumType.STRING)
-  private ResourceType type; // ANNOUNCEMENT, SYSTEM...
-
-  private UUID relatedId; // annoucmentId, postId
 }

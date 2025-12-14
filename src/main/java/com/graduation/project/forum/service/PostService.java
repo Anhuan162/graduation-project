@@ -7,8 +7,10 @@ import com.graduation.project.common.entity.*;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.forum.constant.PostStatus;
+import com.graduation.project.forum.dto.CreatedPostEvent;
 import com.graduation.project.forum.dto.PostRequest;
 import com.graduation.project.forum.dto.PostResponse;
+import com.graduation.project.forum.dto.SearchPostRequest;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.mapper.PostMapper;
@@ -16,17 +18,18 @@ import com.graduation.project.forum.repository.PostRepository;
 import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ public class PostService {
   private final FileService fileService;
   private final AuthorizationService authorizationService;
   private final FileMetadataRepository fileMetadataRepository;
+  private final ApplicationEventPublisher publisher;
 
   @Transactional
   public PostResponse createPost(UUID topicId, PostRequest request) {
@@ -58,6 +62,9 @@ public class PostService {
         fileService.updateFileMetadataList(
             request.getFileMetadataIds(), save.getId(), ResourceType.POST, user.getId());
     List<String> urls = fileMetadataList.stream().map(FileMetadata::getUrl).toList();
+
+    CreatedPostEvent event = CreatedPostEvent.from(post);
+    publisher.publishEvent(event);
     return postMapper.toPostResponse(post, urls);
   }
 
@@ -73,20 +80,61 @@ public class PostService {
     return postMapper.toPostResponse(post, urls);
   }
 
-  public List<PostResponse> getAll() {
-    var user = currentUserService.getCurrentUserEntity();
+  public Page<PostResponse> searchPosts(SearchPostRequest request, Pageable pageable) {
+    Specification<Post> spec =
+        (root, query, criteriaBuilder) -> {
+          List<Predicate> predicates = new ArrayList<>();
 
-    return postRepository.findAll().stream()
-        .filter(post -> authorizationService.canViewTopic(post.getTopic(), user))
-        .map(
-            post -> {
-              List<String> urls = fileService.getFileMetadataIds(post.getId(), ResourceType.POST);
-              return postMapper.toPostResponse(post, urls);
-            })
-        .toList();
+          if (StringUtils.hasText(request.getTitle())) {
+            String searchKey = "%" + request.getTitle().toLowerCase() + "%";
+            predicates.add(
+                criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), searchKey));
+          }
+
+          if (request.getPostStatus() != null) {
+            predicates.add(criteriaBuilder.equal(root.get("postStatus"), request.getPostStatus()));
+          }
+
+          if (StringUtils.hasText(request.getTopicId())) {
+            predicates.add(criteriaBuilder.equal(root.get("topicId"), request.getTopicId()));
+          }
+
+          if (request.getAuthorId() != null) {
+            predicates.add(criteriaBuilder.equal(root.get("authorId"), request.getAuthorId()));
+          }
+
+          predicates.add(criteriaBuilder.equal(root.get("isDeleted"), request.isDeleted()));
+
+          if (request.getFromDate() != null) {
+            predicates.add(
+                criteriaBuilder.greaterThanOrEqualTo(
+                    root.get("createdDateTime"), request.getFromDate()));
+          }
+          if (request.getToDate() != null) {
+            predicates.add(
+                criteriaBuilder.lessThanOrEqualTo(
+                    root.get("createdDateTime"), request.getToDate()));
+          }
+
+          return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+
+    Page<Post> posts = postRepository.findAll(spec, pageable);
+    List<UUID> postIds = posts.getContent().stream().map(Post::getId).toList();
+
+    Map<UUID, List<String>> filesMap =
+        fileMetadataRepository
+            .findAllByResourceIdInAndResourceType(postIds, ResourceType.POST)
+            .stream()
+            .collect(
+                Collectors.groupingBy(
+                    FileMetadata::getResourceId,
+                    Collectors.mapping(FileMetadata::getUrl, Collectors.toList())));
+
+    return posts.map(post -> postMapper.toPostResponse(post, filesMap.get(post.getId())));
   }
 
-  public Page<PostResponse> getPostsByTopic(UUID topicId, Pageable pageable) {
+  public Page<PostResponse> getApprovedPostsByTopic(UUID topicId, Pageable pageable) {
     Topic topic =
         topicRepository
             .findById(topicId)
@@ -95,7 +143,8 @@ public class PostService {
     if (!authorizationService.canViewTopic(topic, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    Page<Post> postPage = postRepository.findByTopicId(topicId, pageable);
+    Page<Post> postPage =
+        postRepository.findByTopicIdAndPostStatus(topicId, PostStatus.APPROVED, pageable);
 
     if (postPage.isEmpty()) {
       return Page.empty(pageable);
@@ -161,7 +210,7 @@ public class PostService {
     postRepository.delete(post);
   }
 
-  public void softDelete(String id) {
+  public PostResponse softDelete(String id) {
     Post post =
         postRepository
             .findById(UUID.fromString(id))
@@ -174,10 +223,11 @@ public class PostService {
     post.setDeleted(true);
 
     postRepository.save(post);
+    return postMapper.toPostResponse(post, Collections.emptyList());
   }
 
   @Transactional
-  public PostResponse approvePost(UUID postId) {
+  public PostResponse upgradePostStatus(UUID postId, PostStatus postStatus) {
     Post post =
         postRepository
             .findById(postId)
@@ -189,7 +239,7 @@ public class PostService {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    post.setPostStatus(PostStatus.APPROVED);
+    post.setPostStatus(postStatus);
     post.setApprovedBy(currentUser);
     post.setApprovedAt(LocalDateTime.now());
 
@@ -201,7 +251,8 @@ public class PostService {
   }
 
   @Transactional
-  public List<PostResponse> getPendingByTopic(UUID topicId) {
+  public Page<PostResponse> searchPostsByTopic(
+      UUID topicId, PostStatus postStatus, Pageable pageable) {
     Topic topic =
         topicRepository
             .findById(topicId)
@@ -213,49 +264,8 @@ public class PostService {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    return postRepository.findByTopicIdAndPostStatus(topicId, PostStatus.PENDING).stream()
-        .map(post -> postMapper.toPostResponse(post, null))
-        .toList();
-  }
-
-  public List<PostResponse> getApprovedByTopic(UUID topicId) {
-    return postRepository.findByTopicIdAndPostStatus(topicId, PostStatus.APPROVED).stream()
-        .map(
-            post ->
-                postMapper.toPostResponse(
-                    post, fileService.getFileMetadataIds(post.getId(), ResourceType.POST)))
-        .toList();
-  }
-
-  public List<PostResponse> getRejectedByTopic(UUID topicId) {
-    return postRepository.findByTopicIdAndPostStatus(topicId, PostStatus.REJECTED).stream()
-        .map(
-            post ->
-                postMapper.toPostResponse(
-                    post, fileService.getFileMetadataIds(post.getId(), ResourceType.POST)))
-        .toList();
-  }
-
-  @Transactional
-  public PostResponse rejectPost(UUID postId) {
-    Post post =
-        postRepository
-            .findById(postId)
-            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
-
-    User currentUser = currentUserService.getCurrentUserEntity();
-
-    if (!authorizationService.canManageTopic(currentUser, post.getTopic())) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
-
-    post.setPostStatus(PostStatus.REJECTED);
-    post.setApprovedBy(currentUser);
-    post.setApprovedAt(LocalDateTime.now());
-    postRepository.save(post);
-
-    List<String> urls = fileService.getFileMetadataIds(post.getId(), ResourceType.POST);
-
-    return postMapper.toPostResponse(post, urls);
+    return postRepository
+        .findByTopicIdAndPostStatus(topicId, postStatus, pageable)
+        .map(post -> postMapper.toPostResponse(post, null));
   }
 }

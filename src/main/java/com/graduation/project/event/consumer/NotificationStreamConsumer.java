@@ -1,7 +1,7 @@
 package com.graduation.project.event.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.graduation.project.event.dto.NotificationMessageDTO;
+import com.graduation.project.event.dto.NotificationEventDTO;
 import com.graduation.project.event.service.IdempotencyService;
 import com.graduation.project.event.service.NotificationHandler;
 import java.util.Map;
@@ -55,8 +55,8 @@ public class NotificationStreamConsumer
               ? (String) payloadObj
               : redisObjectMapper.writeValueAsString(payloadObj);
 
-      NotificationMessageDTO dto =
-          redisObjectMapper.readValue(payloadJson, NotificationMessageDTO.class);
+      NotificationEventDTO dto =
+          redisObjectMapper.readValue(payloadJson, NotificationEventDTO.class);
 
       // Idempotency
       if (!idempotencyService.tryLock(eventId, processedTtlSeconds)) {

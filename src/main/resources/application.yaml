@@ -49,10 +49,19 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
-# Config send verification token by email
-sendgrid:
-  api-key: ${SENDGRID_API_KEY}
-  from-email: huan1622k3@gmail.com
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: huan1622k3@gmail.com
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          starttls:
+            enable: true
+            required: true
+          auth: true
 
 app:
   jwt:

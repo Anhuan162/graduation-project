@@ -1,8 +1,8 @@
 package com.graduation.project.forum.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.common.entity.User;
+import com.graduation.project.forum.constant.TopicRole;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -20,7 +20,9 @@ public class TopicMember {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @Enumerated(EnumType.STRING)
   private TopicRole topicRole;
+
   private boolean approved;
   private LocalDateTime joinedAt;
 

@@ -11,16 +11,17 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotificationMessageDTO {
-  private UUID relatedId; // Liên kết đến Announcement/Post
-  private ResourceType type; // Loại thông báo
+public class NotificationEventDTO {
+  private UUID referenceId;
+  private ResourceType type;
+  private UUID parentReferenceId;
+  private UUID relatedId;
   private String title;
   private String content;
   private UUID senderId;
   private String senderName;
-  private Set<UUID> receiverIds; // Danh sách user nhận thông báo
+  private Set<UUID> receiverIds;
 
-  // ✅ format rõ ràng để Redis JSON serializer đọc được
   @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
   private LocalDateTime createdAt;
 }

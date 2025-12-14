@@ -6,17 +6,20 @@ import com.graduation.project.announcement.entity.AnnouncementTarget;
 import com.graduation.project.announcement.entity.Classroom;
 import com.graduation.project.announcement.repository.AnnouncementRepository;
 import com.graduation.project.announcement.repository.ClassroomRepository;
+import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.FileMetadata;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.cpa.constant.CohortCode;
+import com.graduation.project.event.dto.NotificationEventDTO;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -36,6 +39,7 @@ public class AdminAnnouncementService {
   private final CurrentUserService currentUserService;
   private final ApplicationEventPublisher publisher;
   private final FileService fileService;
+  private final UserRepository userRepository;
 
   @Transactional
   public CreatedAnnonucementResponse createAnnouncement(
@@ -55,6 +59,11 @@ public class AdminAnnouncementService {
 
   public void releaseAnnouncement(UUID announcementId, ReleaseAnnouncementRequest request) {
     Announcement announcement = announcementRepository.findById(announcementId).orElseThrow();
+
+    if (announcement.getAnnouncementStatus()) {
+        throw new RuntimeException("Thông báo đã được gửi");
+    }
+
     Set<String> allClassroomCodes =
         getAllClassroomCodes(
             request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
@@ -62,12 +71,26 @@ public class AdminAnnouncementService {
     List<AnnouncementTarget> announcementTargets =
         generateAnnouncementTargets(allClassroomCodes, announcement);
     announcement.getTargets().addAll(announcementTargets);
+    announcement.setAnnouncementStatus(true);
     announcementRepository.save(announcement);
 
-    AnnouncementCreatedEvent announcementCreatedEvent =
-        AnnouncementCreatedEvent.from(announcement, allClassroomCodes);
+    User user = currentUserService.getCurrentUserEntity();
+    Set<UUID> receiverUserIds =
+        new HashSet<>(userRepository.findUserIdsByClassCodes(allClassroomCodes));
 
-    publisher.publishEvent(announcementCreatedEvent);
+    NotificationEventDTO notificationEventDTO =
+        NotificationEventDTO.builder()
+            .relatedId(announcement.getId())
+            .type(ResourceType.ANNOUNCEMENT)
+            .title("Thông báo mới " + announcement.getTitle())
+            .content(announcement.getContent())
+            .senderId(user.getId())
+            .senderName(user.getEmail())
+            .createdAt(LocalDateTime.now())
+            .receiverIds(receiverUserIds)
+            .build();
+
+    publisher.publishEvent(notificationEventDTO);
   }
 
   private static List<AnnouncementTarget> generateAnnouncementTargets(

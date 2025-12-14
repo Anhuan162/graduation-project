@@ -5,7 +5,7 @@ import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.event.constant.EventType;
 import com.graduation.project.event.dto.EventEnvelope;
-import com.graduation.project.event.dto.NotificationMessageDTO;
+import com.graduation.project.event.dto.NotificationEventDTO;
 import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.forum.constant.ReactionType;
 import com.graduation.project.forum.constant.TargetType;
@@ -130,8 +130,8 @@ public class ReactionService {
       // 4. Validate và tránh tự like tự sướng (Self-notification)
       if (receiver != null && !receiver.getId().equals(sender.getId())) {
 
-        NotificationMessageDTO dto =
-            NotificationMessageDTO.builder()
+        NotificationEventDTO dto =
+            NotificationEventDTO.builder()
                 .relatedId(request.getTargetId()) // ID bài viết hoặc comment
                 .type(ResourceType.REACTION) // Hoặc tạo thêm NotificationType.REACTION
                 .title(title)

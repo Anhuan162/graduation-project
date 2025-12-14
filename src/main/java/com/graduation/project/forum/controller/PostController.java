@@ -1,10 +1,11 @@
 package com.graduation.project.forum.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
+import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.dto.PostRequest;
 import com.graduation.project.forum.dto.PostResponse;
+import com.graduation.project.forum.dto.SearchPostRequest;
 import com.graduation.project.forum.service.PostService;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -45,53 +46,41 @@ public class PostController {
   }
 
   @DeleteMapping("soft-delete/{postId}")
-  public ApiResponse<String> softDelete(@PathVariable String postId) {
-    postService.softDelete(postId);
-    return ApiResponse.<String>builder().result("Deleted successfully").build();
+  public ApiResponse<PostResponse> softDelete(@PathVariable String postId) {
+
+    return ApiResponse.<PostResponse>builder().result(postService.softDelete(postId)).build();
   }
 
   @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
-  public ApiResponse<List<PostResponse>> getAll() {
-    return ApiResponse.<List<PostResponse>>builder().result(postService.getAll()).build();
+  public ApiResponse<Page<PostResponse>> searchPosts(
+      @ModelAttribute SearchPostRequest request, Pageable pageable) {
+    return ApiResponse.<Page<PostResponse>>builder()
+        .result(postService.searchPosts(request, pageable))
+        .build();
   }
 
   @GetMapping("/topic/{topicId}")
-  public ApiResponse<Page<PostResponse>> getPostsByTopic(
+  public ApiResponse<Page<PostResponse>> getApprovedPostsByTopic(
       @PathVariable UUID topicId, Pageable pageable) {
     return ApiResponse.<Page<PostResponse>>builder()
-        .result(postService.getPostsByTopic(topicId, pageable))
+        .result(postService.getApprovedPostsByTopic(topicId, pageable))
         .build();
   }
 
-  @PostMapping("/{postId}/approve")
-  public ApiResponse<PostResponse> approve(@PathVariable UUID postId) {
-    return ApiResponse.<PostResponse>builder().result(postService.approvePost(postId)).build();
-  }
-
-  @PostMapping("/{postId}/reject")
-  public ApiResponse<PostResponse> reject(@PathVariable UUID postId) {
-    return ApiResponse.<PostResponse>builder().result(postService.rejectPost(postId)).build();
-  }
-
-  @GetMapping("/topic/{topicId}/pending")
-  public ApiResponse<List<PostResponse>> getPending(@PathVariable UUID topicId) {
-    return ApiResponse.<List<PostResponse>>builder()
-        .result(postService.getPendingByTopic(topicId))
+  @PostMapping("/upgrade-post/{postId}")
+  public ApiResponse<PostResponse> upgradePostStatus(
+      @PathVariable UUID postId, @RequestParam PostStatus postStatus) {
+    return ApiResponse.<PostResponse>builder()
+        .result(postService.upgradePostStatus(postId, postStatus))
         .build();
   }
 
-  @GetMapping("/topic/{topicId}/approved")
-  public ApiResponse<List<PostResponse>> getApproved(@PathVariable UUID topicId) {
-    return ApiResponse.<List<PostResponse>>builder()
-        .result(postService.getApprovedByTopic(topicId))
-        .build();
-  }
-
-  @GetMapping("/topic/{topicId}/rejected")
-  public ApiResponse<List<PostResponse>> getRejected(@PathVariable UUID topicId) {
-    return ApiResponse.<List<PostResponse>>builder()
-        .result(postService.getRejectedByTopic(topicId))
+  @GetMapping("/topic/{topicId}/search")
+  public ApiResponse<Page<PostResponse>> searchPostsByTopic(
+      @PathVariable UUID topicId, @RequestParam PostStatus postStatus, Pageable pageable) {
+    return ApiResponse.<Page<PostResponse>>builder()
+        .result(postService.searchPostsByTopic(topicId, postStatus, pageable))
         .build();
   }
 }

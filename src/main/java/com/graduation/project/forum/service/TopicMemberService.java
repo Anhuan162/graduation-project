@@ -6,7 +6,6 @@ import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.event.constant.EventType;
-import com.graduation.project.event.constant.NotificationType;
 import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.forum.constant.TopicVisibility;
 import com.graduation.project.forum.entity.Topic;
@@ -14,7 +13,7 @@ import com.graduation.project.forum.entity.TopicMember;
 import com.graduation.project.forum.repository.TopicMemberRepository;
 import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.event.dto.EventEnvelope;
-import com.graduation.project.event.dto.NotificationMessageDTO;
+import com.graduation.project.event.dto.NotificationEventDTO;
 import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.forum.dto.TopicMemberResponse;
 import java.time.LocalDateTime;
@@ -85,8 +84,8 @@ public class TopicMemberService {
     // PRIVATE → pending approval
     topicMember.setApproved(false);
     topicMemberRepository.save(topicMember);
-    NotificationMessageDTO dto =
-        NotificationMessageDTO.builder()
+    NotificationEventDTO dto =
+        NotificationEventDTO.builder()
             .relatedId(topicMember.getId())
             .type(ResourceType.TOPIC_MEMBER)
             .title("Join Topic")
@@ -116,8 +115,8 @@ public class TopicMemberService {
 
     tm.setApproved(true);
     TopicMember save = topicMemberRepository.save(tm);
-    NotificationMessageDTO dto =
-        NotificationMessageDTO.builder()
+    NotificationEventDTO dto =
+        NotificationEventDTO.builder()
             .relatedId(topicMemberId)
             .type(ResourceType.TOPIC_MEMBER)
             .title("Approve Member")
