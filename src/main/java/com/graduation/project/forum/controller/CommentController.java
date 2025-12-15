@@ -6,9 +6,11 @@ import com.graduation.project.forum.dto.CommentResponse;
 import com.graduation.project.forum.dto.CommentWithReplyCountResponse;
 import com.graduation.project.forum.dto.SearchCommentRequest;
 import com.graduation.project.forum.service.CommentService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -69,6 +71,21 @@ public class CommentController {
       @ModelAttribute SearchCommentRequest request, Pageable pageable) {
     return ApiResponse.<Page<CommentResponse>>builder()
         .result(commentService.searchComments(request, pageable))
+        .build();
+  }
+
+  @GetMapping("/{commentId}")
+  public ApiResponse<CommentResponse> getComment(@PathVariable UUID commentId) {
+    return ApiResponse.<CommentResponse>builder()
+        .result(commentService.getComment(commentId))
+        .build();
+  }
+
+  @GetMapping("/my-comments")
+  public ApiResponse<Page<CommentResponse>> getMyComments(
+      @PageableDefault(page = 0, size = 10) Pageable pageable) {
+    return ApiResponse.<Page<CommentResponse>>builder()
+        .result(commentService.getMyComments(pageable))
         .build();
   }
 }

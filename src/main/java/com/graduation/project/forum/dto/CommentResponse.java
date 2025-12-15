@@ -15,7 +15,10 @@ public class CommentResponse {
   private UUID id;
   private String content;
   private UUID authorId;
+  private UUID postId;
+  private UUID parentId;
   private LocalDateTime createdDateTime;
   private String url;
+  private Boolean deleted;
   private Long reactionCount;
 }

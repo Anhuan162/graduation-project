@@ -40,4 +40,6 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
   void decreaseReactionCount(@Param("commentId") UUID commentId);
 
   Page<CommentResponse> findAll(Specification<Comment> spec, Pageable pageable);
+
+  Page<Comment> findAllByAuthorIdAndDeletedFalse(UUID id, Pageable pageable);
 }

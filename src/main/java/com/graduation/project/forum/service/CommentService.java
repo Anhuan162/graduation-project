@@ -134,36 +134,14 @@ public class CommentService {
     return fileMetadata.getUrl();
   }
 
-  private void sendNotification(
-      Comment comment, User sender, Set<UUID> receiverIds, String title, String content) {
-    if (receiverIds.isEmpty()) return;
-
-    NotificationEventDTO dto =
-        NotificationEventDTO.builder()
-            .relatedId(comment.getId())
-            .type(ResourceType.COMMENT)
-            .title(title)
-            .content(content)
-            .senderId(sender.getId())
-            .senderName(sender.getEmail()) // Hoặc getFullName
-            .receiverIds(receiverIds)
-            .createdAt(LocalDateTime.now())
-            .build();
-    publisher.publishEvent(dto);
-  }
-
-  private void logActivity(User user, String action, UUID objectId, String description) {
-    ActivityLogDTO log =
-        ActivityLogDTO.from(
-            user.getId(), action, "FORUM", ResourceType.COMMENT, objectId, description, IP_ADDRESS);
-    publisher.publishEvent(log);
-  }
-
   private CommentResponse toResponse(Comment c, String url) {
     return CommentResponse.builder()
         .id(c.getId())
         .content(c.getContent())
         .authorId(c.getAuthor().getId())
+        .parentId(c.getParent().getId())
+        .postId(c.getPost().getId())
+        .deleted(c.getDeleted())
         .createdDateTime(c.getCreatedDateTime())
         .url(url)
         .reactionCount(c.getReactionCount())
@@ -239,5 +217,32 @@ public class CommentService {
           return cb.and(predicates.toArray(new Predicate[0]));
         };
     return commentRepository.findAll(spec, pageable);
+  }
+
+  public CommentResponse getComment(UUID commentId) {
+    Comment comment =
+        commentRepository
+            .findById(commentId)
+            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+    User user = currentUserService.getCurrentUserEntity();
+
+    if (!authorizationService.canSoftDeleteComment(comment, user)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    FileMetadata fileMetadataList =
+        fileMetadataRepository
+            .findAllByResourceIdAndResourceType(commentId, ResourceType.COMMENT)
+            .getFirst();
+    return toResponse(comment, fileMetadataList.getUrl());
+  }
+
+  @Transactional
+  public Page<CommentResponse> getMyComments(Pageable pageable) {
+    User user = currentUserService.getCurrentUserEntity();
+    Page<Comment> comments =
+        commentRepository.findAllByAuthorIdAndDeletedFalse(user.getId(), pageable);
+    return comments.map(c -> toResponse(c, null));
   }
 }

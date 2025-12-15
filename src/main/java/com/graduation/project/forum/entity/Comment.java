@@ -35,7 +35,8 @@ public class Comment {
   private String content;
 
   private LocalDateTime createdDateTime = LocalDateTime.now();
-  private boolean isDeleted;
+  @Builder.Default
+  private Boolean deleted = Boolean.FALSE;
 
   @Column(name = "reaction_count")
   private Long reactionCount = 0L;

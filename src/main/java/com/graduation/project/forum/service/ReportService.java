@@ -150,7 +150,7 @@ public class ReportService {
       }
     } else if (report.getTargetType() == TargetType.COMMENT && report.getComment() != null) {
       Comment comment = report.getComment();
-      if (!comment.isDeleted()) {
+      if (!comment.getDeleted()) {
         comment.setDeleted(true);
         commentRepository.save(comment);
       }
