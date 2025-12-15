@@ -29,7 +29,7 @@ public class DetailTopicResponse {
         .lastModifiedAt(topic.getLastModifiedAt())
         .topicVisibility(topic.getTopicVisibility())
         .currentUserContext(currentUserContext)
-        .isDeleted(topic.isDeleted())
+        .isDeleted(topic.getDeleted())
         .build();
   }
 

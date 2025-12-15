@@ -27,9 +27,15 @@ public interface PostMapper {
 
   @Mapping(target = "topicId", source = "post.topic.id")
   @Mapping(target = "createdById", source = "post.author.id")
+  @Mapping(target = "approvedById", source = "post.approvedBy.id")
   @Mapping(target = "id", source = "post.id")
   @Mapping(target = "title", source = "post.title")
   @Mapping(target = "content", source = "post.content")
+  @Mapping(target = "createdDateTime", source = "post.createdDateTime")
+  @Mapping(target = "approvedAt", source = "post.approvedAt")
+  @Mapping(target = "postStatus", source = "post.postStatus")
+  @Mapping(target = "reactionCount", source = "post.reactionCount")
+  @Mapping(target = "deleted", source = "post.deleted")
   @Mapping(target = "urls", source = "urls")
   PostResponse toPostResponse(Post post, List<String> urls);
 }

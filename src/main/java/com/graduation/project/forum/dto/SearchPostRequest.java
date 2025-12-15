@@ -15,5 +15,5 @@ public class SearchPostRequest {
   private UUID authorId;
   private LocalDateTime fromDate;
   private LocalDateTime toDate;
-  private boolean isDeleted;
+  private Boolean deleted;
 }

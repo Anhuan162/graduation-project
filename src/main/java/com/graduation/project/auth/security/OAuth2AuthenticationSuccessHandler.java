@@ -1,20 +1,21 @@
 package com.graduation.project.auth.security;
 
 import com.graduation.project.auth.repository.OauthAccountRepository;
+import com.graduation.project.auth.repository.RoleRepository;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.service.TokenService;
-import com.graduation.project.common.entity.OauthAccount;
 import com.graduation.project.common.constant.Provider;
+import com.graduation.project.common.entity.OauthAccount;
 import com.graduation.project.common.entity.Role;
 import com.graduation.project.common.entity.User;
-import com.graduation.project.auth.repository.RoleRepository;
 import jakarta.servlet.http.*;
 import java.io.IOException;
-import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.*;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -48,30 +49,28 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
       throws IOException {
     OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
     String provider = "LOCAL";
-    if (authentication
-        instanceof
-        org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken token) {
-      provider = token.getAuthorizedClientRegistrationId().toUpperCase(); // "GOOGLE" or "FACEBOOK"
+
+    // Lấy Provider ID (Google/Facebook)
+    if (authentication instanceof OAuth2AuthenticationToken token) {
+      provider = token.getAuthorizedClientRegistrationId().toUpperCase();
     }
 
+    // Lấy thông tin User từ Google/Facebook
     String providerUserId =
         provider.equals("GOOGLE")
             ? (String) oauthUser.getAttribute("sub")
-            : (String) oauthUser.getAttribute("id"); // google uses "sub"; facebook uses "id"
-    String email = (String) oauthUser.getAttributes().get("email");
+            : (String) oauthUser.getAttribute("id");
+
+    String email = oauthUser.getAttribute("email");
     if (email == null) email = providerUserId + "@" + provider.toLowerCase() + ".oauth";
 
-    String name = (String) oauthUser.getAttribute("name");
-    String picture = (String) oauthUser.getAttribute("picture");
+    Provider providerEnum = Provider.valueOf(provider); // Lấy Enum động
 
-    log.info("provider = " + provider);
-    log.info("email = " + email);
-
-    Provider providerEnum = Provider.valueOf(provider);
-    // Try find oauth account
+    // Xử lý logic tìm hoặc tạo user
     Optional<OauthAccount> accOpt =
         oauthRepo.findByProviderAndProviderUserId(providerEnum, providerUserId);
     User user;
+
     if (accOpt.isPresent()) {
       user = accOpt.get().getUser();
     } else {
@@ -79,6 +78,7 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
           roleRepo
               .findByName("USER")
               .orElseThrow(() -> new RuntimeException("Role USER not found"));
+
       String finalEmail = email;
       user =
           userRepo
@@ -87,38 +87,38 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
                   () -> {
                     User u = new User();
                     u.setEmail(finalEmail);
-                    u.setProvider(Provider.GOOGLE); // or FACEBOOK depending
+                    u.setProvider(providerEnum);
                     u.setEnabled(true);
-                    u.setFullName((String) oauthUser.getAttribute("name"));
-                    // assign default USER role — assume role exists in DB
+                    u.setFullName(oauthUser.getAttribute("name"));
+                    u.setRegistrationDate(LocalDateTime.now());
                     u.getRoles().add(userRole);
                     return userRepo.save(u);
                   });
 
       OauthAccount acc = new OauthAccount();
-      acc.setProvider(Provider.GOOGLE);
+      acc.setProvider(providerEnum);
       acc.setProviderUserId(providerUserId);
       acc.setUser(user);
       oauthRepo.save(acc);
     }
 
-    List<String> roles = user.getRoles().stream().map(Role::getName).toList();
+    // Tạo Token
     String accessToken = tokenService.generateToken(user, false);
     String refreshToken = tokenService.generateToken(user, true);
 
-    // Safer way: use cookies instead of query params
-    Cookie accessCookie = new Cookie("accessToken", accessToken);
-    accessCookie.setHttpOnly(true);
-    accessCookie.setPath("/");
-    accessCookie.setMaxAge(3600);
-    response.addCookie(accessCookie);
-
-    Cookie refreshCookie = new Cookie("refreshToken", refreshToken);
-    refreshCookie.setHttpOnly(true);
-    refreshCookie.setPath("/");
-    refreshCookie.setMaxAge(86400);
-    response.addCookie(refreshCookie);
+    // Lưu Cookie
+    addCookie(response, "accessToken", accessToken, 3600);
+    addCookie(response, "refreshToken", refreshToken, 86400);
 
     response.sendRedirect(redirectUri);
+  }
+
+  private void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
+    Cookie cookie = new Cookie(name, value);
+    cookie.setHttpOnly(true);
+    cookie.setPath("/");
+    cookie.setMaxAge(maxAge);
+    // cookie.setSecure(true); // Bật dòng này khi chạy HTTPS (Production)
+    response.addCookie(cookie);
   }
 }

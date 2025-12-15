@@ -7,10 +7,7 @@ import com.graduation.project.common.entity.*;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.forum.constant.PostStatus;
-import com.graduation.project.forum.dto.CreatedPostEvent;
-import com.graduation.project.forum.dto.PostRequest;
-import com.graduation.project.forum.dto.PostResponse;
-import com.graduation.project.forum.dto.SearchPostRequest;
+import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.mapper.PostMapper;
@@ -73,7 +70,8 @@ public class PostService {
         postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
 
-    if (!authorizationService.canViewTopic(post.getTopic(), user)) {
+    if (!authorizationService.canManageTopic(user, post.getTopic())
+        && !authorizationService.isPostCreator(post, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
     List<String> urls = fileService.getFileMetadataIds(post.getId(), ResourceType.POST);
@@ -103,7 +101,7 @@ public class PostService {
             predicates.add(criteriaBuilder.equal(root.get("authorId"), request.getAuthorId()));
           }
 
-          predicates.add(criteriaBuilder.equal(root.get("isDeleted"), request.isDeleted()));
+          predicates.add(criteriaBuilder.equal(root.get("deleted"), request.getDeleted()));
 
           if (request.getFromDate() != null) {
             predicates.add(
@@ -120,21 +118,12 @@ public class PostService {
         };
 
     Page<Post> posts = postRepository.findAll(spec, pageable);
-    List<UUID> postIds = posts.getContent().stream().map(Post::getId).toList();
-
-    Map<UUID, List<String>> filesMap =
-        fileMetadataRepository
-            .findAllByResourceIdInAndResourceType(postIds, ResourceType.POST)
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    FileMetadata::getResourceId,
-                    Collectors.mapping(FileMetadata::getUrl, Collectors.toList())));
+    Map<UUID, List<String>> filesMap = mapPostWithFileMetadataIds(posts);
 
     return posts.map(post -> postMapper.toPostResponse(post, filesMap.get(post.getId())));
   }
 
-  public Page<PostResponse> getApprovedPostsByTopic(UUID topicId, Pageable pageable) {
+  public Page<DetailPostResponse> getApprovedPostsByTopic(UUID topicId, Pageable pageable) {
     Topic topic =
         topicRepository
             .findById(topicId)
@@ -144,37 +133,21 @@ public class PostService {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
     Page<Post> postPage =
-        postRepository.findByTopicIdAndPostStatus(topicId, PostStatus.APPROVED, pageable);
+        postRepository.findByTopicIdAndPostStatusAndDeletedFalse(
+            topicId, PostStatus.APPROVED, pageable);
 
     if (postPage.isEmpty()) {
       return Page.empty(pageable);
     }
+    Map<UUID, List<String>> urlsByPostId = mapPostWithFileMetadataIds(postPage);
 
-    List<UUID> postIds = postPage.getContent().stream().map(Post::getId).toList();
+    boolean canManageTopic = authorizationService.canManageTopic(user, topic);
 
-    // 3. Fetch all files related to these posts
-    List<FileMetadata> allFiles =
-        fileMetadataRepository.findByResourceTypeAndResourceIdIn(ResourceType.POST, postIds);
-
-    // 4. Group files by Post ID for easy access
-    Map<UUID, List<String>> urlsByPostId =
-        allFiles.stream()
-            .collect(
-                Collectors.groupingBy(
-                    FileMetadata::getResourceId,
-                    Collectors.mapping(FileMetadata::getUrl, Collectors.toList())));
-
-    // 5. Map Entities to DTOs and inject the URLs
     return postPage.map(
-        post ->
-            PostResponse.builder()
-                .id(post.getId().toString())
-                .title(post.getTitle())
-                .content(post.getContent())
-                .topicId(post.getTopic().getId().toString()) // Assuming Topic has an ID
-                .createdById(post.getAuthor() != null ? post.getAuthor().getId().toString() : null)
-                .urls(urlsByPostId.getOrDefault(post.getId(), Collections.emptyList()))
-                .build());
+        post -> {
+          boolean isPostCreator = authorizationService.isPostCreator(post, user);
+          return DetailPostResponse.from(post, urlsByPostId, canManageTopic, isPostCreator);
+        });
   }
 
   @Transactional
@@ -186,7 +159,7 @@ public class PostService {
     postRepository.save(post);
     var user = currentUserService.getCurrentUserEntity();
 
-    if (authorizationService.isPostCreator(post, user)) {
+    if (!authorizationService.isPostCreator(post, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
     List<FileMetadata> fileMetadataList =
@@ -265,7 +238,43 @@ public class PostService {
     }
 
     return postRepository
-        .findByTopicIdAndPostStatus(topicId, postStatus, pageable)
+        .findByTopicIdAndPostStatusAndDeletedFalse(topicId, postStatus, pageable)
         .map(post -> postMapper.toPostResponse(post, null));
+  }
+
+  @Transactional
+  public Page<PostResponse> getPostsByUserId(UUID userId, Pageable pageable) {
+    Page<Post> postPage = postRepository.findAllByAuthor_Id(userId, pageable);
+    if (postPage.isEmpty()) {
+      return Page.empty(pageable);
+    }
+
+    Map<UUID, List<String>> urlsByPostId = mapPostWithFileMetadataIds(postPage);
+    return postPage.map(post -> postMapper.toPostResponse(post, urlsByPostId.get(post.getId())));
+  }
+
+  @Transactional
+  public Page<PostResponse> getMyPosts(Pageable pageable) {
+    User user = currentUserService.getCurrentUserEntity();
+    Page<Post> postPage = postRepository.findAllByAuthor_Id(user.getId(), pageable);
+
+    if (postPage.isEmpty()) {
+      return Page.empty(pageable);
+    }
+
+    Map<UUID, List<String>> urlsByPostId = mapPostWithFileMetadataIds(postPage);
+    return postPage.map(post -> postMapper.toPostResponse(post, urlsByPostId.get(post.getId())));
+  }
+
+  private Map<UUID, List<String>> mapPostWithFileMetadataIds(Page<Post> postPage) {
+    List<UUID> postIds = postPage.getContent().stream().map(Post::getId).toList();
+
+    List<FileMetadata> allFiles =
+        fileMetadataRepository.findByResourceTypeAndResourceIdIn(ResourceType.POST, postIds);
+    return allFiles.stream()
+        .collect(
+            Collectors.groupingBy(
+                FileMetadata::getResourceId,
+                Collectors.mapping(FileMetadata::getUrl, Collectors.toList())));
   }
 }

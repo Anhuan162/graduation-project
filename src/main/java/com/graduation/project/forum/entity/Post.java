@@ -1,8 +1,8 @@
 package com.graduation.project.forum.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.common.entity.User;
+import com.graduation.project.forum.constant.PostStatus;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,7 +28,9 @@ public class Post {
   private LocalDateTime createdDateTime = LocalDateTime.now();
   private LocalDateTime lastModifiedDateTime = LocalDateTime.now();
 
-  @Builder.Default private PostStatus postStatus = PostStatus.PENDING;
+  @Enumerated(EnumType.STRING)
+  @Builder.Default
+  private PostStatus postStatus = PostStatus.PENDING;
 
   @ManyToOne
   @JoinColumn(name = "approved_by")
@@ -53,7 +55,7 @@ public class Post {
   @Column(name = "reaction_count")
   private Long reactionCount = 0L;
 
-  private boolean isDeleted;
+  @Builder.Default private Boolean deleted = Boolean.FALSE;
   //  @ManyToMany
   //  @JoinTable(
   //      name = "post_tags",

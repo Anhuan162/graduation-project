@@ -2,6 +2,7 @@ package com.graduation.project.forum.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.forum.constant.PostStatus;
+import com.graduation.project.forum.dto.DetailPostResponse;
 import com.graduation.project.forum.dto.PostRequest;
 import com.graduation.project.forum.dto.PostResponse;
 import com.graduation.project.forum.dto.SearchPostRequest;
@@ -61,14 +62,14 @@ public class PostController {
   }
 
   @GetMapping("/topic/{topicId}")
-  public ApiResponse<Page<PostResponse>> getApprovedPostsByTopic(
+  public ApiResponse<Page<DetailPostResponse>> getApprovedPostsByTopic(
       @PathVariable UUID topicId, Pageable pageable) {
-    return ApiResponse.<Page<PostResponse>>builder()
+    return ApiResponse.<Page<DetailPostResponse>>builder()
         .result(postService.getApprovedPostsByTopic(topicId, pageable))
         .build();
   }
 
-  @PostMapping("/upgrade-post/{postId}")
+  @PutMapping("/upgrade-post/{postId}")
   public ApiResponse<PostResponse> upgradePostStatus(
       @PathVariable UUID postId, @RequestParam PostStatus postStatus) {
     return ApiResponse.<PostResponse>builder()
@@ -81,6 +82,21 @@ public class PostController {
       @PathVariable UUID topicId, @RequestParam PostStatus postStatus, Pageable pageable) {
     return ApiResponse.<Page<PostResponse>>builder()
         .result(postService.searchPostsByTopic(topicId, postStatus, pageable))
+        .build();
+  }
+
+  @GetMapping("/user/{userId}")
+  public ApiResponse<Page<PostResponse>> getPostsByUserId(
+      @PathVariable UUID userId, Pageable pageable) {
+    return ApiResponse.<Page<PostResponse>>builder()
+        .result(postService.getPostsByUserId(userId, pageable))
+        .build();
+  }
+
+  @GetMapping("/my-posts")
+  public ApiResponse<Page<PostResponse>> getMyPosts(Pageable pageable) {
+    return ApiResponse.<Page<PostResponse>>builder()
+        .result(postService.getMyPosts(pageable))
         .build();
   }
 }

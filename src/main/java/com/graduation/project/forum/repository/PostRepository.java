@@ -14,7 +14,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PostRepository extends JpaRepository<Post, UUID> {
 
-  Page<Post> findByTopicIdAndPostStatus(UUID topicId, PostStatus postStatus, Pageable pageable);
+  Page<Post> findByTopicIdAndPostStatusAndDeletedFalse(
+      UUID topicId, PostStatus postStatus, Pageable pageable);
 
   @Modifying
   @Query("UPDATE Post p SET p.reactionCount = p.reactionCount + 1 WHERE p.id = :postId")
@@ -25,4 +26,6 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
   void decreaseReactionCount(UUID postId);
 
   Page<Post> findAll(Specification<Post> spec, Pageable pageable);
+
+  Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
 }

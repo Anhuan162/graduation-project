@@ -131,7 +131,7 @@ public class TopicService {
 
   public Page<TopicResponse> getByCategory(UUID categoryId, Pageable pageable) {
     return topicRepository
-        .findByCategoryIdAndIsDeletedIsFalse(categoryId, pageable)
+        .findByCategoryIdAndDeletedIsFalse(categoryId, pageable)
         .map(topicMapper::toTopicResponse);
   }
 

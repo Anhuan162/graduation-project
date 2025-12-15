@@ -28,7 +28,7 @@ public class TopicResponse {
               .createdAt(topic.getCreatedAt())
               .lastModifiedAt(topic.getLastModifiedAt())
               .topicVisibility(topic.getTopicVisibility())
-              .isDeleted(topic.isDeleted())
+              .isDeleted(topic.getDeleted())
               .build();
   }
 }
