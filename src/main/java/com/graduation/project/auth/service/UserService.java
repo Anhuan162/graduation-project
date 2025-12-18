@@ -221,21 +221,29 @@ public class UserService {
 
     User user = userRepository.findUserByEmail(email);
     if (user == null){
-      throw new AppException(ErrorCode.USER_NOT_FOUND);
+      throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
     }
 
     String otp = generateVerificationCode();
     try {
       sendVerificationEmail(user, otp);
     } catch (Exception e) {
-      throw new RuntimeException("can not send email", e);
+      throw new AppException(ErrorCode.CAN_NOT_SEND_EMAIL);
     }
-    passwordResetSessionRepository.save(PasswordResetSession.builder()
-            .otp(otp)
-            .email(email)
-            .expiresAt(LocalDateTime.now().plusMinutes(5)) // hen han trong 5 phut
-            .build());
 
+    PasswordResetSession passwordResetSession = passwordResetSessionRepository.findByEmailAndNotUsed(email);
+    if (passwordResetSession == null){
+      PasswordResetSession newPasswordResetSession = new PasswordResetSession();
+      newPasswordResetSession.setEmail(email);
+      newPasswordResetSession.setOtp(otp);
+      newPasswordResetSession.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+      passwordResetSessionRepository.save(newPasswordResetSession);
+
+    } else if (passwordResetSession.getUsed() == null || !passwordResetSession.getUsed()){
+      passwordResetSession.setOtp(otp);
+      passwordResetSession.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+      passwordResetSessionRepository.save(passwordResetSession);
+    }
    return email;
   }
 
@@ -243,35 +251,34 @@ public class UserService {
     PasswordResetSession passwordResetSession =
             passwordResetSessionRepository.findPasswordResetSessionByEmailAndOtp(email, otp);
     if (passwordResetSession == null) {
-      Integer attempts = passwordResetSession.getAttemptCount()+1;
-      passwordResetSession.setAttemptCount(attempts);
-      passwordResetSessionRepository.save(passwordResetSession);
       throw new AppException(ErrorCode.INVALID_TOKEN);
     }
     if (passwordResetSession.getExpiresAt().isBefore(LocalDateTime.now())) {
       throw new AppException(ErrorCode.TOKEN_EXPIRED);
-    }
-    if (passwordResetSession.getAttemptCount() > 5 ){
-      throw new AppException(ErrorCode.FAILED_ATTEMPTS);
     }
     return passwordResetSession.getId().toString();
   }
 
   @Transactional
   public String changePassword(String passwordResetSessionId, String newPassword) {
-    UUID sessionId = UUID.fromString(passwordResetSessionId);
+    UUID sessionId = null;
+    try {
+      sessionId = UUID.fromString(passwordResetSessionId);
+    } catch (Exception e) {
+      throw new AppException(ErrorCode.UUID_IS_INVALID);
+    }
     Optional<PasswordResetSession> passwordResetSession = passwordResetSessionRepository.findById(sessionId);
-    if (passwordResetSession.isEmpty()) {
+    if (passwordResetSession == null || passwordResetSession.isEmpty()) {
       throw new AppException(ErrorCode.SESSION_REST_PASSWORD_NOT_FOUND);
     }
-    if (passwordResetSession.get().getUsed()){
+    if (passwordResetSession.get().getUsed() != null && passwordResetSession.get().getUsed()){
       throw new AppException(ErrorCode.SESSION_REST_PASSWORD_HAS_USED);
     }
-    if (passwordResetSession.get().getExpiresAt().isBefore(LocalDateTime.now())) {
+    if (passwordResetSession.get().getExpiresAt().plusMinutes(5).isBefore(LocalDateTime.now())) {
       throw new AppException(ErrorCode.TOKEN_EXPIRED);
     }
     User user = userRepository.findUserByEmail(passwordResetSession.get().getEmail());
-    user.setPassword(newPassword);
+    user.setPassword(passwordEncoder.encode(newPassword));
     userRepository.save(user);
 
     passwordResetSession.get().setUsed(true);

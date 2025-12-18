@@ -6,6 +6,5 @@ create table IF NOT EXISTS password_reset_session (
     otp varchar(10),
     is_verified BOOLEAN DEFAULT FALSE ,
     expires_at timestamp NOT NULL ,
-    used BOOLEAN default false,
-    attempt_count int default 0
+    used BOOLEAN default false
 );

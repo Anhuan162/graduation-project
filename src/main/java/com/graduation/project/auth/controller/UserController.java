@@ -1,8 +1,7 @@
 package com.graduation.project.auth.controller;
 
 import com.graduation.project.auth.dto.VerifyUserDto;
-import com.graduation.project.auth.dto.request.SearchUserRequest;
-import com.graduation.project.auth.dto.request.SignupRequest;
+import com.graduation.project.auth.dto.request.*;
 import com.graduation.project.auth.dto.response.*;
 import com.graduation.project.auth.service.UserService;
 import jakarta.validation.Valid;
@@ -67,27 +66,28 @@ public class UserController {
   }
 
 
-  @PostMapping("/reset-password")
-  public ApiResponse<String> resetPassword (
-          @RequestParam String email
+  @PostMapping("/password/reset")
+  public ApiResponse<String> requestResetPassword(
+          @RequestBody ResetPasswordRequest request
   ) {
-    return ApiResponse.<String>builder().result(userService.sendOtpToUserToResetPassword(email)).build();
+    return ApiResponse.<String>builder()
+            .result(userService.sendOtpToUserToResetPassword(request.getEmail())).build();
   }
 
+
   @PostMapping("/otp")
-  public ApiResponse<String> otp (
-          @RequestParam String otp,
-          @RequestParam String email
+  public ApiResponse<String> verifyOtp (
+          @Valid @RequestBody VerifyOtpRequest request
   ) {
-    return ApiResponse.<String>builder().result( userService.verifyOtp(otp, email)).build();
+    return ApiResponse.<String>builder().result( userService.verifyOtp(request.getOtp(), request.getEmail())).build();
   }
 
   @PutMapping("/change-password")
   public ApiResponse<String> changePassword (
-          @RequestParam String PasswordSessionId,
-          @RequestParam String newPassword
+          @Valid @RequestBody ChangePasswordRequest request
   ) {
-    return ApiResponse.<String>builder().result( userService.changePassword(PasswordSessionId, newPassword)).build();
+    return ApiResponse.<String>builder().result(
+            userService.changePassword(request.getPasswordSessionId(), request.getNewPassword())).build();
   }
 
   @GetMapping("/profiles")

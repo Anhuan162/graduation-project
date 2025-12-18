@@ -1,18 +1,14 @@
 package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Getter
-@Setter
+@Data
 @Entity
-@Builder
 @Table(name = "password_reset_session")
 public class PasswordResetSession {
 
@@ -30,9 +26,4 @@ public class PasswordResetSession {
     private LocalDateTime expiresAt;
 
     private Boolean used;
-
-    @Column(name = "attempt_count")
-    private Integer AttemptCount;
-
-
 }
