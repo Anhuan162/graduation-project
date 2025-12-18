@@ -35,6 +35,9 @@ public enum ErrorCode {
   INVALID_REPORT_TARGET(1025, "Invalid report target", HttpStatus.NOT_FOUND),
   REPORT_ALREADY_EXISTED(1026, "Report already existed", HttpStatus.NOT_FOUND),
   REPORT_NOT_FOUND(1026, "Report not found", HttpStatus.NOT_FOUND),
+  FAILED_ATTEMPTS(1027, "Too many failed attempts", HttpStatus.BAD_REQUEST),
+  SESSION_REST_PASSWORD_NOT_FOUND(1028, "Session reset password not found", HttpStatus.NOT_FOUND),
+  SESSION_REST_PASSWORD_HAS_USED(1029, "Session reset password has used", HttpStatus.BAD_REQUEST),
   ;
 
   private final int code;
