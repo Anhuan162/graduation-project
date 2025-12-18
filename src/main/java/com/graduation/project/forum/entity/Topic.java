@@ -1,8 +1,8 @@
 package com.graduation.project.forum.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.graduation.project.forum.constant.TopicVisibility;
 import com.graduation.project.common.entity.User;
+import com.graduation.project.forum.constant.TopicVisibility;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -35,8 +35,7 @@ public class Topic {
   @Enumerated(EnumType.STRING)
   private TopicVisibility topicVisibility = TopicVisibility.PUBLIC;
 
-  @Builder.Default
-  private boolean isDeleted = Boolean.FALSE;
+  @Builder.Default private Boolean deleted = Boolean.FALSE;
 
   @JsonIgnore
   @ManyToOne

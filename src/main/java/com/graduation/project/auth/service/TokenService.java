@@ -1,9 +1,10 @@
 package com.graduation.project.auth.service;
 
+import com.graduation.project.auth.repository.InvalidatedTokenRepository;
+import com.graduation.project.auth.repository.UserRepository;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import com.graduation.project.common.entity.User;
-import com.graduation.project.auth.repository.InvalidatedTokenRepository;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -19,12 +20,14 @@ import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Log4j2
 public class TokenService {
 
   private final InvalidatedTokenRepository invalidatedTokenRepository;
+  private final UserRepository userRepository;
 
   @Value("${app.jwt.secret}")
   protected String secretKey;
@@ -35,11 +38,17 @@ public class TokenService {
   @Value("${app.jwt.refreshTokenExpirationMs}")
   protected long refreshTokenValidityMs;
 
-  public TokenService(InvalidatedTokenRepository invalidatedTokenRepository) {
+  public TokenService(
+      InvalidatedTokenRepository invalidatedTokenRepository, UserRepository userRepository) {
     this.invalidatedTokenRepository = invalidatedTokenRepository;
+    this.userRepository = userRepository;
   }
 
+  @Transactional
   public String generateToken(User user, boolean isRefreshToken) {
+    if (!isRefreshToken) {
+      user = userRepository.findById(user.getId()).orElse(user);
+    }
     JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
     JWTClaimsSet jwtClaimsSet =

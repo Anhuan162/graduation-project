@@ -27,7 +27,6 @@ public class UserNotification {
   @JoinColumn(name = "user_id")
   private User user;
 
-  private boolean isRead;
   private Instant deliveredAt;
   private Instant readAt;
 

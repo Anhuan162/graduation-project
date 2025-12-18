@@ -6,15 +6,9 @@ import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
-import com.graduation.project.event.constant.EventType;
 import com.graduation.project.event.dto.ActivityLogDTO;
-import com.graduation.project.event.dto.EventEnvelope;
-import com.graduation.project.event.dto.NotificationMessageDTO;
-import com.graduation.project.event.producer.StreamProducer;
-import com.graduation.project.forum.dto.CommentRequest;
-import com.graduation.project.forum.dto.CommentResponse;
-import com.graduation.project.forum.dto.CommentWithReplyCountResponse;
-import com.graduation.project.forum.dto.SearchCommentRequest;
+import com.graduation.project.event.dto.NotificationEventDTO;
+import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.repository.CommentRepository;
@@ -26,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -42,7 +37,7 @@ public class CommentService {
   private final AuthorizationService authorizationService;
   private final FileMetadataRepository fileMetadataRepository;
   private final FileService fileService;
-  private final StreamProducer streamProducer;
+  private final ApplicationEventPublisher publisher;
 
   // Constants để tránh hardcode
   private static final String IP_ADDRESS = "127.0.0.1"; // Nên lấy từ Request thực tế
@@ -56,7 +51,7 @@ public class CommentService {
             .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
-    if (authorizationService.canViewTopic(post.getTopic(), user)) {
+    if (!authorizationService.canViewTopic(post.getTopic(), user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
@@ -65,20 +60,8 @@ public class CommentService {
 
     String fileUrl = handleFileMetadata(request.getFileMetadataId(), comment, user);
 
-    // Notify Post Author
-    sendNotification(
-        comment,
-        user,
-        Set.of(post.getAuthor().getId()),
-        NOTI_TITLE_COMMENT,
-        user.getFullName() + " đã bình luận vào bài viết của bạn");
-
-    logActivity(
-        user,
-        "CREATE COMMENT",
-        comment.getId(),
-        "Bạn đã bình luận vào bài viết của " + post.getAuthor().getFullName());
-
+    CreatedCommentEvent createdCommentEvent = CreatedCommentEvent.from(comment);
+    publisher.publishEvent(createdCommentEvent);
     return toResponse(comment, fileUrl);
   }
 
@@ -89,42 +72,20 @@ public class CommentService {
             .findById(UUID.fromString(parentId))
             .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
-    User user = currentUserService.getCurrentUserEntity();
-    if (authorizationService.canViewTopic(parent.getPost().getTopic(), user)) {
+    User currentUser = currentUserService.getCurrentUserEntity();
+
+    if (!authorizationService.canViewTopic(parent.getPost().getTopic(), currentUser)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    // Reply vẫn thuộc về Post của parent
-    Comment reply = buildComment(parent.getPost(), parent, user, request.getContent());
+
+    Comment reply = buildComment(parent.getPost(), parent, currentUser, request.getContent());
     commentRepository.save(reply);
+    String fileUrl = handleFileMetadata(request.getFileMetadataId(), reply, currentUser);
 
-    String fileUrl = handleFileMetadata(request.getFileMetadataId(), reply, user);
-
-    // Notify logic (dùng Set để tránh gửi trùng nếu author post và author comment là 1 người)
-    Set<UUID> receivers = new HashSet<>();
-    if (!user.getId().equals(parent.getPost().getAuthor().getId())) {
-      // Notify post owner
-      sendNotification(
-          reply,
-          user,
-          Set.of(parent.getPost().getAuthor().getId()),
-          NOTI_TITLE_COMMENT,
-          user.getFullName() + " đã bình luận vào bài viết của bạn");
-    }
-
-    if (!user.getId().equals(parent.getAuthor().getId())) {
-      // Notify comment owner
-      sendNotification(
-          reply,
-          user,
-          Set.of(parent.getAuthor().getId()),
-          NOTI_TITLE_COMMENT,
-          user.getFullName() + " đã phản hồi bình luận của bạn");
-    }
-
+    CreatedCommentEvent event = CreatedCommentEvent.from(reply);
+    publisher.publishEvent(event);
     return toResponse(reply, fileUrl);
   }
-
-  // --- Optimized Read Methods ---
 
   @Transactional(readOnly = true)
   public Page<CommentWithReplyCountResponse> getRootComments(String postId, Pageable pageable) {
@@ -173,36 +134,14 @@ public class CommentService {
     return fileMetadata.getUrl();
   }
 
-  private void sendNotification(
-      Comment comment, User sender, Set<UUID> receiverIds, String title, String content) {
-    if (receiverIds.isEmpty()) return;
-
-    NotificationMessageDTO dto =
-        NotificationMessageDTO.builder()
-            .relatedId(comment.getId())
-            .type(ResourceType.COMMENT)
-            .title(title)
-            .content(content)
-            .senderId(sender.getId())
-            .senderName(sender.getEmail()) // Hoặc getFullName
-            .receiverIds(receiverIds)
-            .createdAt(LocalDateTime.now())
-            .build();
-    streamProducer.publish(EventEnvelope.from(EventType.NOTIFICATION, dto, "COMMENT"));
-  }
-
-  private void logActivity(User user, String action, UUID objectId, String description) {
-    ActivityLogDTO log =
-        ActivityLogDTO.from(
-            user.getId(), action, "FORUM", ResourceType.COMMENT, objectId, description, IP_ADDRESS);
-    streamProducer.publish(EventEnvelope.from(EventType.NOTIFICATION, log, "COMMENT"));
-  }
-
   private CommentResponse toResponse(Comment c, String url) {
     return CommentResponse.builder()
         .id(c.getId())
         .content(c.getContent())
         .authorId(c.getAuthor().getId())
+        .parentId(c.getParent().getId())
+        .postId(c.getPost().getId())
+        .deleted(c.getDeleted())
         .createdDateTime(c.getCreatedDateTime())
         .url(url)
         .reactionCount(c.getReactionCount())
@@ -223,7 +162,6 @@ public class CommentService {
     commentRepository.save(comment);
 
     String fileUrl = handleFileMetadata(request.getFileMetadataId(), comment, user);
-
     return toResponse(comment, fileUrl);
   }
 
@@ -279,5 +217,32 @@ public class CommentService {
           return cb.and(predicates.toArray(new Predicate[0]));
         };
     return commentRepository.findAll(spec, pageable);
+  }
+
+  public CommentResponse getComment(UUID commentId) {
+    Comment comment =
+        commentRepository
+            .findById(commentId)
+            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+    User user = currentUserService.getCurrentUserEntity();
+
+    if (!authorizationService.canSoftDeleteComment(comment, user)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    FileMetadata fileMetadataList =
+        fileMetadataRepository
+            .findAllByResourceIdAndResourceType(commentId, ResourceType.COMMENT)
+            .getFirst();
+    return toResponse(comment, fileMetadataList.getUrl());
+  }
+
+  @Transactional
+  public Page<CommentResponse> getMyComments(Pageable pageable) {
+    User user = currentUserService.getCurrentUserEntity();
+    Page<Comment> comments =
+        commentRepository.findAllByAuthorIdAndDeletedFalse(user.getId(), pageable);
+    return comments.map(c -> toResponse(c, null));
   }
 }

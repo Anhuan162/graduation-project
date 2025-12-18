@@ -16,7 +16,7 @@ public interface TopicMapper {
   @Mapping(target = "id", ignore = true) // ignore id vì nó tự generate
   Topic toTopic(TopicRequest request, Category category, User user);
 
-  @Mapping(target = "categoryId", source = "category.id")
-  @Mapping(target = "createdBy", source = "createdBy.id")
+  @Mapping(target = "categoryName", source = "category.name")
+  @Mapping(target = "createdBy", source = "createdBy.fullName")
   TopicResponse toTopicResponse(Topic topic);
 }

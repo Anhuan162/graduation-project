@@ -144,13 +144,13 @@ public class ReportService {
   private void handleContentDeletion(Report report) {
     if (report.getTargetType() == TargetType.POST && report.getPost() != null) {
       Post post = report.getPost();
-      if (!post.isDeleted()) { // Chỉ xóa nếu chưa xóa
+      if (!post.getDeleted()) { // Chỉ xóa nếu chưa xóa
         post.setDeleted(true);
         postRepository.save(post);
       }
     } else if (report.getTargetType() == TargetType.COMMENT && report.getComment() != null) {
       Comment comment = report.getComment();
-      if (!comment.isDeleted()) {
+      if (!comment.getDeleted()) {
         comment.setDeleted(true);
         commentRepository.save(comment);
       }

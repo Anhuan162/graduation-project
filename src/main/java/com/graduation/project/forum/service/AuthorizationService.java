@@ -1,6 +1,5 @@
 package com.graduation.project.forum.service;
 
-import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.forum.constant.CategoryType;
 import com.graduation.project.forum.constant.TopicRole;
@@ -9,6 +8,9 @@ import com.graduation.project.forum.entity.Category;
 import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Topic;
+import com.graduation.project.forum.repository.PostRepository;
+import com.graduation.project.forum.repository.TopicMemberRepository;
+import com.graduation.project.forum.repository.TopicRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +18,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthorizationService {
 
-  private final CurrentUserService currentUserService;
+  private final TopicRepository topicRepository;
+  private final PostRepository postRepository;
+  private final TopicMemberRepository topicMemberRepository;
 
   public boolean canManageTopic(User currentUser, Topic topic) {
     boolean isAdmin = isAdmin(currentUser);
@@ -29,7 +33,7 @@ public class AuthorizationService {
         || category.getCategoryType() == CategoryType.CLASSROOM) {
       return isAdmin(user);
     }
-    return false;
+    return true;
   }
 
   public boolean canCreatePost(Topic topic, User user) {
@@ -59,7 +63,7 @@ public class AuthorizationService {
     return isCommentCreator(comment, user) || canSoftDeletePost(comment.getPost(), user);
   }
 
-  private static boolean isTopicCreator(User currentUser, Topic topic) {
+  public boolean isTopicCreator(User currentUser, Topic topic) {
     return topic.getCreatedBy().getId().equals(currentUser.getId());
   }
 
@@ -67,18 +71,13 @@ public class AuthorizationService {
     return user.getRoles().stream().anyMatch(r -> r.getName().equals("ADMIN"));
   }
 
-  private boolean isTopicManager(User user, Topic topic) {
-    return topic.getTopicMembers().stream()
-        .anyMatch(
-            m ->
-                m.getUser().getId().equals(user.getId())
-                    && m.isApproved()
-                    && m.getTopicRole() == TopicRole.MANAGER);
+  public boolean isTopicManager(User user, Topic topic) {
+    return topicMemberRepository.checkPermission(user.getId(), topic.getId(), TopicRole.MANAGER);
   }
 
-  private boolean isTopicMember(User user, Topic topic) {
-    return topic.getTopicMembers().stream()
-        .anyMatch(m -> m.getUser().getId().equals(user.getId()) && m.isApproved());
+  public boolean isTopicMember(User user, Topic topic) {
+
+    return topicMemberRepository.checkPermission(user.getId(), topic.getId(), null);
   }
 
   public boolean isCommentCreator(Comment comment, User user) {
