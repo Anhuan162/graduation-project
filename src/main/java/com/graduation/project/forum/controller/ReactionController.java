@@ -1,5 +1,6 @@
 package com.graduation.project.forum.controller;
 
+import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.forum.constant.ReactionType;
 import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.dto.ReactionDetailResponse;
@@ -10,7 +11,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -21,24 +21,27 @@ public class ReactionController {
   private final ReactionService reactionService;
 
   @PostMapping
-  public ResponseEntity<String> react(@RequestBody ReactionRequest request) {
+  public ApiResponse<String> react(@RequestBody ReactionRequest request) {
     reactionService.toggleReaction(request);
-
-    return ResponseEntity.ok("Success");
+    return ApiResponse.<String>builder().result("Success").build();
   }
 
   @GetMapping("/summary")
-  public ResponseEntity<ReactionSummary> getSummary(
+  public ApiResponse<ReactionSummary> getSummary(
       @RequestParam UUID targetId, @RequestParam TargetType targetType) {
-    return ResponseEntity.ok(reactionService.getReactionSummary(targetId, targetType));
+    return ApiResponse.<ReactionSummary>builder()
+        .result(reactionService.getReactionSummary(targetId, targetType))
+        .build();
   }
 
   @GetMapping
-  public ResponseEntity<Page<ReactionDetailResponse>> getList(
+  public ApiResponse<Page<ReactionDetailResponse>> getList(
       @RequestParam UUID targetId,
       @RequestParam TargetType targetType,
       @RequestParam(required = false) ReactionType type,
       Pageable pageable) {
-    return ResponseEntity.ok(reactionService.getReactions(targetId, targetType, type, pageable));
+    return ApiResponse.<Page<ReactionDetailResponse>>builder()
+        .result(reactionService.getReactions(targetId, targetType, type, pageable))
+        .build();
   }
 }

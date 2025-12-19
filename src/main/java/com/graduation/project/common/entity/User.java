@@ -31,7 +31,7 @@ public class User {
 
   private Boolean enabled;
 
-  private String avatar_url;
+  private String avatarUrl;
 
   private String phone;
 

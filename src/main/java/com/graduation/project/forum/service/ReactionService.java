@@ -1,19 +1,13 @@
 package com.graduation.project.forum.service;
 
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.User;
-import com.graduation.project.event.constant.EventType;
-import com.graduation.project.event.dto.EventEnvelope;
-import com.graduation.project.event.dto.NotificationEventDTO;
-import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.forum.constant.ReactionType;
 import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.dto.ReactionDetailResponse;
+import com.graduation.project.forum.dto.ReactionEvent;
 import com.graduation.project.forum.dto.ReactionRequest;
 import com.graduation.project.forum.dto.ReactionSummary;
-import com.graduation.project.forum.entity.Comment;
-import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Reaction;
 import com.graduation.project.forum.repository.CommentRepository;
 import com.graduation.project.forum.repository.PostRepository;
@@ -21,10 +15,12 @@ import com.graduation.project.forum.repository.ReactionCountProjection;
 import com.graduation.project.forum.repository.ReactionRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -39,7 +35,7 @@ public class ReactionService {
   private final CurrentUserService currentUserService;
   private final PostRepository postRepository;
   private final CommentRepository commentRepository;
-  private final StreamProducer streamProducer;
+  private final ApplicationEventPublisher publisher;
 
   @Transactional
   public void toggleReaction(ReactionRequest request) {
@@ -51,24 +47,31 @@ public class ReactionService {
     if (existingReactionOpt.isPresent()) {
       Reaction existingReaction = existingReactionOpt.get();
 
-      if (existingReaction.getType() == request.getType()) {
+      if (existingReaction.getType() == request.getReactionType()) {
         // TRƯỜNG HỢP A: Đã thả rồi, bấm lại y hệt -> XÓA (Unlike)
         reactionRepository.delete(existingReaction);
         updateReactionCount(request.getTargetId(), request.getTargetType(), false);
       } else {
         // TRƯỜNG HỢP B: Đã thả rồi, nhưng đổi loại (Like -> Love) -> CẬP NHẬT
-        existingReaction.setType(request.getType());
+        existingReaction.setType(request.getReactionType());
         reactionRepository.save(existingReaction);
       }
     } else {
       // TRƯỜNG HỢP C: Chưa thả bao giờ -> TẠO MỚI
-      if (!postRepository.existsById(request.getTargetId())
-          && request.getTargetType().equals(TargetType.POST)) {
-        throw new AppException(ErrorCode.USER_EXISTED);
-      }
-      if (!commentRepository.existsById(request.getTargetId())
-          && request.getTargetType().equals(TargetType.COMMENT)) {
-        throw new AppException(ErrorCode.USER_EXISTED);
+      UUID receiverId = null;
+
+      if (request.getTargetType().equals(TargetType.POST)) {
+        var post =
+            postRepository
+                .findById(request.getTargetId())
+                .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+        receiverId = post.getAuthor().getId();
+      } else if (request.getTargetType().equals(TargetType.COMMENT)) {
+        var comment =
+            commentRepository
+                .findById(request.getTargetId())
+                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+        receiverId = comment.getAuthor().getId();
       }
 
       Reaction newReaction =
@@ -76,13 +79,17 @@ public class ReactionService {
               .user(user)
               .targetId(request.getTargetId())
               .targetType(request.getTargetType())
-              .type(request.getType())
+              .type(request.getReactionType())
+              .createdAt(LocalDateTime.now())
               .build();
 
       reactionRepository.save(newReaction);
       updateReactionCount(request.getTargetId(), request.getTargetType(), true);
 
-      sendReactionNotification(user, request);
+      if (receiverId != null && !receiverId.equals(user.getId())) {
+        ReactionEvent reactionEvent = ReactionEvent.from(newReaction, user, receiverId);
+        publisher.publishEvent(reactionEvent);
+      }
     }
   }
 
@@ -99,59 +106,6 @@ public class ReactionService {
       } else {
         commentRepository.decreaseReactionCount(targetId);
       }
-    }
-  }
-
-  private void sendReactionNotification(User sender, ReactionRequest request) {
-    try {
-      User receiver = null;
-      String content = "";
-      String title = "";
-
-      // 3. Phải query để lấy người nhận (Chủ bài viết hoặc chủ comment)
-      if (request.getTargetType() == TargetType.POST) {
-        Optional<Post> postOpt = postRepository.findById(request.getTargetId());
-        if (postOpt.isPresent()) {
-          receiver = postOpt.get().getAuthor(); // Giả sử Post có field createdBy
-          title = "Ai đó đã bày tỏ cảm xúc về bài viết của bạn";
-          content =
-              sender.getFullName() + " đã thả " + request.getType() + " vào bài viết của bạn.";
-        }
-      } else if (request.getTargetType() == TargetType.COMMENT) {
-        Optional<Comment> commentOpt = commentRepository.findById(request.getTargetId());
-        if (commentOpt.isPresent()) {
-          receiver = commentOpt.get().getAuthor(); // Giả sử Comment có field createdBy
-          title = "Ai đó đã bày tỏ cảm xúc về bình luận của bạn";
-          content =
-              sender.getFullName() + " đã thả " + request.getType() + " vào bình luận của bạn.";
-        }
-      }
-
-      // 4. Validate và tránh tự like tự sướng (Self-notification)
-      if (receiver != null && !receiver.getId().equals(sender.getId())) {
-
-        NotificationEventDTO dto =
-            NotificationEventDTO.builder()
-                .relatedId(request.getTargetId()) // ID bài viết hoặc comment
-                .type(ResourceType.REACTION) // Hoặc tạo thêm NotificationType.REACTION
-                .title(title)
-                .content(content)
-                .senderId(sender.getId())
-                .senderName(sender.getFullName()) // Hoặc email
-                .receiverIds(Collections.singleton(receiver.getId())) // List chứa 1 người
-                .createdAt(java.time.LocalDateTime.now())
-                .build();
-
-        // 5. Đóng gói Event và đẩy vào Redis
-        EventEnvelope eventEnvelope =
-            EventEnvelope.from(EventType.NOTIFICATION, dto, "REACTION_SERVICE");
-
-        streamProducer.publish(eventEnvelope);
-      }
-
-    } catch (Exception e) {
-      // Log lỗi nhưng KHÔNG throw exception để tránh rollback transaction của việc Like
-      log.error("Failed to send reaction notification", e);
     }
   }
 
@@ -216,7 +170,7 @@ public class ReactionService {
             ReactionDetailResponse.builder()
                 .userId(reaction.getUser().getId())
                 .username(reaction.getUser().getFullName()) // Giả sử User entity có field này
-                //                .avatarUrl(reaction.getUser().getAvatarUrl()) // Giả sử User
+                .avatarUrl(reaction.getUser().getAvatarUrl()) // Giả sử User
                 .type(reaction.getType())
                 .build());
   }

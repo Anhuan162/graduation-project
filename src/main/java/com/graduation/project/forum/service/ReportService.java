@@ -1,9 +1,7 @@
 package com.graduation.project.forum.service;
 
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.User;
-import com.graduation.project.event.entity.DomainEvent;
 import com.graduation.project.forum.constant.ReportStatus;
 import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.dto.ProcessReportRequest;
@@ -12,15 +10,15 @@ import com.graduation.project.forum.dto.ReportResponse;
 import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Report;
+import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.repository.CommentRepository;
 import com.graduation.project.forum.repository.PostRepository;
 import com.graduation.project.forum.repository.ReportRepository;
+import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,7 +32,8 @@ public class ReportService {
   private final PostRepository postRepository;
   private final CommentRepository commentRepository;
   private final CurrentUserService currentUserService;
-  private final ApplicationEventPublisher publisher;
+  private final AuthorizationService authorizationService;
+  private final TopicRepository topicRepository;
 
   @Transactional
   public void createReport(ReportRequest request) {
@@ -55,25 +54,6 @@ public class ReportService {
     } else {
       throw new AppException(ErrorCode.INVALID_REPORT_TARGET);
     }
-
-    DomainEvent event =
-        DomainEvent.builder()
-            .actorId(reporter.getId())
-            .actorName(reporter.getEmail()) // hoặc fullName
-            .action("CREATE_REPORT") // Nên dùng Enum
-            .module("FORUM") // Nên dùng Enum
-            .resourceId(
-                reportBuilder
-                    .build()
-                    .getId()) // ID của cái Report vừa tạo (lưu ý: cần save trước hoặc lấy ID sau
-            // save)
-            .resourceType(ResourceType.REPORT)
-            .title("Báo cáo vi phạm mới")
-            .content("Người dùng " + reporter.getEmail() + " đã báo cáo một nội dung.")
-//            .recipientIds(getAdminIds()) // Logic lấy ID admin để thông báo
-            .localDateTime(LocalDateTime.now())
-            .build();
-    publisher.publishEvent(event);
 
     reportRepository.save(reportBuilder.build());
   }
@@ -107,9 +87,24 @@ public class ReportService {
   }
 
   @Transactional(readOnly = true)
-  public Page<ReportResponse> getReports(ReportStatus status, TargetType type, Pageable pageable) {
-    // Cần viết thêm method query trong Repository (xem bước 4)
+  public Page<ReportResponse> searchReportsForAdmin(
+      ReportStatus status, TargetType type, Pageable pageable) {
     Page<Report> reports = reportRepository.findAllByFilters(status, type, pageable);
+    return reports.map(this::mapToResponse);
+  }
+
+  @Transactional
+  public Page<ReportResponse> searchReportsByTopic(UUID topicId, Pageable pageable) {
+    User reporter = currentUserService.getCurrentUserEntity();
+    Topic topic =
+        topicRepository
+            .findById(topicId)
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+
+    if (!authorizationService.canManageTopic(reporter, topic)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+    Page<Report> reports = reportRepository.findAllReportsByTopic(topicId, pageable);
     return reports.map(this::mapToResponse);
   }
 
@@ -123,13 +118,12 @@ public class ReportService {
   }
 
   @Transactional
-  public void processReport(UUID reportId, ProcessReportRequest request) {
+  public ReportResponse processReport(UUID reportId, ProcessReportRequest request) {
     Report report =
         reportRepository
             .findById(reportId)
             .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
 
-    // 1. Cập nhật trạng thái báo cáo
     report.setStatus(request.getStatus());
 
     // 2. Logic xử lý nội dung vi phạm (Nếu Admin chọn xóa)
@@ -138,6 +132,7 @@ public class ReportService {
     }
 
     reportRepository.save(report);
+    return mapToResponse(report);
   }
 
   // Helper method: Xử lý xóa nội dung dựa trên TargetType

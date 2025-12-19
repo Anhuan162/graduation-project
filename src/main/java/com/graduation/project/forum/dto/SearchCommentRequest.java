@@ -8,7 +8,7 @@ import lombok.Data;
 public class SearchCommentRequest {
   private UUID authorId;
   private UUID postId;
-  private String isDeleted;
+  private Boolean deleted;
   private LocalDate fromDate;
   private LocalDate toDate;
 }

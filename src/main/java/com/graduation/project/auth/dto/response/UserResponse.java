@@ -33,7 +33,7 @@ public class UserResponse {
         .password(user.getPassword())
         .fullName(user.getFullName())
         .enabled(user.getEnabled())
-        .avatar_url(user.getAvatar_url())
+        .avatar_url(user.getAvatarUrl())
         .phone(user.getPhone())
         .studentCode(user.getStudentCode())
         .roles(RoleResponse.from(user.getRoles()))

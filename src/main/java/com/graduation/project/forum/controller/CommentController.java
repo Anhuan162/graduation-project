@@ -1,10 +1,7 @@
 package com.graduation.project.forum.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.forum.dto.CommentRequest;
-import com.graduation.project.forum.dto.CommentResponse;
-import com.graduation.project.forum.dto.CommentWithReplyCountResponse;
-import com.graduation.project.forum.dto.SearchCommentRequest;
+import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.service.CommentService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -39,16 +36,16 @@ public class CommentController {
 
   @GetMapping("/post/{postId}")
   public ApiResponse<Page<CommentWithReplyCountResponse>> getRootComments(
-      @PathVariable String postId, @RequestParam Pageable pageable) {
+      @PathVariable String postId, @PageableDefault(page = 0, size = 10) Pageable pageable) {
     return ApiResponse.<Page<CommentWithReplyCountResponse>>builder()
         .result(commentService.getRootComments(postId, pageable))
         .build();
   }
 
   @GetMapping("/{commentId}/replies")
-  public ApiResponse<Page<CommentResponse>> getReplies(
-      @PathVariable String commentId, @RequestParam Pageable pageable) {
-    return ApiResponse.<Page<CommentResponse>>builder()
+  public ApiResponse<Page<DetailCommentResponse>> getReplies(
+      @PathVariable String commentId, Pageable pageable) {
+    return ApiResponse.<Page<DetailCommentResponse>>builder()
         .result(commentService.getReplies(commentId, pageable))
         .build();
   }
@@ -60,9 +57,11 @@ public class CommentController {
   }
 
   @DeleteMapping("/soft-delete/{commentId}")
-  public ApiResponse<String> softDeleteComment(@PathVariable String commentId) {
-    commentService.softDeleteComment(commentId);
-    return ApiResponse.<String>builder().result("Deleted comment").build();
+  public ApiResponse<CommentResponse> softDeleteComment(@PathVariable String commentId) {
+
+    return ApiResponse.<CommentResponse>builder()
+        .result(commentService.softDeleteComment(commentId))
+        .build();
   }
 
   @GetMapping
@@ -75,8 +74,8 @@ public class CommentController {
   }
 
   @GetMapping("/{commentId}")
-  public ApiResponse<CommentResponse> getComment(@PathVariable UUID commentId) {
-    return ApiResponse.<CommentResponse>builder()
+  public ApiResponse<DetailCommentResponse> getComment(@PathVariable UUID commentId) {
+    return ApiResponse.<DetailCommentResponse>builder()
         .result(commentService.getComment(commentId))
         .build();
   }
