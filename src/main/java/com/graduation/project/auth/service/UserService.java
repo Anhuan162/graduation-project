@@ -348,7 +348,7 @@ public class UserService {
 
       try {
             String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER );
-            user.setAvatar_url(newAvatarUrl);
+            user.setAvatarUrl(newAvatarUrl);
         } catch (IOException e) {
             throw new RuntimeException("can not upload avatar", e);
         }

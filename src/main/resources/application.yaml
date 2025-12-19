@@ -1,5 +1,5 @@
 server:
-  port: 9080
+  port: 8080
 
 spring:
   application:
@@ -7,7 +7,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/authdb
     username: postgres
-    password: postgres
+    password: root
   jpa:
     hibernate:
       ddl-auto: none

@@ -81,7 +81,7 @@ public class User {
             .fullName(this.fullName)
             .phone(this.phone)
             .enabled(this.enabled)
-            .avatar_url(this.avatar_url)
+            .avatar_url(this.avatarUrl)
             .studentCode(this.studentCode)
             .classCode(this.classCode)
             .build();
