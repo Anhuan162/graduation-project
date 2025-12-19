@@ -1,6 +1,7 @@
 package com.graduation.project.common.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.graduation.project.auth.dto.response.UserProfileResponse;
 import com.graduation.project.common.constant.Provider;
 import com.graduation.project.cpa.entity.CpaProfile;
 import com.graduation.project.forum.entity.Category;
@@ -73,4 +74,16 @@ public class User {
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   @Builder.Default
   private Set<TopicMember> topicMembers = new HashSet<>();
+
+  public UserProfileResponse toUserProfileResponse () {
+    return UserProfileResponse.builder()
+            .email(this.email)
+            .fullName(this.fullName)
+            .phone(this.phone)
+            .enabled(this.enabled)
+            .avatar_url(this.avatar_url)
+            .studentCode(this.studentCode)
+            .classCode(this.classCode)
+            .build();
+  }
 }

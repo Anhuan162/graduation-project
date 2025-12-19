@@ -1,11 +1,8 @@
 package com.graduation.project.auth.controller;
 
 import com.graduation.project.auth.dto.VerifyUserDto;
-import com.graduation.project.auth.dto.request.SearchUserRequest;
-import com.graduation.project.auth.dto.request.SignupRequest;
-import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.auth.dto.response.SignupResponse;
-import com.graduation.project.auth.dto.response.UserResponse;
+import com.graduation.project.auth.dto.request.*;
+import com.graduation.project.auth.dto.response.*;
 import com.graduation.project.auth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("api/users")
@@ -65,5 +63,55 @@ public class UserController {
   ApiResponse<String> deleteUser(@PathVariable String userId) {
     userService.deleteUser(userId);
     return ApiResponse.<String>builder().result("User has been deleted").build();
+  }
+
+
+  @PostMapping("/password/reset")
+  public ApiResponse<String> requestResetPassword(
+          @RequestBody ResetPasswordRequest request
+  ) {
+    return ApiResponse.<String>builder()
+            .result(userService.sendOtpToUserToResetPassword(request.getEmail())).build();
+  }
+
+
+  @PostMapping("/otp")
+  public ApiResponse<String> verifyOtp (
+          @Valid @RequestBody VerifyOtpRequest request
+  ) {
+    return ApiResponse.<String>builder().result( userService.verifyOtp(request.getOtp(), request.getEmail())).build();
+  }
+
+  @PutMapping("/change-password")
+  public ApiResponse<String> changePassword (
+          @Valid @RequestBody ChangePasswordRequest request
+  ) {
+    return ApiResponse.<String>builder().result(
+            userService.changePassword(request.getPasswordSessionId(), request.getNewPassword())).build();
+  }
+
+  @GetMapping("/profiles")
+  public ApiResponse<UserProfileResponse> getUserProfile () {
+    return ApiResponse.<UserProfileResponse>builder().result(userService.getUserProfile()).build();
+  }
+
+
+  @PutMapping("/profiles")
+  public ApiResponse<UserProfileResponse> updateUserProfile (
+          @RequestParam(value = "image") MultipartFile avatarFile,
+          @RequestParam("fullName") String fullName,
+          @RequestParam("phone") String phone,
+          @RequestParam("studentCode") String studentCode,
+          @RequestParam("classCode") String classCode
+  ) {
+
+    UserProfileRequest userProfileRequest =
+            UserProfileRequest.builder()
+                    .phone(phone)
+                    .classCode(classCode)
+                    .studentCode(studentCode)
+                    .avatarFile(avatarFile)
+                    .fullName(fullName).build();
+    return ApiResponse.<UserProfileResponse>builder().result(userService.updateUserProfile(userProfileRequest)).build();
   }
 }

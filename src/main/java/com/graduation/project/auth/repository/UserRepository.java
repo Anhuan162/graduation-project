@@ -19,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   List<UUID> findUserIdsByClassCodes(@Param("classCodes") Set<String> classCodes);
 
   Page<User> findAll(Specification<User> spec, Pageable pageable);
+
+  User findUserByEmail(String email);
 }

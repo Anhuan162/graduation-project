@@ -1,22 +1,32 @@
 package com.graduation.project.auth.service;
 
+import com.graduation.project.announcement.entity.Faculty;
+import com.graduation.project.announcement.repository.FacultyRepository;
 import com.graduation.project.auth.constant.PredefinedRole;
 import com.graduation.project.auth.dto.VerifyUserDto;
 import com.graduation.project.auth.dto.request.SearchUserRequest;
 import com.graduation.project.auth.dto.request.SignupRequest;
 import com.graduation.project.auth.dto.response.SignupResponse;
+import com.graduation.project.auth.dto.response.UserProfileRequest;
+import com.graduation.project.auth.dto.response.UserProfileResponse;
 import com.graduation.project.auth.dto.response.UserResponse;
+import com.graduation.project.auth.repository.PasswordResetSessionRepository;
 import com.graduation.project.auth.repository.RoleRepository;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.repository.VerificationTokenRepository;
+import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.common.constant.Provider;
+import com.graduation.project.common.entity.PasswordResetSession;
 import com.graduation.project.common.entity.Role;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.entity.VerificationToken;
+import com.graduation.project.common.service.FirebaseService;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
+
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +34,9 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +50,11 @@ public class UserService {
   private final EmailService emailService;
   private final VerificationTokenRepository verificationTokenRepository;
   private final RoleRepository roleRepository;
+  private final PasswordResetSessionRepository passwordResetSessionRepository;
+  private final FirebaseService firebaseService;
+  private final FacultyRepository facultyRepository;
+
+  private String AVATAR_FOLDER = "avatars";
 
   public SignupResponse register(SignupRequest request) {
     String email = request.getEmail();
@@ -197,5 +215,157 @@ public class UserService {
 
   public void deleteUser(String userId) {
     userRepository.deleteById(UUID.fromString(userId));
+  }
+
+  public String sendOtpToUserToResetPassword(String email){
+
+    User user = userRepository.findUserByEmail(email);
+    if (user == null){
+      throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
+    }
+
+    String otp = generateVerificationCode();
+    try {
+      sendVerificationEmail(user, otp);
+    } catch (Exception e) {
+      throw new AppException(ErrorCode.CAN_NOT_SEND_EMAIL);
+    }
+
+    PasswordResetSession passwordResetSession = passwordResetSessionRepository.findByEmailAndNotUsed(email);
+    if (passwordResetSession == null){
+      PasswordResetSession newPasswordResetSession = new PasswordResetSession();
+      newPasswordResetSession.setEmail(email);
+      newPasswordResetSession.setOtp(otp);
+      newPasswordResetSession.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+      passwordResetSessionRepository.save(newPasswordResetSession);
+
+    } else if (passwordResetSession.getUsed() == null || !passwordResetSession.getUsed()){
+      passwordResetSession.setOtp(otp);
+      passwordResetSession.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+      passwordResetSessionRepository.save(passwordResetSession);
+    }
+   return email;
+  }
+
+  public String verifyOtp(String otp, String email) {
+    PasswordResetSession passwordResetSession =
+            passwordResetSessionRepository.findPasswordResetSessionByEmailAndOtp(email, otp);
+    if (passwordResetSession == null) {
+      throw new AppException(ErrorCode.INVALID_TOKEN);
+    }
+    if (passwordResetSession.getExpiresAt().isBefore(LocalDateTime.now())) {
+      throw new AppException(ErrorCode.TOKEN_EXPIRED);
+    }
+    return passwordResetSession.getId().toString();
+  }
+
+  @Transactional
+  public String changePassword(String passwordResetSessionId, String newPassword) {
+    UUID sessionId = null;
+    try {
+      sessionId = UUID.fromString(passwordResetSessionId);
+    } catch (Exception e) {
+      throw new AppException(ErrorCode.UUID_IS_INVALID);
+    }
+    Optional<PasswordResetSession> passwordResetSession = passwordResetSessionRepository.findById(sessionId);
+    if (passwordResetSession == null || passwordResetSession.isEmpty()) {
+      throw new AppException(ErrorCode.SESSION_REST_PASSWORD_NOT_FOUND);
+    }
+    if (passwordResetSession.get().getUsed() != null && passwordResetSession.get().getUsed()){
+      throw new AppException(ErrorCode.SESSION_REST_PASSWORD_HAS_USED);
+    }
+    if (passwordResetSession.get().getExpiresAt().plusMinutes(5).isBefore(LocalDateTime.now())) {
+      throw new AppException(ErrorCode.TOKEN_EXPIRED);
+    }
+    User user = userRepository.findUserByEmail(passwordResetSession.get().getEmail());
+    user.setPassword(passwordEncoder.encode(newPassword));
+    userRepository.save(user);
+
+    passwordResetSession.get().setUsed(true);
+    passwordResetSessionRepository.save(passwordResetSession.get());
+    return "success";
+  }
+
+  public User getCurrentUser() {
+    UserPrincipal userPrincipal = getCurrentUserPrincipal();
+    if (userPrincipal != null && userPrincipal.getId() != null) {
+      return userRepository.findUserByEmail(userPrincipal.getUsername());
+    }
+    return null;
+  }
+
+  public UserPrincipal getCurrentUserPrincipal() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal)) {
+      throw new RuntimeException("User not authenticated");
+    }
+    return (UserPrincipal) auth.getPrincipal();
+  }
+
+  public UserProfileResponse getUserProfile() {
+    User user = getCurrentUser();
+    if (user == null) {
+      throw new RuntimeException("User not authenticated or not found");
+    }
+    UserProfileResponse userProfileResponse = user.toUserProfileResponse();
+    if (user.getStudentCode() != null && user.getClassCode()!=null)
+      userProfileResponse.setFacultyName(getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
+    userProfileResponse.setPermissionResponse(getPermissionOfCurrentUser());
+    return userProfileResponse;
+  }
+
+  public List<String> getPermissionOfCurrentUser() {
+    UserPrincipal userPrincipal = getCurrentUserPrincipal();
+    return userPrincipal.getAuthorities().stream().map(
+            auth -> {
+              return auth.getAuthority();
+            }
+    ).toList();
+  }
+
+  public String getAndValidateFacultiesCode(String studentCode, String classCode) {
+    if (studentCode != null && studentCode.length() != 10) throw new RuntimeException("student code is invalid");;
+    if (classCode != null && classCode.length() < 10) throw new RuntimeException("class code is invalid");
+    String facultiesCodeFromStudent = studentCode.trim().toUpperCase().substring(5,7);
+    String facultiesCodeFromClass = classCode.trim().toUpperCase().substring(5,7);
+    if (!facultiesCodeFromStudent.equals(facultiesCodeFromClass)) {
+      throw new RuntimeException("faculties code is invalid");
+    }
+    Optional<Faculty> faculty = facultyRepository.findByFacultyCode(facultiesCodeFromClass);
+    if (faculty.isEmpty()) throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
+    return faculty.get().getFacultyName();
+  }
+
+  public UserProfileResponse updateUserProfile(UserProfileRequest userProfileRequest) {
+    User user = getCurrentUser();
+    if (user == null) {
+      throw new RuntimeException("User not authenticated or not found");
+    }
+    if (userProfileRequest.getAvatarFile() != null && !userProfileRequest.getAvatarFile().isEmpty()) {
+      if (!userProfileRequest.getAvatarFile().getContentType().startsWith("image/")) {
+        throw new RuntimeException("Invalid image type");
+      }
+
+      try {
+            String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER );
+            user.setAvatar_url(newAvatarUrl);
+        } catch (IOException e) {
+            throw new RuntimeException("can not upload avatar", e);
+        }
+    }
+    String facultiesName = "";
+    if (userProfileRequest.getClassCode()!= null && !userProfileRequest.getClassCode().isEmpty()
+            && userProfileRequest.getStudentCode()!= null && !userProfileRequest.getStudentCode().isEmpty()){
+      facultiesName = getAndValidateFacultiesCode(userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
+      user.setStudentCode(userProfileRequest.getStudentCode());
+      user.setClassCode(userProfileRequest.getClassCode());
+    }
+    user.setFullName(userProfileRequest.getFullName());
+    user.setPhone(userProfileRequest.getPhone());
+    userRepository.save(user);
+    UserProfileResponse userProfileResponse = user.toUserProfileResponse();
+    userProfileResponse.setPermissionResponse(getPermissionOfCurrentUser());
+    userProfileResponse.setFacultyName(facultiesName);
+    return userProfileResponse;
   }
 }

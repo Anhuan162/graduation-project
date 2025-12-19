@@ -1,6 +1,7 @@
 package com.graduation.project.security.exception;
 
 import lombok.Getter;
+import org.apache.commons.codec.net.BCodec;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
@@ -34,7 +35,13 @@ public enum ErrorCode {
   FILE_NOT_FOUND(1024, "File not found", HttpStatus.NOT_FOUND),
   INVALID_REPORT_TARGET(1025, "Invalid report target", HttpStatus.NOT_FOUND),
   REPORT_ALREADY_EXISTED(1026, "Report already existed", HttpStatus.NOT_FOUND),
-  REPORT_NOT_FOUND(1026, "Report not found", HttpStatus.NOT_FOUND),
+  REPORT_NOT_FOUND(1027, "Report not found", HttpStatus.NOT_FOUND),
+  FAILED_ATTEMPTS(1028, "Too many failed attempts", HttpStatus.BAD_REQUEST),
+  SESSION_REST_PASSWORD_NOT_FOUND(1029, "Session reset password not found", HttpStatus.NOT_FOUND),
+  SESSION_REST_PASSWORD_HAS_USED(1030, "Session reset password has used", HttpStatus.GONE),
+  EMAIL_NOT_FOUND(1031, "email not found", HttpStatus.NOT_FOUND),
+  CAN_NOT_SEND_EMAIL(1032, "Can't send email", HttpStatus.BAD_REQUEST),
+  UUID_IS_INVALID(1033, "UUID is invalid", HttpStatus.BAD_REQUEST),
   ;
 
   private final int code;
