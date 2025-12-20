@@ -5,30 +5,21 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.util.Set;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class UserProfileResponse {
+@ToString(exclude = { "email", "fullName", "permissions" })
+public class UserAuthResponse {
     String id;
     String email;
     String fullName;
-    String avatarUrl;
-    String studentCode;
-    String classCode;
-    String phone;
-    String facultyName;
-
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    LocalDate dob;
-
-    LocalDateTime createdAt;
+    String avatar;
+    Set<String> permissions;
 }

@@ -1,7 +1,6 @@
 package com.graduation.project.security.exception;
 
 import lombok.Getter;
-import org.apache.commons.codec.net.BCodec;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
@@ -42,6 +41,8 @@ public enum ErrorCode {
   EMAIL_NOT_FOUND(1031, "email not found", HttpStatus.NOT_FOUND),
   CAN_NOT_SEND_EMAIL(1032, "Can't send email", HttpStatus.BAD_REQUEST),
   UUID_IS_INVALID(1033, "UUID is invalid", HttpStatus.BAD_REQUEST),
+  INVALID_STUDENT_CODE(1034, "Student code is invalid", HttpStatus.BAD_REQUEST),
+  INVALID_REQUEST(1035, "Invalid request", HttpStatus.BAD_REQUEST),
   ;
 
   private final int code;
