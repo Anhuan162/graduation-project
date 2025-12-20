@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -47,12 +48,7 @@ public class UserController {
   @GetMapping
   ApiResponse<Page<UserResponse>> searchUsers(
       @ModelAttribute SearchUserRequest searchUserRequest,
-      @PageableDefault(
-              page = 0,
-              size = 10,
-              sort = "registrationDate",
-              direction = Sort.Direction.DESC)
-          Pageable pageable) {
+      @PageableDefault(page = 0, size = 10, sort = "registrationDate", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<UserResponse>>builder()
         .result(userService.searchUsers(searchUserRequest, pageable))
         .build();
@@ -65,53 +61,57 @@ public class UserController {
     return ApiResponse.<String>builder().result("User has been deleted").build();
   }
 
-
   @PostMapping("/password/reset")
   public ApiResponse<String> requestResetPassword(
-          @RequestBody ResetPasswordRequest request
-  ) {
+      @RequestBody ResetPasswordRequest request) {
     return ApiResponse.<String>builder()
-            .result(userService.sendOtpToUserToResetPassword(request.getEmail())).build();
+        .result(userService.sendOtpToUserToResetPassword(request.getEmail())).build();
   }
 
-
   @PostMapping("/otp")
-  public ApiResponse<String> verifyOtp (
-          @Valid @RequestBody VerifyOtpRequest request
-  ) {
-    return ApiResponse.<String>builder().result( userService.verifyOtp(request.getOtp(), request.getEmail())).build();
+  public ApiResponse<String> verifyOtp(
+      @Valid @RequestBody VerifyOtpRequest request) {
+    return ApiResponse.<String>builder().result(userService.verifyOtp(request.getOtp(), request.getEmail())).build();
   }
 
   @PutMapping("/change-password")
-  public ApiResponse<String> changePassword (
-          @Valid @RequestBody ChangePasswordRequest request
-  ) {
+  public ApiResponse<String> changePassword(
+      @Valid @RequestBody ChangePasswordRequest request) {
     return ApiResponse.<String>builder().result(
-            userService.changePassword(request.getPasswordSessionId(), request.getNewPassword())).build();
+        userService.changePassword(request.getPasswordSessionId(), request.getNewPassword())).build();
   }
 
-  @GetMapping("/profiles")
-  public ApiResponse<UserProfileResponse> getUserProfile () {
-    return ApiResponse.<UserProfileResponse>builder().result(userService.getUserProfile()).build();
+  @PreAuthorize("isAuthenticated()")
+  @GetMapping("/me")
+  public ApiResponse<UserAuthResponse> getAuthInfo() {
+    return ApiResponse.<UserAuthResponse>builder()
+        .result(userService.getAuthInfo())
+        .build();
   }
 
+  @PreAuthorize("isAuthenticated()")
+  @GetMapping("/profile")
+  public ApiResponse<UserProfileResponse> getMyProfile() {
+    return ApiResponse.<UserProfileResponse>builder()
+        .result(userService.getUserProfile())
+        .build();
+  }
 
-  @PutMapping("/profiles")
-  public ApiResponse<UserProfileResponse> updateUserProfile (
-          @RequestParam(value = "image") MultipartFile avatarFile,
-          @RequestParam("fullName") String fullName,
-          @RequestParam("phone") String phone,
-          @RequestParam("studentCode") String studentCode,
-          @RequestParam("classCode") String classCode
-  ) {
+  @PreAuthorize("isAuthenticated()")
+  @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ApiResponse<UserProfileResponse> updateUserProfile(
+      @RequestParam(value = "image", required = false) MultipartFile avatarFile,
+      @RequestParam(value = "fullName", required = false) String fullName,
+      @RequestParam(value = "phone", required = false) String phone,
+      @RequestParam(value = "studentCode", required = false) String studentCode,
+      @RequestParam(value = "classCode", required = false) String classCode) {
 
-    UserProfileRequest userProfileRequest =
-            UserProfileRequest.builder()
-                    .phone(phone)
-                    .classCode(classCode)
-                    .studentCode(studentCode)
-                    .avatarFile(avatarFile)
-                    .fullName(fullName).build();
+    UserProfileUpdateRequest userProfileRequest = UserProfileUpdateRequest.builder()
+        .phone(phone)
+        .classCode(classCode)
+        .studentCode(studentCode)
+        .avatarFile(avatarFile)
+        .fullName(fullName).build();
     return ApiResponse.<UserProfileResponse>builder().result(userService.updateUserProfile(userProfileRequest)).build();
   }
 }
