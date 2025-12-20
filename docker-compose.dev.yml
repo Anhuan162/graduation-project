@@ -40,9 +40,9 @@ services:
 
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/authdb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
 
       SPRING_BOOT_RUN_JVM_ARGUMENTS: >
         -Dspring.devtools.restart.poll-interval=2s
@@ -51,9 +51,9 @@ services:
         -Djava.security.egd=file:/dev/./urandom
         -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
 
-#      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-#      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-#      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
 
     volumes:
       - ./:/app                 
