@@ -5,10 +5,9 @@ spring:
   application:
     name: project
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/authdb}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/authdb
+    username: postgres
+    password: root
   jpa:
     hibernate:
       ddl-auto: none
@@ -78,7 +77,7 @@ logging:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    accessTokenExpirationMs: 15000 # 15 minutes
+    accessTokenExpirationMs: 150000 # 15 minutes
     refreshTokenExpirationMs: 604800000 # 7 days
   oauth2:
     authorizedRedirectUri: http://localhost:3000/oauth2/redirect
