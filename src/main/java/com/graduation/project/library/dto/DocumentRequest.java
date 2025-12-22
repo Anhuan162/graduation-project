@@ -13,4 +13,5 @@ public class DocumentRequest {
     private String description;
     private DocumentType documentType;
     private UUID subjectId;
+    private UUID id;
 }

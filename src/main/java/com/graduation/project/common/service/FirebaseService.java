@@ -6,6 +6,8 @@ import com.google.firebase.cloud.StorageClient;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -79,4 +81,28 @@ public class FirebaseService {
       blob.delete();
     }
   }
+
+  public void deleteFileByUrl(String fileUrl) {
+    try {
+      // Lấy phần sau /o/
+      String encodedPath = fileUrl.substring(fileUrl.indexOf("/o/") + 3);
+
+      // Bỏ query params (?alt=media&token=...)
+      int queryIndex = encodedPath.indexOf("?");
+      if (queryIndex != -1) {
+        encodedPath = encodedPath.substring(0, queryIndex);
+      }
+
+      // Decode %2F, %20 ...
+      String filePath = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8);
+
+      // Xoá file
+      deleteFile(filePath);
+
+    } catch (Exception e) {
+      throw new RuntimeException("Cannot delete Firebase file from URL", e);
+    }
+  }
+
+
 }

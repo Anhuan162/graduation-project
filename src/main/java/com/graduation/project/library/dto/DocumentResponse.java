@@ -9,6 +9,7 @@ import java.util.UUID;
 @Data
 @Builder
 public class DocumentResponse {
+    private String id;
     private String title;
     private String description;
     private DocumentType documentType;

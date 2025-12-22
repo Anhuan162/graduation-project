@@ -42,6 +42,8 @@ public enum ErrorCode {
   EMAIL_NOT_FOUND(1031, "email not found", HttpStatus.NOT_FOUND),
   CAN_NOT_SEND_EMAIL(1032, "Can't send email", HttpStatus.BAD_REQUEST),
   UUID_IS_INVALID(1033, "UUID is invalid", HttpStatus.BAD_REQUEST),
+  UPDATE_FALSE(1034, "Update failed", HttpStatus.BAD_REQUEST),
+  DOCUMENT_NOT_FOUND(1035, "Document not found", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;
