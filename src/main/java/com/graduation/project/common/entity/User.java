@@ -32,7 +32,7 @@ public class User {
 
   private Boolean enabled;
 
-  private String avatar_url;
+  private String avatarUrl;
 
   private String phone;
 
@@ -49,10 +49,7 @@ public class User {
   private List<FileMetadata> fileMetadata;
 
   @ManyToMany(fetch = FetchType.EAGER)
-  @JoinTable(
-      name = "user_roles",
-      joinColumns = @JoinColumn(name = "user_id"),
-      inverseJoinColumns = @JoinColumn(name = "role_id"))
+  @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
   private Set<Role> roles = new HashSet<>();
 
   @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
@@ -75,15 +72,14 @@ public class User {
   @Builder.Default
   private Set<TopicMember> topicMembers = new HashSet<>();
 
-  public UserProfileResponse toUserProfileResponse () {
+  public UserProfileResponse toUserProfileResponse() {
     return UserProfileResponse.builder()
-            .email(this.email)
-            .fullName(this.fullName)
-            .phone(this.phone)
-            .enabled(this.enabled)
-            .avatar_url(this.avatar_url)
-            .studentCode(this.studentCode)
-            .classCode(this.classCode)
-            .build();
+        .email(this.email)
+        .fullName(this.fullName)
+        .phone(this.phone)
+        .avatarUrl(this.avatarUrl)
+        .studentCode(this.studentCode)
+        .classCode(this.classCode)
+        .build();
   }
 }

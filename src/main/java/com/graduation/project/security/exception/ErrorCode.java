@@ -14,7 +14,7 @@ public enum ErrorCode {
   INVALID_TOKEN(1004, "Token is invalid", HttpStatus.NOT_FOUND),
   TOKEN_EXPIRED(1005, "Token expired", HttpStatus.NOT_FOUND),
   ACCOUNT_NOT_VERIFIED(
-      1006, "Account not verified. Please verify your account.", HttpStatus.NOT_FOUND),
+      1006, "Account not verified. Please verify your account.", HttpStatus.BAD_REQUEST),
   ANNOUNCEMENT_NOT_FOUND(1007, "Announcement not found", HttpStatus.NOT_FOUND),
   FACULTY_NOT_FOUND(1008, "Faculty not found", HttpStatus.NOT_FOUND),
   UNAUTHENTICATED(1009, "Unauthenticated", HttpStatus.UNAUTHORIZED),
@@ -42,8 +42,10 @@ public enum ErrorCode {
   EMAIL_NOT_FOUND(1031, "email not found", HttpStatus.NOT_FOUND),
   CAN_NOT_SEND_EMAIL(1032, "Can't send email", HttpStatus.BAD_REQUEST),
   UUID_IS_INVALID(1033, "UUID is invalid", HttpStatus.BAD_REQUEST),
-  UPDATE_FALSE(1034, "Update failed", HttpStatus.BAD_REQUEST),
-  DOCUMENT_NOT_FOUND(1035, "Document not found", HttpStatus.NOT_FOUND),
+  INVALID_STUDENT_CODE(1034, "Student code is invalid", HttpStatus.BAD_REQUEST),
+  INVALID_REQUEST(1035, "Invalid request", HttpStatus.BAD_REQUEST),
+  UPDATE_FALSE(1036, "Update failed", HttpStatus.BAD_REQUEST),
+  DOCUMENT_NOT_FOUND(1037, "Document not found", HttpStatus.NOT_FOUND),
   ;
 
   private final int code;

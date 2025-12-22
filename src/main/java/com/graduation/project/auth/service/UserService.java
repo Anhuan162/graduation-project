@@ -6,8 +6,9 @@ import com.graduation.project.auth.constant.PredefinedRole;
 import com.graduation.project.auth.dto.VerifyUserDto;
 import com.graduation.project.auth.dto.request.SearchUserRequest;
 import com.graduation.project.auth.dto.request.SignupRequest;
+import com.graduation.project.auth.dto.request.UserProfileUpdateRequest;
 import com.graduation.project.auth.dto.response.SignupResponse;
-import com.graduation.project.auth.dto.response.UserProfileRequest;
+import com.graduation.project.auth.dto.response.UserAuthResponse;
 import com.graduation.project.auth.dto.response.UserProfileResponse;
 import com.graduation.project.auth.dto.response.UserResponse;
 import com.graduation.project.auth.repository.PasswordResetSessionRepository;
@@ -25,6 +26,8 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -36,7 +39,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +55,7 @@ public class UserService {
   private final PasswordResetSessionRepository passwordResetSessionRepository;
   private final FirebaseService firebaseService;
   private final FacultyRepository facultyRepository;
+  private final Validator validator;
 
   private String AVATAR_FOLDER = "avatars";
 
@@ -91,10 +94,9 @@ public class UserService {
   }
 
   public void verifyEmail(VerifyUserDto request) {
-    VerificationToken verificationToken =
-        verificationTokenRepository
-            .findByToken(request.getVerificationCode())
-            .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+    VerificationToken verificationToken = verificationTokenRepository
+        .findByToken(request.getVerificationCode())
+        .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
 
     if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
       throw new AppException(ErrorCode.TOKEN_EXPIRED);
@@ -132,21 +134,20 @@ public class UserService {
   private void sendVerificationEmail(User user, String token) { // TODO: Update with company logo
     String subject = "Account Verification";
     String verificationCode = "VERIFICATION CODE " + token;
-    String htmlMessage =
-        "<html>"
-            + "<body style=\"font-family: Arial, sans-serif;\">"
-            + "<div style=\"background-color: #f5f5f5; padding: 20px;\">"
-            + "<h2 style=\"color: #333;\">Welcome to our app!</h2>"
-            + "<p style=\"font-size: 16px;\">Please enter the verification code below to continue:</p>"
-            + "<div style=\"background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);\">"
-            + "<h3 style=\"color: #333;\">Verification Code:</h3>"
-            + "<p style=\"font-size: 18px; font-weight: bold; color: #007bff;\">"
-            + verificationCode
-            + "</p>"
-            + "</div>"
-            + "</div>"
-            + "</body>"
-            + "</html>";
+    String htmlMessage = "<html>"
+        + "<body style=\"font-family: Arial, sans-serif;\">"
+        + "<div style=\"background-color: #f5f5f5; padding: 20px;\">"
+        + "<h2 style=\"color: #333;\">Welcome to our app!</h2>"
+        + "<p style=\"font-size: 16px;\">Please enter the verification code below to continue:</p>"
+        + "<div style=\"background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);\">"
+        + "<h3 style=\"color: #333;\">Verification Code:</h3>"
+        + "<p style=\"font-size: 18px; font-weight: bold; color: #007bff;\">"
+        + verificationCode
+        + "</p>"
+        + "</div>"
+        + "</div>"
+        + "</body>"
+        + "</html>";
 
     emailService.sendVerificationEmail(user.getEmail(), subject, htmlMessage);
   }
@@ -160,48 +161,47 @@ public class UserService {
   public Page<UserResponse> searchUsers(SearchUserRequest searchUserRequest, Pageable pageable) {
     log.info("In method get Users");
 
-    Specification<User> spec =
-        (root, query, cb) -> {
-          List<Predicate> predicates = new ArrayList<>();
+    Specification<User> spec = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
 
-          if (searchUserRequest.getEmail() != null
-              && !searchUserRequest.getEmail().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("email")),
-                    "%" + searchUserRequest.getEmail().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getEmail() != null
+          && !searchUserRequest.getEmail().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("email")),
+                "%" + searchUserRequest.getEmail().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getFullName() != null
-              && !searchUserRequest.getFullName().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("fullName")),
-                    "%" + searchUserRequest.getFullName().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getFullName() != null
+          && !searchUserRequest.getFullName().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("fullName")),
+                "%" + searchUserRequest.getFullName().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getStudentCode() != null
-              && !searchUserRequest.getStudentCode().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("studentCode")),
-                    "%" + searchUserRequest.getStudentCode().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getStudentCode() != null
+          && !searchUserRequest.getStudentCode().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("studentCode")),
+                "%" + searchUserRequest.getStudentCode().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getClassCode() != null
-              && !searchUserRequest.getClassCode().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("classCode")),
-                    "%" + searchUserRequest.getClassCode().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getClassCode() != null
+          && !searchUserRequest.getClassCode().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("classCode")),
+                "%" + searchUserRequest.getClassCode().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getEnable() != null) {
-            predicates.add(cb.equal(root.get("enable"), searchUserRequest.getEnable()));
-          }
+      if (searchUserRequest.getEnable() != null) {
+        predicates.add(cb.equal(root.get("enabled"), searchUserRequest.getEnable()));
+      }
 
-          return cb.and(predicates.toArray(new Predicate[0]));
-        };
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
 
     return userRepository.findAll(spec, pageable).map(UserResponse::from);
   }
@@ -217,10 +217,10 @@ public class UserService {
     userRepository.deleteById(UUID.fromString(userId));
   }
 
-  public String sendOtpToUserToResetPassword(String email){
+  public String sendOtpToUserToResetPassword(String email) {
 
     User user = userRepository.findUserByEmail(email);
-    if (user == null){
+    if (user == null) {
       throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
     }
 
@@ -232,24 +232,24 @@ public class UserService {
     }
 
     PasswordResetSession passwordResetSession = passwordResetSessionRepository.findByEmailAndNotUsed(email);
-    if (passwordResetSession == null){
+    if (passwordResetSession == null) {
       PasswordResetSession newPasswordResetSession = new PasswordResetSession();
       newPasswordResetSession.setEmail(email);
       newPasswordResetSession.setOtp(otp);
       newPasswordResetSession.setExpiresAt(LocalDateTime.now().plusMinutes(5));
       passwordResetSessionRepository.save(newPasswordResetSession);
 
-    } else if (passwordResetSession.getUsed() == null || !passwordResetSession.getUsed()){
+    } else if (passwordResetSession.getUsed() == null || !passwordResetSession.getUsed()) {
       passwordResetSession.setOtp(otp);
       passwordResetSession.setExpiresAt(LocalDateTime.now().plusMinutes(5));
       passwordResetSessionRepository.save(passwordResetSession);
     }
-   return email;
+    return email;
   }
 
   public String verifyOtp(String otp, String email) {
-    PasswordResetSession passwordResetSession =
-            passwordResetSessionRepository.findPasswordResetSessionByEmailAndOtp(email, otp);
+    PasswordResetSession passwordResetSession = passwordResetSessionRepository
+        .findPasswordResetSessionByEmailAndOtp(email, otp);
     if (passwordResetSession == null) {
       throw new AppException(ErrorCode.INVALID_TOKEN);
     }
@@ -271,7 +271,7 @@ public class UserService {
     if (passwordResetSession == null || passwordResetSession.isEmpty()) {
       throw new AppException(ErrorCode.SESSION_REST_PASSWORD_NOT_FOUND);
     }
-    if (passwordResetSession.get().getUsed() != null && passwordResetSession.get().getUsed()){
+    if (passwordResetSession.get().getUsed() != null && passwordResetSession.get().getUsed()) {
       throw new AppException(ErrorCode.SESSION_REST_PASSWORD_HAS_USED);
     }
     if (passwordResetSession.get().getExpiresAt().plusMinutes(5).isBefore(LocalDateTime.now())) {
@@ -308,63 +308,88 @@ public class UserService {
       throw new RuntimeException("User not authenticated or not found");
     }
     UserProfileResponse userProfileResponse = user.toUserProfileResponse();
-    if (user.getStudentCode() != null && user.getClassCode()!=null)
+    if (user.getStudentCode() != null && user.getClassCode() != null)
       userProfileResponse.setFacultyName(getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
-    userProfileResponse.setPermissionResponse(getPermissionOfCurrentUser());
     return userProfileResponse;
+  }
+
+  public UserAuthResponse getAuthInfo() {
+    User user = getCurrentUser();
+    if (user == null) {
+      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
+    return UserAuthResponse.builder()
+        .id(user.getId().toString())
+        .email(user.getEmail())
+        .fullName(user.getFullName())
+        .avatar(user.getAvatarUrl())
+        .permissions(new HashSet<>(getPermissionOfCurrentUser()))
+        .build();
   }
 
   public List<String> getPermissionOfCurrentUser() {
     UserPrincipal userPrincipal = getCurrentUserPrincipal();
     return userPrincipal.getAuthorities().stream().map(
-            auth -> {
-              return auth.getAuthority();
-            }
-    ).toList();
+        auth -> {
+          return auth.getAuthority();
+        }).toList();
   }
 
   public String getAndValidateFacultiesCode(String studentCode, String classCode) {
-    if (studentCode != null && studentCode.length() != 10) throw new RuntimeException("student code is invalid");;
-    if (classCode != null && classCode.length() < 10) throw new RuntimeException("class code is invalid");
-    String facultiesCodeFromStudent = studentCode.trim().toUpperCase().substring(5,7);
-    String facultiesCodeFromClass = classCode.trim().toUpperCase().substring(5,7);
+    if (studentCode != null && studentCode.length() != 10)
+      throw new AppException(ErrorCode.INVALID_STUDENT_CODE);
+    if (classCode != null && classCode.length() < 10)
+      throw new RuntimeException("class code is invalid");
+    String facultiesCodeFromStudent = studentCode.trim().toUpperCase().substring(5, 7);
+    String facultiesCodeFromClass = classCode.trim().toUpperCase().substring(5, 7);
     if (!facultiesCodeFromStudent.equals(facultiesCodeFromClass)) {
       throw new RuntimeException("faculties code is invalid");
     }
     Optional<Faculty> faculty = facultyRepository.findByFacultyCode(facultiesCodeFromClass);
-    if (faculty.isEmpty()) throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
+    if (faculty.isEmpty())
+      throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
     return faculty.get().getFacultyName();
   }
 
-  public UserProfileResponse updateUserProfile(UserProfileRequest userProfileRequest) {
+  public UserProfileResponse updateUserProfile(UserProfileUpdateRequest userProfileRequest) {
+    // Validate the request
+    Set<ConstraintViolation<UserProfileUpdateRequest>> violations = validator.validate(userProfileRequest);
+    if (!violations.isEmpty()) {
+      StringBuilder message = new StringBuilder();
+      for (ConstraintViolation<UserProfileUpdateRequest> violation : violations) {
+        message.append(violation.getMessage()).append("; ");
+      }
+      throw new AppException(ErrorCode.INVALID_REQUEST, message.toString());
+    }
+
     User user = getCurrentUser();
     if (user == null) {
       throw new RuntimeException("User not authenticated or not found");
     }
     if (userProfileRequest.getAvatarFile() != null && !userProfileRequest.getAvatarFile().isEmpty()) {
-      if (!userProfileRequest.getAvatarFile().getContentType().startsWith("image/")) {
-        throw new RuntimeException("Invalid image type");
-      }
-
       try {
-            String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER );
-            user.setAvatar_url(newAvatarUrl);
-        } catch (IOException e) {
-            throw new RuntimeException("can not upload avatar", e);
-        }
+        String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER);
+        user.setAvatarUrl(newAvatarUrl);
+      } catch (IOException e) {
+        throw new RuntimeException("can not upload avatar", e);
+      }
     }
     String facultiesName = "";
-    if (userProfileRequest.getClassCode()!= null && !userProfileRequest.getClassCode().isEmpty()
-            && userProfileRequest.getStudentCode()!= null && !userProfileRequest.getStudentCode().isEmpty()){
-      facultiesName = getAndValidateFacultiesCode(userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
+    if (userProfileRequest.getClassCode() != null && !userProfileRequest.getClassCode().isEmpty()
+        && userProfileRequest.getStudentCode() != null && !userProfileRequest.getStudentCode().isEmpty()) {
+      facultiesName = getAndValidateFacultiesCode(userProfileRequest.getStudentCode(),
+          userProfileRequest.getClassCode());
       user.setStudentCode(userProfileRequest.getStudentCode());
       user.setClassCode(userProfileRequest.getClassCode());
     }
-    user.setFullName(userProfileRequest.getFullName());
-    user.setPhone(userProfileRequest.getPhone());
+    if (userProfileRequest.getFullName() != null && !userProfileRequest.getFullName().isEmpty()) {
+      user.setFullName(userProfileRequest.getFullName());
+    }
+    if (userProfileRequest.getPhone() != null && !userProfileRequest.getPhone().isEmpty()) {
+      user.setPhone(userProfileRequest.getPhone());
+    }
     userRepository.save(user);
     UserProfileResponse userProfileResponse = user.toUserProfileResponse();
-    userProfileResponse.setPermissionResponse(getPermissionOfCurrentUser());
     userProfileResponse.setFacultyName(facultiesName);
     return userProfileResponse;
   }

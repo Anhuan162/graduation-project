@@ -15,12 +15,12 @@ import org.springframework.data.jpa.repository.Query;
 public interface CommentRepository extends JpaRepository<Comment, UUID> {
   @Query(
       "SELECT new com.graduation.project.forum.dto.CommentWithReplyCountResponse("
-          + "c.id, c.content, c.author.id, c.createdDateTime, COUNT(r), f.url) "
-          + "FROM Comment c "
-          + "LEFT JOIN c.replies r "
-          + "LEFT JOIN FileMetadata f ON f.resourceId = c.id AND f.resourceType = 'COMMENT' "
-          + "WHERE c.post.id = :postId AND c.parent IS NULL "
-          + "GROUP BY c.id, c.content, c.author.id, c.createdDateTime, f.url")
+              + "c.id, c.content, c.author.id, c.createdDateTime, COUNT(r), f.url) "
+              + "FROM Comment c "
+              + "LEFT JOIN c.replies r "
+              + "LEFT JOIN FileMetadata f ON f.resourceId = c.id AND f.resourceType = 'COMMENT' "
+              + "WHERE c.post.id = :postId AND c.parent IS NULL AND c.deleted IS FALSE "
+              + "GROUP BY c.id, c.content, c.author.id, c.createdDateTime, f.url")
   Page<CommentWithReplyCountResponse> findRootCommentsWithCount(
       @Param("postId") UUID postId, Pageable pageable);
 
