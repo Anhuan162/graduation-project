@@ -11,6 +11,7 @@ import com.graduation.project.auth.dto.response.SignupResponse;
 import com.graduation.project.auth.dto.response.UserAuthResponse;
 import com.graduation.project.auth.dto.response.UserProfileResponse;
 import com.graduation.project.auth.dto.response.UserResponse;
+import com.graduation.project.auth.dto.response.PublicUserProfileResponse;
 import com.graduation.project.auth.repository.PasswordResetSessionRepository;
 import com.graduation.project.auth.repository.RoleRepository;
 import com.graduation.project.auth.repository.UserRepository;
@@ -28,7 +29,6 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -78,6 +78,7 @@ public class UserService {
     user.setRoles(roles);
     user.setRegistrationDate(LocalDateTime.now());
     userRepository.save(user);
+
     String token = generateVerificationCode();
     storeVerifyToken(user, token);
 
@@ -164,32 +165,28 @@ public class UserService {
     Specification<User> spec = (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
 
-      if (searchUserRequest.getEmail() != null
-          && !searchUserRequest.getEmail().trim().isEmpty()) {
+      if (searchUserRequest.getEmail() != null && !searchUserRequest.getEmail().trim().isEmpty()) {
         predicates.add(
             cb.like(
                 cb.lower(root.get("email")),
                 "%" + searchUserRequest.getEmail().toLowerCase() + "%"));
       }
 
-      if (searchUserRequest.getFullName() != null
-          && !searchUserRequest.getFullName().trim().isEmpty()) {
+      if (searchUserRequest.getFullName() != null && !searchUserRequest.getFullName().trim().isEmpty()) {
         predicates.add(
             cb.like(
                 cb.lower(root.get("fullName")),
                 "%" + searchUserRequest.getFullName().toLowerCase() + "%"));
       }
 
-      if (searchUserRequest.getStudentCode() != null
-          && !searchUserRequest.getStudentCode().trim().isEmpty()) {
+      if (searchUserRequest.getStudentCode() != null && !searchUserRequest.getStudentCode().trim().isEmpty()) {
         predicates.add(
             cb.like(
                 cb.lower(root.get("studentCode")),
                 "%" + searchUserRequest.getStudentCode().toLowerCase() + "%"));
       }
 
-      if (searchUserRequest.getClassCode() != null
-          && !searchUserRequest.getClassCode().trim().isEmpty()) {
+      if (searchUserRequest.getClassCode() != null && !searchUserRequest.getClassCode().trim().isEmpty()) {
         predicates.add(
             cb.like(
                 cb.lower(root.get("classCode")),
@@ -218,7 +215,6 @@ public class UserService {
   }
 
   public String sendOtpToUserToResetPassword(String email) {
-
     User user = userRepository.findUserByEmail(email);
     if (user == null) {
       throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
@@ -267,23 +263,75 @@ public class UserService {
     } catch (Exception e) {
       throw new AppException(ErrorCode.UUID_IS_INVALID);
     }
-    Optional<PasswordResetSession> passwordResetSession = passwordResetSessionRepository.findById(sessionId);
-    if (passwordResetSession == null || passwordResetSession.isEmpty()) {
-      throw new AppException(ErrorCode.SESSION_REST_PASSWORD_NOT_FOUND);
-    }
-    if (passwordResetSession.get().getUsed() != null && passwordResetSession.get().getUsed()) {
+
+    PasswordResetSession passwordResetSession = passwordResetSessionRepository.findById(sessionId)
+        .orElseThrow(() -> new AppException(ErrorCode.SESSION_REST_PASSWORD_NOT_FOUND));
+
+    if (passwordResetSession.getUsed() != null && passwordResetSession.getUsed()) {
       throw new AppException(ErrorCode.SESSION_REST_PASSWORD_HAS_USED);
     }
-    if (passwordResetSession.get().getExpiresAt().plusMinutes(5).isBefore(LocalDateTime.now())) {
+    if (passwordResetSession.getExpiresAt().isBefore(LocalDateTime.now())) {
       throw new AppException(ErrorCode.TOKEN_EXPIRED);
     }
-    User user = userRepository.findUserByEmail(passwordResetSession.get().getEmail());
+
+    User user = userRepository.findUserByEmail(passwordResetSession.getEmail());
     user.setPassword(passwordEncoder.encode(newPassword));
     userRepository.save(user);
 
-    passwordResetSession.get().setUsed(true);
-    passwordResetSessionRepository.save(passwordResetSession.get());
+    passwordResetSession.setUsed(true);
+    passwordResetSessionRepository.save(passwordResetSession);
     return "success";
+  }
+
+  @Transactional
+  public String resetPasswordWithOtp(String email, String otp, String newPassword) {
+    PasswordResetSession passwordResetSession = passwordResetSessionRepository
+        .findPasswordResetSessionByEmailAndOtp(email, otp);
+    if (passwordResetSession == null) {
+      throw new AppException(ErrorCode.INVALID_TOKEN);
+    }
+    if (passwordResetSession.getUsed() != null && passwordResetSession.getUsed()) {
+      throw new AppException(ErrorCode.SESSION_REST_PASSWORD_HAS_USED);
+    }
+    if (passwordResetSession.getExpiresAt().isBefore(LocalDateTime.now())) {
+      throw new AppException(ErrorCode.TOKEN_EXPIRED);
+    }
+
+    User user = userRepository.findUserByEmail(passwordResetSession.getEmail());
+    user.setPassword(passwordEncoder.encode(newPassword));
+    userRepository.save(user);
+
+    passwordResetSession.setUsed(true);
+    passwordResetSessionRepository.save(passwordResetSession);
+    return "success";
+  }
+
+  @Transactional
+  public String changePasswordAuthenticated(String oldPassword, String newPassword) {
+    User user = getCurrentUser();
+    if (user == null) {
+      throw new AppException(ErrorCode.USER_NOT_FOUND);
+    }
+    if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+      throw new AppException(ErrorCode.INVALID_PASSWORD);
+    }
+
+    user.setPassword(passwordEncoder.encode(newPassword));
+    userRepository.save(user);
+    return "success";
+  }
+
+  public PublicUserProfileResponse getPublicProfile(String userId) {
+    UUID id;
+    try {
+      id = UUID.fromString(userId);
+    } catch (IllegalArgumentException e) {
+      throw new AppException(ErrorCode.UUID_IS_INVALID);
+    }
+    User user = userRepository
+        .findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    return PublicUserProfileResponse.from(user);
   }
 
   public User getCurrentUser() {
@@ -309,30 +357,34 @@ public class UserService {
     }
     UserProfileResponse userProfileResponse = user.toUserProfileResponse();
     if (user.getStudentCode() != null && user.getClassCode() != null)
-      userProfileResponse.setFacultyName(getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
+      userProfileResponse.setFacultyName(
+          getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
     return userProfileResponse;
   }
 
   public UserAuthResponse getAuthInfo() {
-    User user = getCurrentUser();
-    if (user == null) {
-      throw new AppException(ErrorCode.UNAUTHENTICATED);
-    }
+    UserPrincipal userPrincipal = getCurrentUserPrincipal();
+
     return UserAuthResponse.builder()
-        .id(user.getId().toString())
-        .email(user.getEmail())
-        .fullName(user.getFullName())
-        .avatar(user.getAvatarUrl())
-        .permissions(new HashSet<>(getPermissionOfCurrentUser()))
+        .id(userPrincipal.getId().toString())
+        .email(userPrincipal.getEmail())
+        .fullName(userPrincipal.getFullName())
+        .avatar(userPrincipal.getAvatar())
+        .permissions(getUserPermissionsFromPrincipal(userPrincipal))
         .build();
+  }
+
+  private Set<String> getUserPermissionsFromPrincipal(UserPrincipal principal) {
+    Set<String> permissions = new HashSet<>();
+    for (var auth : principal.getAuthorities()) {
+      permissions.add(auth.getAuthority());
+    }
+    return permissions;
   }
 
   public List<String> getPermissionOfCurrentUser() {
     UserPrincipal userPrincipal = getCurrentUserPrincipal();
-    return userPrincipal.getAuthorities().stream().map(
-        auth -> {
-          return auth.getAuthority();
-        }).toList();
+    return new ArrayList<>(getUserPermissionsFromPrincipal(userPrincipal));
   }
 
   public String getAndValidateFacultiesCode(String studentCode, String classCode) {
@@ -366,6 +418,7 @@ public class UserService {
     if (user == null) {
       throw new RuntimeException("User not authenticated or not found");
     }
+
     if (userProfileRequest.getAvatarFile() != null && !userProfileRequest.getAvatarFile().isEmpty()) {
       try {
         String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER);
@@ -374,21 +427,27 @@ public class UserService {
         throw new RuntimeException("can not upload avatar", e);
       }
     }
+
     String facultiesName = "";
-    if (userProfileRequest.getClassCode() != null && !userProfileRequest.getClassCode().isEmpty()
-        && userProfileRequest.getStudentCode() != null && !userProfileRequest.getStudentCode().isEmpty()) {
-      facultiesName = getAndValidateFacultiesCode(userProfileRequest.getStudentCode(),
-          userProfileRequest.getClassCode());
+    if (userProfileRequest.getClassCode() != null
+        && !userProfileRequest.getClassCode().isEmpty()
+        && userProfileRequest.getStudentCode() != null
+        && !userProfileRequest.getStudentCode().isEmpty()) {
+      facultiesName = getAndValidateFacultiesCode(
+          userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
       user.setStudentCode(userProfileRequest.getStudentCode());
       user.setClassCode(userProfileRequest.getClassCode());
     }
+
     if (userProfileRequest.getFullName() != null && !userProfileRequest.getFullName().isEmpty()) {
       user.setFullName(userProfileRequest.getFullName());
     }
     if (userProfileRequest.getPhone() != null && !userProfileRequest.getPhone().isEmpty()) {
       user.setPhone(userProfileRequest.getPhone());
     }
+
     userRepository.save(user);
+
     UserProfileResponse userProfileResponse = user.toUserProfileResponse();
     userProfileResponse.setFacultyName(facultiesName);
     return userProfileResponse;

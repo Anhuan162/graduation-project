@@ -43,6 +43,7 @@ public enum ErrorCode {
   UUID_IS_INVALID(1033, "UUID is invalid", HttpStatus.BAD_REQUEST),
   INVALID_STUDENT_CODE(1034, "Student code is invalid", HttpStatus.BAD_REQUEST),
   INVALID_REQUEST(1035, "Invalid request", HttpStatus.BAD_REQUEST),
+  INVALID_PASSWORD(1036, "Invalid password", HttpStatus.BAD_REQUEST),
   ;
 
   private final int code;

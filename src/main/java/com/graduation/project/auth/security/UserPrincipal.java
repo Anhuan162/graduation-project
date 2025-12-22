@@ -15,13 +15,24 @@ public class UserPrincipal implements UserDetails {
   private UUID id;
   private String email;
   private String password;
+
+  private String fullName;
+  private String avatar;
+
   private Collection<? extends GrantedAuthority> authorities;
 
   public UserPrincipal(
-      UUID id, String email, String password, Collection<? extends GrantedAuthority> authorities) {
+      UUID id,
+      String email,
+      String password,
+      String fullName,
+      String avatar,
+      Collection<? extends GrantedAuthority> authorities) {
     this.id = id;
     this.email = email;
     this.password = password;
+    this.fullName = fullName;
+    this.avatar = avatar;
     this.authorities = authorities;
   }
 
@@ -35,7 +46,14 @@ public class UserPrincipal implements UserDetails {
         grantedAuthorities.add(new SimpleGrantedAuthority(permission.getName()));
       }
     }
-    return new UserPrincipal(user.getId(), user.getEmail(), user.getPassword(), grantedAuthorities);
+
+    return new UserPrincipal(
+        user.getId(),
+        user.getEmail(),
+        user.getPassword(),
+        user.getFullName(),
+        user.getAvatarUrl(),
+        grantedAuthorities);
   }
 
   public boolean hasRole(String roleName) {

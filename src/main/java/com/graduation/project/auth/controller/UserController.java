@@ -3,6 +3,8 @@ package com.graduation.project.auth.controller;
 import com.graduation.project.auth.dto.VerifyUserDto;
 import com.graduation.project.auth.dto.request.*;
 import com.graduation.project.auth.dto.response.*;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +41,9 @@ public class UserController {
     return ApiResponse.<Void>builder().result(null).build();
   }
 
+  @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
   @GetMapping("/{userId}")
-  ApiResponse<UserResponse> getUser(@PathVariable("userId") String userId) {
+  ApiResponse<UserResponse> getUserDetail(@PathVariable("userId") String userId) {
     return ApiResponse.<UserResponse>builder().result(userService.getUser(userId)).build();
   }
 
@@ -74,11 +77,24 @@ public class UserController {
     return ApiResponse.<String>builder().result(userService.verifyOtp(request.getOtp(), request.getEmail())).build();
   }
 
+  @PutMapping("/password/reset-confirm")
+  public ApiResponse<String> confirmResetPassword(
+      @Valid @RequestBody ResetPasswordConfirmRequest request) {
+    return ApiResponse.<String>builder().result(
+        userService.resetPasswordWithOtp(request.getEmail(), request.getOtp(), request.getNewPassword())).build();
+  }
+
+  @PreAuthorize("isAuthenticated()")
   @PutMapping("/change-password")
   public ApiResponse<String> changePassword(
-      @Valid @RequestBody ChangePasswordRequest request) {
+      @Valid @RequestBody ChangePasswordAuthenticatedRequest request) {
     return ApiResponse.<String>builder().result(
-        userService.changePassword(request.getPasswordSessionId(), request.getNewPassword())).build();
+        userService.changePasswordAuthenticated(request.getOldPassword(), request.getNewPassword())).build();
+  }
+
+  @GetMapping("/public/{userId}")
+  public ApiResponse<PublicUserProfileResponse> getPublicProfile(@PathVariable("userId") String userId) {
+    return ApiResponse.<PublicUserProfileResponse>builder().result(userService.getPublicProfile(userId)).build();
   }
 
   @PreAuthorize("isAuthenticated()")
