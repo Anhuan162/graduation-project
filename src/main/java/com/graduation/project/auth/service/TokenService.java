@@ -74,7 +74,7 @@ public class TokenService {
         .issuer("graduation_project.com")
         .issueTime(new Date())
         .expirationTime(
-            new Date(Instant.now().plus(refreshTokenValidityMs, ChronoUnit.SECONDS).toEpochMilli()))
+            new Date(Instant.now().plus(refreshTokenValidityMs, ChronoUnit.MILLIS).toEpochMilli()))
         .jwtID(UUID.randomUUID().toString())
         .build();
   }
@@ -85,7 +85,7 @@ public class TokenService {
         .issuer("graduation_project.com")
         .issueTime(new Date())
         .expirationTime(
-            new Date(Instant.now().plus(accessTokenValidityMs, ChronoUnit.SECONDS).toEpochMilli()))
+            new Date(Instant.now().plus(accessTokenValidityMs, ChronoUnit.MILLIS).toEpochMilli()))
         .jwtID(UUID.randomUUID().toString())
         .claim("scope", buildScope(user));
 
@@ -120,7 +120,7 @@ public class TokenService {
                   .getJWTClaimsSet()
                   .getIssueTime()
                   .toInstant()
-                  .plus(refreshTokenValidityMs, ChronoUnit.SECONDS)
+                  .plus(refreshTokenValidityMs, ChronoUnit.MILLIS)
                   .toEpochMilli())
           : signedJWT.getJWTClaimsSet().getExpirationTime();
 
