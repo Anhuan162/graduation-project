@@ -71,6 +71,7 @@ public class Document {
         .urlDoc(this.filePath)
         .urlImage(this.imageUrl)
         .subjectId(this.id)
+        .id(this.id.toString())
         .build();
   }
 }
