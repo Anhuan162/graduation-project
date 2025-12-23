@@ -35,9 +35,12 @@ public class Comment {
   private String content;
 
   private LocalDateTime createdDateTime = LocalDateTime.now();
-  @Builder.Default
-  private Boolean deleted = Boolean.FALSE;
+  @Builder.Default private Boolean deleted = Boolean.FALSE;
 
   @Column(name = "reaction_count")
   private Long reactionCount = 0L;
+
+  @Column(name = "is_accepted")
+  @Builder.Default
+  private Boolean isAccepted = false;
 }

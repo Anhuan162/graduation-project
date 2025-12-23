@@ -87,4 +87,10 @@ public class CommentController {
         .result(commentService.getMyComments(pageable))
         .build();
   }
+
+  @PutMapping("/{postId}/comment/{commentId}/toggle-useful")
+  public ApiResponse<Void> toggleUseful(@PathVariable UUID postId, @PathVariable UUID commentId) {
+    commentService.toggleCommentUseful(postId, commentId);
+    return ApiResponse.<Void>builder().build();
+  }
 }

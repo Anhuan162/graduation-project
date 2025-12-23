@@ -277,4 +277,33 @@ public class CommentService {
         commentRepository.findAllByAuthorIdAndDeletedFalse(user.getId(), pageable);
     return comments.map(c -> toResponse(c, null));
   }
+
+  @Transactional
+  public void toggleCommentUseful(UUID postId, UUID commentId) {
+    User currentUser = currentUserService.getCurrentUserEntity();
+
+    Post post =
+        postRepository
+            .findById(postId)
+            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+
+    if (!post.getAuthor().getId().equals(currentUser.getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    Comment comment =
+        commentRepository
+            .findById(commentId)
+            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+    // 4. Validate Comment phải thuộc về Post này
+    if (!comment.getPost().getId().equals(postId)) {
+      throw new IllegalArgumentException("Comment does not belong to this post");
+    }
+
+    boolean currentStatus = Boolean.TRUE.equals(comment.getIsAccepted());
+    comment.setIsAccepted(!currentStatus);
+
+    // Hibernate sẽ tự động lưu thay đổi xuống DB khi kết thúc Transaction
+  }
 }
