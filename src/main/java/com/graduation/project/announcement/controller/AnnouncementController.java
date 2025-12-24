@@ -2,42 +2,45 @@ package com.graduation.project.announcement.controller;
 
 import com.graduation.project.announcement.constant.AnnouncementType;
 import com.graduation.project.announcement.dto.AnnouncementResponse;
+import com.graduation.project.announcement.dto.FullAnnouncementResponse;
 import com.graduation.project.announcement.service.AnnouncementService;
 import com.graduation.project.auth.dto.response.ApiResponse;
-import lombok.RequiredArgsConstructor;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 
 import java.time.LocalDate;
-
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-@RequiredArgsConstructor
 @RestController
-@RequestMapping("api/announcements")
+@RequestMapping("/api/announcements")
+@RequiredArgsConstructor
 public class AnnouncementController {
 
   private final AnnouncementService announcementService;
 
   @GetMapping
-  public ApiResponse<Page<AnnouncementResponse>> search(Pageable pageable,
+  public ApiResponse<Page<AnnouncementResponse>> searchAnnouncements(
+      @PageableDefault(sort = "createdDate", direction = Sort.Direction.DESC) Pageable pageable,
       @RequestParam(required = false) AnnouncementType type,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Boolean status,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
-    return ApiResponse.ok(announcementService.search(pageable, type, keyword, status, fromDate, toDate));
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+      @RequestParam(required = false) String classroomCode) {
+    return ApiResponse.ok(
+        announcementService.searchAnnouncements(pageable, type, keyword, status, fromDate, toDate, classroomCode));
   }
 
   @GetMapping("/{announcementId}")
-  public ApiResponse<AnnouncementResponse> getDetail(@PathVariable String announcementId) {
-    return ApiResponse.ok(announcementService.getDetail(announcementId));
+  public ApiResponse<FullAnnouncementResponse> getDetail(@PathVariable UUID announcementId) {
+    return ApiResponse.ok(announcementService.getAnnouncementDetail(announcementId));
   }
+
 }

@@ -34,6 +34,8 @@ import org.springframework.stereotype.Service;
 @Service
 @Transactional
 public class AdminAnnouncementService {
+  private static final String CREATED_DATE = "createdDate";
+
   private final AnnouncementRepository announcementRepository;
   private final ClassroomRepository classroomRepository;
   private final CurrentUserService currentUserService;
@@ -42,17 +44,16 @@ public class AdminAnnouncementService {
   private final UserRepository userRepository;
 
   @Transactional
-  public CreatedAnnonucementResponse createAnnouncement(
-      CreatedAnnouncementRequest request, User user) {
+  public CreatedAnnonucementResponse createAnnouncement(CreatedAnnouncementRequest request, User user) {
     Announcement announcement = CreatedAnnouncementRequest.toAnnouncement(request, user);
     announcementRepository.save(announcement);
 
-    List<FileMetadata> fileMetadataList =
-        fileService.updateFileMetadataList(
-            request.getFileMetadataIds(),
-            announcement.getId(),
-            ResourceType.ANNOUNCEMENT,
-            user.getId());
+    List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
+        request.getFileMetadataIds(),
+        announcement.getId(),
+        ResourceType.ANNOUNCEMENT,
+        user.getId());
+
     List<String> urls = fileMetadataList.stream().map(FileMetadata::getUrl).toList();
     return CreatedAnnonucementResponse.from(announcement, urls);
   }
@@ -60,83 +61,74 @@ public class AdminAnnouncementService {
   public void releaseAnnouncement(UUID announcementId, ReleaseAnnouncementRequest request) {
     Announcement announcement = announcementRepository.findById(announcementId).orElseThrow();
 
-    if (announcement.getAnnouncementStatus()) {
-        throw new RuntimeException("Thông báo đã được gửi");
+    if (Boolean.TRUE.equals(announcement.getAnnouncementStatus())) {
+      throw new AppException(ErrorCode.INVALID_REQUEST, "Thông báo đã được gửi");
     }
 
-    Set<String> allClassroomCodes =
-        getAllClassroomCodes(
-            request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
+    Set<String> allClassroomCodes = getAllClassroomCodes(
+        request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
 
-    List<AnnouncementTarget> announcementTargets =
-        generateAnnouncementTargets(allClassroomCodes, announcement);
+    List<AnnouncementTarget> announcementTargets = generateAnnouncementTargets(allClassroomCodes, announcement);
     announcement.getTargets().addAll(announcementTargets);
     announcement.setAnnouncementStatus(true);
     announcementRepository.save(announcement);
 
     User user = currentUserService.getCurrentUserEntity();
-    Set<UUID> receiverUserIds =
-        new HashSet<>(userRepository.findUserIdsByClassCodes(allClassroomCodes));
+    Set<UUID> receiverUserIds = new HashSet<>(userRepository.findUserIdsByClassCodes(allClassroomCodes));
 
-    NotificationEventDTO notificationEventDTO =
-        NotificationEventDTO.builder()
-            .relatedId(announcement.getId())
-            .type(ResourceType.ANNOUNCEMENT)
-            .title("Thông báo mới " + announcement.getTitle())
-            .content(announcement.getContent())
-            .senderId(user.getId())
-            .senderName(user.getEmail())
-            .createdAt(LocalDateTime.now())
-            .receiverIds(receiverUserIds)
-            .build();
+    NotificationEventDTO notificationEventDTO = NotificationEventDTO.builder()
+        .relatedId(announcement.getId())
+        .type(ResourceType.ANNOUNCEMENT)
+        .title("Thông báo mới " + announcement.getTitle())
+        .content(announcement.getContent())
+        .senderId(user.getId())
+        .senderName(user.getEmail())
+        .createdAt(LocalDateTime.now())
+        .receiverIds(receiverUserIds)
+        .build();
 
     publisher.publishEvent(notificationEventDTO);
   }
 
-  private static List<AnnouncementTarget> generateAnnouncementTargets(
-      Set<String> allClassroomCodes, Announcement announcement) {
+  private static List<AnnouncementTarget> generateAnnouncementTargets(Set<String> allClassroomCodes,
+      Announcement announcement) {
     return allClassroomCodes.stream()
-        .map(
-            classroomCode -> {
-              return AnnouncementTarget.builder()
-                  .classroomCode(classroomCode)
-                  .announcement(announcement)
-                  .build();
-            })
+        .map(classroomCode -> AnnouncementTarget.builder()
+            .classroomCode(classroomCode)
+            .announcement(announcement)
+            .build())
         .toList();
   }
 
-  private Set<String> getAllClassroomCodes(
-      List<CohortCode> schoolYearCodes, List<UUID> facultyIds, List<String> classCodes) {
+  private Set<String> getAllClassroomCodes(List<CohortCode> schoolYearCodes, List<UUID> facultyIds,
+      List<String> classCodes) {
     Set<String> allClassroomCodes = new HashSet<>();
-    if (Objects.nonNull(schoolYearCodes)) {
-      List<String> classroomCodeBySchoolYearCodes =
-          classroomRepository.findBySchoolYearCodeIn(schoolYearCodes).stream()
-              .map(Classroom::getClassCode)
-              .toList();
-      allClassroomCodes.addAll(classroomCodeBySchoolYearCodes);
+
+    if (schoolYearCodes != null) {
+      List<String> codes = classroomRepository.findBySchoolYearCodeIn(schoolYearCodes).stream()
+          .map(Classroom::getClassCode)
+          .toList();
+      allClassroomCodes.addAll(codes);
     }
 
-    if (Objects.nonNull(facultyIds)) {
-      List<String> classroomCodeByFacultyCodes =
-          classroomRepository.findByFacultyIdIn(facultyIds).stream()
-              .map(Classroom::getClassCode)
-              .toList();
-      allClassroomCodes.addAll(classroomCodeByFacultyCodes);
+    if (facultyIds != null) {
+      List<String> codes = classroomRepository.findByFacultyIdIn(facultyIds).stream()
+          .map(Classroom::getClassCode)
+          .toList();
+      allClassroomCodes.addAll(codes);
     }
 
-    if (Objects.nonNull(classCodes)) {
+    if (classCodes != null) {
       allClassroomCodes.addAll(classCodes);
     }
+
     return allClassroomCodes;
   }
 
-  public AnnouncementResponse updateAnnouncement(
-      String announcementId, UpdatedAnnouncementRequest request, User user) {
-    Announcement announcement =
-        announcementRepository
-            .findById(UUID.fromString(announcementId))
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+  public AnnouncementResponse updateAnnouncement(String announcementId, UpdatedAnnouncementRequest request, User user) {
+    Announcement announcement = announcementRepository
+        .findById(UUID.fromString(announcementId))
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
     announcement.setTitle(request.getTitle());
     announcement.setContent(request.getContent());
@@ -144,72 +136,58 @@ public class AdminAnnouncementService {
     announcement.setModifiedBy(user);
     announcement.setModifiedDate(LocalDate.now());
 
-    Set<String> allClassroomCodes =
-        getAllClassroomCodes(
-            request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
+    Set<String> allClassroomCodes = getAllClassroomCodes(
+        request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
+
     announcement.setTargets(generateAnnouncementTargets(allClassroomCodes, announcement));
     announcementRepository.save(announcement);
     return AnnouncementResponse.from(announcement);
   }
 
   public AnnouncementResponse getAnnouncement(String announcementId) {
-    var announcement =
-        announcementRepository
-            .findById(UUID.fromString(announcementId))
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+    Announcement announcement = announcementRepository
+        .findById(UUID.fromString(announcementId))
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
     return AnnouncementResponse.from(announcement);
   }
 
-  //  ThieuNN
-  public Page<AnnouncementResponse> searchAnnouncement(
-      SearchAnnouncementRequest request, Pageable pageable) {
-    Specification<Announcement> specification =
-        (root, query, cb) -> {
-          List<Predicate> predicates = new ArrayList<>();
+  public Page<AnnouncementResponse> searchAnnouncement(SearchAnnouncementRequest request, Pageable pageable) {
+    Specification<Announcement> specification = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
 
-          if (Objects.nonNull(request.getTitle())) {
-            predicates.add(
-                cb.like(root.get("title").as(String.class), "%" + request.getTitle() + "%"));
-          }
+      if (request.getTitle() != null && !request.getTitle().isBlank()) {
+        predicates.add(cb.like(
+            cb.lower(root.get("title")),
+            "%" + request.getTitle().toLowerCase() + "%"));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementType())) {
-            predicates.add(
-                cb.equal(
-                    root.get("announcementType").as(String.class), request.getAnnouncementType()));
-          }
+      if (request.getAnnouncementType() != null) {
+        predicates.add(cb.equal(root.get("announcementType"), request.getAnnouncementType()));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementStatus())) {
-            predicates.add(
-                cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
-          }
+      if (request.getAnnouncementStatus() != null) {
+        predicates.add(cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
+      }
 
-          if (Objects.nonNull(request.getFromDate())) {
-            predicates.add(
-                cb.greaterThanOrEqualTo(
-                    root.get("createdDate"), request.getFromDate().atStartOfDay()));
-          }
+      if (request.getFromDate() != null) {
+        predicates.add(cb.greaterThanOrEqualTo(root.get(CREATED_DATE), request.getFromDate()));
+      }
 
-          if (Objects.nonNull(request.getToDate())) {
-            predicates.add(
-                cb.lessThanOrEqualTo(
-                    root.get("createdDate"), request.getToDate().atTime(23, 59, 59)));
-          }
+      if (request.getToDate() != null) {
+        predicates.add(cb.lessThanOrEqualTo(root.get(CREATED_DATE), request.getToDate()));
+      }
 
-          Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDate")));
+      Objects.requireNonNull(query).orderBy(cb.desc(root.get(CREATED_DATE)));
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
 
-          return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
-    Page<Announcement> announcementPage = announcementRepository.findAll(specification, pageable);
-    return announcementPage.map(AnnouncementResponse::from);
+    return announcementRepository.findAll(specification, pageable).map(AnnouncementResponse::from);
   }
 
   public void deleteAnnouncement(String announcementId) {
-    Announcement announcement =
-        announcementRepository
-            .findById(UUID.fromString(announcementId))
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
-
+    Announcement announcement = announcementRepository
+        .findById(UUID.fromString(announcementId))
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
     announcementRepository.delete(announcement);
   }
 }

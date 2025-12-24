@@ -28,13 +28,13 @@ public class Faculty {
   @OneToMany(mappedBy = "faculty", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<SubjectReference> subjectReferences;
 
-//  ThieuNN
+  // ThieuNN
   public FacultyResponse toFacultyResponse() {
     return FacultyResponse.builder()
-            .id(this.id.toString())
-            .facultyName(this.facultyName)
-            .facultyCode(this.facultyCode)
-            .description(this.description)
-            .build();
+        .id(this.id.toString())
+        .facultyName(this.facultyName)
+        .facultyCode(this.facultyCode)
+        .description(this.description)
+        .build();
   }
 }
