@@ -3,11 +3,15 @@ package com.graduation.project.common.controller;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.dto.FileMetadataResponse;
+import com.graduation.project.common.dto.SearchFileRequest;
 import com.graduation.project.common.service.FileService;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -73,5 +77,14 @@ public class FileController {
     // Lấy value theo key "fileIds"
     fileService.deleteAllFiles(request.get("fileIds"));
     return ApiResponse.builder().result(null).build();
+  }
+
+  @GetMapping
+  public ApiResponse<Page<FileMetadataResponse>> searchFiles(
+          @ModelAttribute SearchFileRequest searchFileRequest,
+          @PageableDefault(page = 0, size = 10, sort = "CreatedAt")Pageable pageable) {
+    return ApiResponse.<Page<FileMetadataResponse>>builder()
+        .result(fileService.searchFiles(searchFileRequest, pageable))
+        .build();
   }
 }

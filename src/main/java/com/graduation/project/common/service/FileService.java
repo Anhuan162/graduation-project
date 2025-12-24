@@ -5,6 +5,7 @@ import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;
+import com.graduation.project.common.dto.SearchFileRequest;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.mapper.FileMetadataMapper;
@@ -17,6 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -200,5 +203,12 @@ public class FileService {
   public List<FileMetadata> findFileMetadataByResourceTarget(
       UUID resourceId, ResourceType resourceType) {
     return fileMetadataRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
+  }
+
+  public Page<FileMetadataResponse> searchFiles(
+      SearchFileRequest searchFileRequest, Pageable pageable) {
+    Page<FileMetadata> fileMetadataPage =
+        fileMetadataRepository.searchFiles(searchFileRequest, pageable);
+    return fileMetadataPage.map(fileMetadataMapper::toFileMetadataResponse);
   }
 }

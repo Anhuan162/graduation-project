@@ -1,4 +1,3 @@
-
 server:
   port: 8080
 
@@ -78,3 +77,10 @@ redis:
     pending-scan-interval-ms: 10000
     base-backoff-ms: 5000
     processed-ttl-seconds: 86400
+
+google:
+  drive:
+    # Cú pháp: ${TÊN_BIẾN_MÔI_TRƯỜNG:giá_trị_mặc_định_nếu_không_có}
+    client-id: ${CLIENT_ID}
+    client-secret: ${CLIENT_SECRET}
+    refresh-token: ${REFRESH_TOKEN}
