@@ -9,6 +9,9 @@ import com.graduation.project.event.entity.ActivityLog;
 public class ActivityLogMapper {
 
     public ActivityLogResponse toResponse(ActivityLog log) {
+        if (log == null) {
+            return null;
+        }
         ActivityLogResponse res = new ActivityLogResponse();
         res.setId(log.getId());
 

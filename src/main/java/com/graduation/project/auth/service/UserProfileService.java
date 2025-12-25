@@ -44,7 +44,7 @@ public class UserProfileService {
         UUID uuid;
         try {
             uuid = UUID.fromString(id);
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             throw new AppException(ErrorCode.UUID_IS_INVALID);
         }
 
@@ -57,7 +57,7 @@ public class UserProfileService {
         UUID id;
         try {
             id = UUID.fromString(userId);
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             throw new AppException(ErrorCode.UUID_IS_INVALID);
         }
 

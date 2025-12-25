@@ -25,33 +25,47 @@ public class UserAdminService {
 
     private final UserRepository userRepository;
 
+    private static String escapeLikePattern(String input) {
+        if (input == null) {
+            return null;
+        }
+        String trimmed = input.trim().toLowerCase();
+        return trimmed.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+    }
+
     @Transactional(readOnly = true)
     public Page<UserResponse> searchUsers(SearchUserRequest req, Pageable pageable) {
         Specification<User> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             if (req.getEmail() != null && !req.getEmail().trim().isEmpty()) {
+                String escaped = escapeLikePattern(req.getEmail());
                 predicates.add(cb.like(
                         cb.lower(root.get("email")),
-                        "%" + req.getEmail().trim().toLowerCase() + "%"));
+                        "%" + escaped + "%", '\\'));
             }
 
             if (req.getFullName() != null && !req.getFullName().trim().isEmpty()) {
+                String escaped = escapeLikePattern(req.getFullName());
                 predicates.add(cb.like(
                         cb.lower(root.get("fullName")),
-                        "%" + req.getFullName().trim().toLowerCase() + "%"));
+                        "%" + escaped + "%", '\\'));
             }
 
             if (req.getStudentCode() != null && !req.getStudentCode().trim().isEmpty()) {
+                String escaped = escapeLikePattern(req.getStudentCode());
                 predicates.add(cb.like(
                         cb.lower(root.get("studentCode")),
-                        "%" + req.getStudentCode().trim().toLowerCase() + "%"));
+                        "%" + escaped + "%", '\\'));
             }
 
             if (req.getClassCode() != null && !req.getClassCode().trim().isEmpty()) {
+                String escaped = escapeLikePattern(req.getClassCode());
                 predicates.add(cb.like(
                         cb.lower(root.get("classCode")),
-                        "%" + req.getClassCode().trim().toLowerCase() + "%"));
+                        "%" + escaped + "%", '\\'));
             }
 
             if (req.getEnable() != null) {

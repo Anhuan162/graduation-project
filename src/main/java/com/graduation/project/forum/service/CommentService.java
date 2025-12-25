@@ -359,7 +359,7 @@ public class CommentService {
 
     // userState
     CommentUserStateResponse userState = CommentUserStateResponse.builder()
-        .isLiked(Boolean.TRUE.equals(isLiked))
+        .liked(Boolean.TRUE.equals(isLiked))
         .build();
 
     // permissions

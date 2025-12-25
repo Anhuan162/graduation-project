@@ -3,6 +3,8 @@ package com.graduation.project.forum.dto;
 import com.graduation.project.forum.constant.PostStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
+
 import lombok.*;
 
 @Data
@@ -10,19 +12,20 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class PostResponse {
-  private String id;
+
+  private UUID id;
   private String title;
   private String excerpt;
   private String content;
   private String slug;
-  private String topicId;
   private PostStatus postStatus;
   private LocalDateTime createdDateTime;
   private LocalDateTime lastModifiedDateTime;
   private LocalDateTime approvedAt;
+  private UUID topicId;
+  private UUID createdById;
+  private UUID approvedById;
 
-  private String createdById;
-  private String approvedById;
   private Long reactionCount;
   private Boolean deleted;
   private List<String> urls;

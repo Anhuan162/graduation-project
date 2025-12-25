@@ -11,12 +11,18 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring")
 public interface PostMapper {
+
+  // ===== helpers =====
   default UUID safeTopicId(Post post) {
-    return post != null && post.getTopic() != null ? post.getTopic().getId() : null;
+    return (post != null && post.getTopic() != null) ? post.getTopic().getId() : null;
   }
 
   default UUID safeAuthorId(Post post) {
-    return post != null && post.getAuthor() != null ? post.getAuthor().getId() : null;
+    return (post != null && post.getAuthor() != null) ? post.getAuthor().getId() : null;
+  }
+
+  default UUID safeUserUuid(User user) {
+    return user == null ? null : user.getId();
   }
 
   // ===== entity create =====
@@ -33,13 +39,15 @@ public interface PostMapper {
   @Mapping(target = "approvedAt", ignore = true)
   Post toPost(PostRequest request, Topic topic, User author);
 
-  // ===== response base mapping =====
+  // ===== response =====
   @Mapping(target = "id", source = "post.id")
   @Mapping(target = "title", source = "post.title")
   @Mapping(target = "content", source = "post.content")
+
   @Mapping(target = "topicId", expression = "java(safeTopicId(post))")
   @Mapping(target = "createdById", expression = "java(safeAuthorId(post))")
-  @Mapping(target = "approvedById", expression = "java(safeUserId(post.getApprovedBy()))")
+  @Mapping(target = "approvedById", expression = "java(safeUserUuid(post.getApprovedBy()))")
+
   @Mapping(target = "createdDateTime", source = "post.createdDateTime")
   @Mapping(target = "lastModifiedDateTime", source = "post.lastModifiedDateTime")
   @Mapping(target = "approvedAt", source = "post.approvedAt")
@@ -64,8 +72,4 @@ public interface PostMapper {
       PostUserStateResponse userState,
       PostPermissionsResponse permissions,
       List<AttachmentResponse> attachments);
-
-  default String safeUserId(User user) {
-    return user == null ? null : user.getId().toString();
-  }
 }

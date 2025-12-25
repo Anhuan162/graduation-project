@@ -75,11 +75,10 @@ public class GlobalHandleException {
   public ResponseEntity<ApiResponse<?>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
     ErrorCode errorCode = ErrorCode.BAD_REQUEST;
     String param = ex.getName();
-    String value = ex.getValue() == null ? "null" : ex.getValue().toString();
 
     return ResponseEntity
         .status(errorCode.getHttpStatusCode())
-        .body(ApiResponse.error(errorCode.getCode(), "Invalid value for '" + param + "': " + value));
+        .body(ApiResponse.error(errorCode.getCode(), "Invalid value for '" + param + "'"));
   }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)

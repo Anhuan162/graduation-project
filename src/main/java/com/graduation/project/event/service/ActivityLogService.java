@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 public class ActivityLogService {
 
   private final ActivityLogRepository activityLogRepository;
+  private final ActivityLogMapper activityLogMapper;
 
   public Page<ActivityLogResponse> searchLogs(ActivityLogSearchRequest request, Pageable pageable) {
 
@@ -72,31 +73,8 @@ public class ActivityLogService {
       return cb.and(predicates.toArray(new Predicate[0]));
     };
 
-    return activityLogRepository.findAll(spec, pageable).map(this::mapToResponse);
+    return activityLogRepository.findAll(spec, pageable).map(activityLogMapper::toResponse);
   }
-
-  // Mapper function
-  public ActivityLogResponse mapToResponse(ActivityLog entity) {
-    ActivityLogResponse dto = new ActivityLogResponse();
-    dto.setId(entity.getId());
-    dto.setAction(entity.getAction());
-    dto.setModule(entity.getModule());
-    dto.setDescription(entity.getDescription());
-    dto.setTargetId(entity.getTargetId());
-    dto.setTargetType(entity.getTargetType());
-    dto.setMetadata(entity.getMetadata());
-    dto.setIpAddress(entity.getIpAddress());
-    dto.setCreatedAt(entity.getCreatedAt());
-
-    if (entity.getUser() != null) {
-      dto.setUserId(entity.getUser().getId());
-      dto.setUsername(entity.getUser().getEmail()); // Hoặc getFullName()
-      // dto.setUserAvatar(...)
-    }
-    return dto;
-  }
-
-  private final ActivityLogMapper activityLogMapper;
 
   @Transactional(readOnly = true)
   public ActivityLogResponse getLogDetail(UUID id) {

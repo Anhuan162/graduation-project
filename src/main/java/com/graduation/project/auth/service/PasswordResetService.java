@@ -6,8 +6,9 @@ import com.graduation.project.common.entity.PasswordResetSession;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,9 +25,10 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final CurrentUserService currentUserService;
-    private final Random random = new Random();
+    private final SecureRandom random = new SecureRandom();
 
     // ===== REQUEST OTP =====
+    @Transactional
     public String sendOtpToUserToResetPassword(String email) {
         User user = userRepository.findUserByEmail(email);
         if (user == null) {
@@ -34,12 +36,6 @@ public class PasswordResetService {
         }
 
         String otp = generateOtp();
-        try {
-            sendOtpEmail(user, otp);
-        } catch (Exception e) {
-            log.warn("Send email failed for {}", email, e);
-            throw new AppException(ErrorCode.CAN_NOT_SEND_EMAIL);
-        }
 
         PasswordResetSession session = passwordResetSessionRepository.findByEmailAndNotUsed(email);
 
@@ -48,11 +44,28 @@ public class PasswordResetService {
             newSession.setEmail(email);
             newSession.setOtp(otp);
             newSession.setExpiresAt(LocalDateTime.now().plusMinutes(5));
-            passwordResetSessionRepository.save(newSession);
+            try {
+                passwordResetSessionRepository.save(newSession);
+            } catch (Exception e) {
+                log.error("Failed to persist password reset session for {}", email, e);
+                throw e;
+            }
         } else {
             session.setOtp(otp);
             session.setExpiresAt(LocalDateTime.now().plusMinutes(5));
-            passwordResetSessionRepository.save(session);
+            try {
+                passwordResetSessionRepository.save(session);
+            } catch (Exception e) {
+                log.error("Failed to persist password reset session for {}", email, e);
+                throw e;
+            }
+        }
+
+        try {
+            sendOtpEmail(user, otp);
+        } catch (Exception e) {
+            log.warn("Send email failed for {}", email, e);
+            throw new AppException(ErrorCode.CAN_NOT_SEND_EMAIL);
         }
 
         return email;
@@ -85,9 +98,12 @@ public class PasswordResetService {
         if (session.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new AppException(ErrorCode.TOKEN_EXPIRED);
         }
-
         User user = userRepository.findUserByEmail(session.getEmail());
+        if (user == null) {
+            throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
+        }
         user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
         userRepository.save(user);
 
         session.setUsed(true);

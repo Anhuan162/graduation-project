@@ -13,6 +13,9 @@ import com.graduation.project.common.entity.User;
 import com.graduation.project.common.entity.VerificationToken;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+
+import jakarta.transaction.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Optional;
@@ -33,9 +36,10 @@ public class UserRegistrationService {
     private final VerificationTokenRepository verificationTokenRepository;
     private final RoleRepository roleRepository;
 
-    private final SecureRandom secureRandom = new SecureRandom();
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     // ===== REGISTER =====
+    @Transactional
     public SignupResponse register(SignupRequest request) {
         String email = request.getEmail();
         String rawPassword = request.getPassword();
@@ -45,7 +49,9 @@ public class UserRegistrationService {
         }
 
         HashSet<Role> roles = new HashSet<>();
-        roleRepository.findById(PredefinedRole.USER_ROLE).ifPresent(roles::add);
+        Role userRole = roleRepository.findById(PredefinedRole.USER_ROLE)
+                .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
+        roles.add(userRole);
 
         User user = new User();
         user.setEmail(email);
@@ -64,6 +70,7 @@ public class UserRegistrationService {
     }
 
     // ===== VERIFY EMAIL =====
+    @Transactional
     public void verifyEmail(VerifyUserDto request) {
         VerificationToken verificationToken = verificationTokenRepository
                 .findByToken(request.getVerificationCode())
@@ -86,6 +93,7 @@ public class UserRegistrationService {
     }
 
     // ===== RESEND CODE =====
+    @Transactional
     public void resendVerificationCode(String email) {
         Optional<User> optionalUser = userRepository.findByEmail(email);
         if (optionalUser.isEmpty()) {
@@ -116,7 +124,7 @@ public class UserRegistrationService {
 
     private void sendVerificationEmail(User user, String token) {
         String subject = "Account Verification";
-        String verificationCode = "VERIFICATION CODE " + token;
+        String verificationCode = token;
 
         String htmlMessage = "<html>"
                 + "<body style=\"font-family: Arial, sans-serif;\">"

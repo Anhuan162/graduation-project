@@ -47,12 +47,11 @@ public enum ErrorCode {
   CAN_NOT_SEND_EMAIL(1032, "Can not send email", HttpStatus.SERVICE_UNAVAILABLE),
   UUID_IS_INVALID(1033, "UUID is invalid", HttpStatus.BAD_REQUEST),
 
-  ACTIVITY_LOG_NOT_FOUND(1038, "Activity log not found", HttpStatus.NOT_FOUND),
-
   VALIDATION_ERROR(1034, "Validation error", HttpStatus.BAD_REQUEST),
   FORBIDDEN(1035, "Forbidden", HttpStatus.FORBIDDEN),
   BAD_REQUEST(1036, "Bad request", HttpStatus.BAD_REQUEST),
   CONFLICT(1037, "Conflict", HttpStatus.CONFLICT),
+  ACTIVITY_LOG_NOT_FOUND(1038, "Activity log not found", HttpStatus.NOT_FOUND),
   INVALID_REQUEST(1040, "Invalid request", HttpStatus.BAD_REQUEST),
   FILE_UPLOAD_FAILED(1041, "File upload failed", HttpStatus.SERVICE_UNAVAILABLE),
   INVALID_PASSWORD(1042, "Invalid password", HttpStatus.BAD_REQUEST),
