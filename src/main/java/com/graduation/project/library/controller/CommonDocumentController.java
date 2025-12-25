@@ -33,36 +33,22 @@ public class CommonDocumentController {
       @RequestParam(required = false, defaultValue = "") String description,
       @RequestParam(required = false) DocumentType documentType)
       throws IOException {
-    DocumentRequest documentRequest =
-        DocumentRequest.builder()
-            .title(title)
-            .documentType(documentType)
-            .description(description)
-            .subjectId(subjectId)
-            .build();
+    DocumentRequest documentRequest = DocumentRequest.builder()
+        .title(title)
+        .documentType(documentType)
+        .description(description)
+        .subjectId(subjectId)
+        .build();
     DocumentResponse res = documentService.uploadDocument(document, image, documentRequest);
     return ApiResponse.<DocumentResponse>builder().result(res).build();
   }
 
   @GetMapping("/search")
-  public ApiResponse<Page<DocumentResponse>> searchDocumentBySubjectIdAndTitleAndDocumentType(
-      @RequestParam(required = false) String subjectId,
+  public ApiResponse<Page<DocumentResponse>> search(
+      @RequestParam(required = false) UUID subjectId,
       @RequestParam(required = false) String title,
-      @RequestParam(required = false) String documentType,
-      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
-          Pageable pageable) {
-    UUID UUIDSubjectId = null;
-    DocumentType edocumentType = null;
-    try {
-      UUIDSubjectId = UUID.fromString(subjectId);
-    } catch (Exception e) {
-    }
-    try {
-      edocumentType = DocumentType.valueOf(documentType);
-    } catch (Exception e) {
-    }
-    Page<DocumentResponse> res =
-        documentService.searchDocuments(UUIDSubjectId, title, edocumentType, pageable);
-    return ApiResponse.<Page<DocumentResponse>>builder().result(res).build();
+      @RequestParam(required = false) DocumentType documentType,
+      Pageable pageable) {
+    return ApiResponse.ok(documentService.searchDocuments(subjectId, title, documentType, pageable));
   }
 }

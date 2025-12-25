@@ -59,10 +59,11 @@ public class AdminAnnouncementService {
   }
 
   public void releaseAnnouncement(UUID announcementId, ReleaseAnnouncementRequest request) {
-    Announcement announcement = announcementRepository.findById(announcementId).orElseThrow();
+    Announcement announcement = announcementRepository.findById(announcementId).orElseThrow(
+        () -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND, "Announcement not found for id: " + announcementId));
 
     if (Boolean.TRUE.equals(announcement.getAnnouncementStatus())) {
-      throw new AppException(ErrorCode.INVALID_REQUEST, "Thông báo đã được gửi");
+      throw new AppException(ErrorCode.CONFLICT, "Thông báo đã được gửi");
     }
 
     Set<String> allClassroomCodes = getAllClassroomCodes(

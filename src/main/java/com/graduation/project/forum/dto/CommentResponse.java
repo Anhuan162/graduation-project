@@ -1,11 +1,9 @@
 package com.graduation.project.forum.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Data
 @NoArgsConstructor
@@ -21,4 +19,10 @@ public class CommentResponse {
   private String url;
   private Boolean deleted;
   private Long reactionCount;
+
+  private PostAuthorResponse author;
+  private CommentStatsResponse stats;
+  private CommentUserStateResponse userState;
+  private CommentPermissionsResponse permissions;
+  private List<AttachmentResponse> attachments;
 }

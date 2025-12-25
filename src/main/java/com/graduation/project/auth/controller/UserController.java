@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("api/users")
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -24,19 +24,19 @@ public class UserController {
 
   @PostMapping("/register")
   public ApiResponse<SignupResponse> register(@Valid @RequestBody SignupRequest request) {
-    return ApiResponse.<SignupResponse>builder().result(userService.register(request)).build();
+    return ApiResponse.ok(userService.register(request));
   }
 
   @PostMapping("/verify")
   public ApiResponse<Void> verifyEmail(@RequestBody VerifyUserDto request) {
     userService.verifyEmail(request);
-    return ApiResponse.<Void>builder().result(null).build();
+    return ApiResponse.ok(null);
   }
 
   @PostMapping("/resend")
   public ApiResponse<Void> resendVerificationCode(@RequestParam String email) {
     userService.resendVerificationCode(email);
-    return ApiResponse.<Void>builder().result(null).build();
+    return ApiResponse.ok(null);
   }
 
   @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")

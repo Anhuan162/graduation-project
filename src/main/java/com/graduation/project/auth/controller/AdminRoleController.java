@@ -1,6 +1,9 @@
 package com.graduation.project.auth.controller;
 
 import com.graduation.project.auth.service.RoleService;
+
+import jakarta.validation.Valid;
+
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.auth.dto.request.AddPermissionRequest;
 import com.graduation.project.auth.dto.request.RoleRequest;
@@ -13,34 +16,34 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("api/admin/roles")
+@RequestMapping("/api/admin/roles")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class AdminRoleController {
+
   RoleService roleService;
 
   @PostMapping
-  ApiResponse<RoleResponse> create(@RequestBody RoleRequest request) {
-    return ApiResponse.<RoleResponse>builder().result(roleService.create(request)).build();
+  public ApiResponse<RoleResponse> create(@Valid @RequestBody RoleRequest request) {
+    return ApiResponse.ok(roleService.create(request));
   }
 
   @PutMapping("/{roleId}")
-  ApiResponse<RoleResponse> addPermissions(
-      @PathVariable String roleId, @RequestBody AddPermissionRequest request) {
-    return ApiResponse.<RoleResponse>builder()
-        .result(roleService.addPermissions(roleId, request))
-        .build();
+  public ApiResponse<RoleResponse> addPermissions(
+      @PathVariable String roleId,
+      @Valid @RequestBody AddPermissionRequest request) {
+    return ApiResponse.ok(roleService.addPermissions(roleId, request));
   }
 
   @GetMapping
-  ApiResponse<List<RoleResponse>> getAll() {
-    return ApiResponse.<List<RoleResponse>>builder().result(roleService.getAll()).build();
+  public ApiResponse<List<RoleResponse>> getAll() {
+    return ApiResponse.ok(roleService.getAll());
   }
 
   @DeleteMapping("/{role}")
-  ApiResponse<Void> delete(@PathVariable String role) {
+  public ApiResponse<String> delete(@PathVariable("role") String role) {
     roleService.delete(role);
-    return ApiResponse.<Void>builder().build();
+    return ApiResponse.ok("ROLE_DELETED");
   }
 }

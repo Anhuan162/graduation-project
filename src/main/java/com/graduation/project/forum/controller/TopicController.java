@@ -50,7 +50,7 @@ public class TopicController {
     return ApiResponse.<String>builder().result("Deleted successfully").build();
   }
 
-  @DeleteMapping("soft-delete/{topicId}")
+  @DeleteMapping("/soft-delete/{topicId}")
   public ApiResponse<TopicResponse> softDelete(@PathVariable UUID topicId) {
     return ApiResponse.<TopicResponse>builder().result(topicService.softDelete(topicId)).build();
   }

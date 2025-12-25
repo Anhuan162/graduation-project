@@ -12,27 +12,29 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TopicMemberRepository extends JpaRepository<TopicMember, UUID> {
-  List<TopicMember> findByTopicId(UUID topicId);
 
-  boolean existsByUserIdAndTopicId(UUID id, UUID topicId);
+    List<TopicMember> findByTopicId(UUID topicId);
 
-  Optional<TopicMember> findByUserIdAndTopicId(UUID userId, UUID topicId);
+    boolean existsByUserIdAndTopicId(UUID userId, UUID topicId);
 
-  Page<TopicMember> findAllByApprovedIsFalse(Pageable pageable);
+    Optional<TopicMember> findByUserIdAndTopicId(UUID userId, UUID topicId);
 
-  Page<TopicMember> findAllByApprovedIsTrue(Pageable pageable);
+    Page<TopicMember> findAllByApprovedIsFalse(Pageable pageable);
 
-  boolean existsByUserIdAndTopicIdAndApprovedIsTrue(UUID userId, UUID topicId);
+    Page<TopicMember> findAllByApprovedIsTrue(Pageable pageable);
 
-  @Query(
-      "SELECT COUNT(tm) > 0 "
-          + "FROM TopicMember tm "
-          + "WHERE tm.user.id = :currentUserId "
-          + "AND tm.topic.id = :topicId "
-          + "AND ( :role IS NULL OR tm.topicRole = :role) "
-          + "AND tm.approved = true")
-  boolean checkPermission(
-      @Param("currentUserId") UUID currentUserId,
-      @Param("topicId") UUID topicId,
-      @Param("role") TopicRole role);
+    boolean existsByUserIdAndTopicIdAndApprovedIsTrue(UUID userId, UUID topicId);
+
+    void deleteByUserIdAndTopicId(UUID userId, UUID topicId);
+
+    @Query("SELECT COUNT(tm) > 0 "
+            + "FROM TopicMember tm "
+            + "WHERE tm.user.id = :currentUserId "
+            + "AND tm.topic.id = :topicId "
+            + "AND (:role IS NULL OR tm.topicRole = :role) "
+            + "AND tm.approved = true")
+    boolean checkPermission(
+            @Param("currentUserId") UUID currentUserId,
+            @Param("topicId") UUID topicId,
+            @Param("role") TopicRole role);
 }

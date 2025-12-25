@@ -11,15 +11,22 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
-  @Builder.Default
-  private int code = 1000;
 
-  private String message;
-  private T result;
+  @Builder.Default
+  int code = 1000;
+
+  String message;
+  T result;
 
   public static <T> ApiResponse<T> ok(T result) {
-    return ApiResponse.<T>builder()
-        .result(result)
-        .build();
+    return ApiResponse.<T>builder().result(result).build();
+  }
+
+  public static <T> ApiResponse<T> of(int code, String message, T result) {
+    return ApiResponse.<T>builder().code(code).message(message).result(result).build();
+  }
+
+  public static <T> ApiResponse<T> error(int code, String message) {
+    return ApiResponse.<T>builder().code(code).message(message).build();
   }
 }

@@ -46,9 +46,8 @@ public class PostController {
     return ApiResponse.<String>builder().result("Deleted successfully").build();
   }
 
-  @DeleteMapping("soft-delete/{postId}")
-  public ApiResponse<PostResponse> softDelete(@PathVariable String postId) {
-
+  @DeleteMapping("/soft-delete/{postId}")
+  public ApiResponse<PostResponse> softDelete(@PathVariable UUID postId) {
     return ApiResponse.<PostResponse>builder().result(postService.softDelete(postId)).build();
   }
 
@@ -69,6 +68,7 @@ public class PostController {
         .build();
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @PutMapping("/upgrade-post/{postId}")
   public ApiResponse<PostResponse> upgradePostStatus(
       @PathVariable UUID postId, @RequestParam PostStatus postStatus) {

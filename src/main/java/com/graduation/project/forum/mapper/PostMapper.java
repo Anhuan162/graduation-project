@@ -1,17 +1,25 @@
 package com.graduation.project.forum.mapper;
 
+import com.graduation.project.common.entity.User;
+import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Topic;
-import com.graduation.project.common.entity.User;
-import com.graduation.project.forum.dto.PostRequest;
-import com.graduation.project.forum.dto.PostResponse;
 import java.util.List;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import java.util.UUID;
+
+import org.mapstruct.*;
 
 @Mapper(componentModel = "spring")
 public interface PostMapper {
+  default UUID safeTopicId(Post post) {
+    return post != null && post.getTopic() != null ? post.getTopic().getId() : null;
+  }
 
+  default UUID safeAuthorId(Post post) {
+    return post != null && post.getAuthor() != null ? post.getAuthor().getId() : null;
+  }
+
+  // ===== entity create =====
   @Mapping(target = "author", source = "author")
   @Mapping(target = "topic", source = "topic")
   @Mapping(target = "title", source = "request.title")
@@ -25,17 +33,39 @@ public interface PostMapper {
   @Mapping(target = "approvedAt", ignore = true)
   Post toPost(PostRequest request, Topic topic, User author);
 
-  @Mapping(target = "topicId", source = "post.topic.id")
-  @Mapping(target = "createdById", source = "post.author.id")
-  @Mapping(target = "approvedById", source = "post.approvedBy.id")
+  // ===== response base mapping =====
   @Mapping(target = "id", source = "post.id")
   @Mapping(target = "title", source = "post.title")
   @Mapping(target = "content", source = "post.content")
+  @Mapping(target = "topicId", expression = "java(safeTopicId(post))")
+  @Mapping(target = "createdById", expression = "java(safeAuthorId(post))")
+  @Mapping(target = "approvedById", expression = "java(safeUserId(post.getApprovedBy()))")
   @Mapping(target = "createdDateTime", source = "post.createdDateTime")
+  @Mapping(target = "lastModifiedDateTime", source = "post.lastModifiedDateTime")
   @Mapping(target = "approvedAt", source = "post.approvedAt")
   @Mapping(target = "postStatus", source = "post.postStatus")
   @Mapping(target = "reactionCount", source = "post.reactionCount")
   @Mapping(target = "deleted", source = "post.deleted")
   @Mapping(target = "urls", source = "urls")
-  PostResponse toPostResponse(Post post, List<String> urls);
+
+  @Mapping(target = "excerpt", source = "excerpt")
+  @Mapping(target = "author", source = "author")
+  @Mapping(target = "stats", source = "stats")
+  @Mapping(target = "userState", source = "userState")
+  @Mapping(target = "permissions", source = "permissions")
+  @Mapping(target = "attachments", source = "attachments")
+  @Mapping(target = "slug", ignore = true)
+  PostResponse toPostResponse(
+      Post post,
+      List<String> urls,
+      String excerpt,
+      PostAuthorResponse author,
+      PostStatsResponse stats,
+      PostUserStateResponse userState,
+      PostPermissionsResponse permissions,
+      List<AttachmentResponse> attachments);
+
+  default String safeUserId(User user) {
+    return user == null ? null : user.getId().toString();
+  }
 }

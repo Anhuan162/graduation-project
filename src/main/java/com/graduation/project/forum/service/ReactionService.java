@@ -37,110 +37,122 @@ public class ReactionService {
   private final CommentRepository commentRepository;
   private final ApplicationEventPublisher publisher;
 
+  /**
+   * Toggle reaction:
+   * - Nếu đã reaction cùng type -> delete (unlike)
+   * - Nếu đã reaction khác type -> update type (không đổi count)
+   * - Nếu chưa reaction -> create (like)
+   */
   @Transactional
   public void toggleReaction(ReactionRequest request) {
     User user = currentUserService.getCurrentUserEntity();
-    var existingReactionOpt =
-        reactionRepository.findByUserIdAndTargetIdAndTargetType(
-            user.getId(), request.getTargetId(), request.getTargetType());
 
-    if (existingReactionOpt.isPresent()) {
-      Reaction existingReaction = existingReactionOpt.get();
+    Optional<Reaction> existingOpt = reactionRepository.findByUserIdAndTargetIdAndTargetType(
+        user.getId(), request.getTargetId(), request.getTargetType());
 
-      if (existingReaction.getType() == request.getReactionType()) {
-        // TRƯỜNG HỢP A: Đã thả rồi, bấm lại y hệt -> XÓA (Unlike)
-        reactionRepository.delete(existingReaction);
+    // ===== Case: đã có reaction =====
+    if (existingOpt.isPresent()) {
+      Reaction existing = existingOpt.get();
+
+      // A) bấm lại y hệt -> UNLIKE
+      if (existing.getType() == request.getReactionType()) {
+        reactionRepository.delete(existing);
         updateReactionCount(request.getTargetId(), request.getTargetType(), false);
-      } else {
-        // TRƯỜNG HỢP B: Đã thả rồi, nhưng đổi loại (Like -> Love) -> CẬP NHẬT
-        existingReaction.setType(request.getReactionType());
-        reactionRepository.save(existingReaction);
-      }
-    } else {
-      // TRƯỜNG HỢP C: Chưa thả bao giờ -> TẠO MỚI
-      UUID receiverId = null;
-
-      if (request.getTargetType().equals(TargetType.POST)) {
-        var post =
-            postRepository
-                .findById(request.getTargetId())
-                .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
-        receiverId = post.getAuthor().getId();
-      } else if (request.getTargetType().equals(TargetType.COMMENT)) {
-        var comment =
-            commentRepository
-                .findById(request.getTargetId())
-                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
-        receiverId = comment.getAuthor().getId();
+        return;
       }
 
-      Reaction newReaction =
-          Reaction.builder()
-              .user(user)
-              .targetId(request.getTargetId())
-              .targetType(request.getTargetType())
-              .type(request.getReactionType())
-              .createdAt(LocalDateTime.now())
-              .build();
+      // B) đổi reaction type -> UPDATE (không đổi count)
+      existing.setType(request.getReactionType());
+      reactionRepository.save(existing);
+      return;
+    }
 
-      reactionRepository.save(newReaction);
-      updateReactionCount(request.getTargetId(), request.getTargetType(), true);
+    // ===== Case: chưa có reaction =====
+    UUID receiverId = resolveReceiverId(request.getTargetType(), request.getTargetId());
 
-      if (receiverId != null && !receiverId.equals(user.getId())) {
-        ReactionEvent reactionEvent = ReactionEvent.from(newReaction, user, receiverId);
-        publisher.publishEvent(reactionEvent);
-      }
+    Reaction created = Reaction.builder()
+        .user(user)
+        .targetId(request.getTargetId())
+        .targetType(request.getTargetType())
+        .type(request.getReactionType())
+        .createdAt(LocalDateTime.now())
+        .build();
+
+    reactionRepository.save(created);
+    updateReactionCount(request.getTargetId(), request.getTargetType(), true);
+
+    // Publish event nếu không self-like
+    if (receiverId != null && !receiverId.equals(user.getId())) {
+      publisher.publishEvent(ReactionEvent.from(created, user, receiverId));
     }
   }
 
-  private void updateReactionCount(UUID targetId, TargetType targetType, boolean isIncrement) {
-    if (targetType == TargetType.POST) {
-      if (isIncrement) {
-        postRepository.increaseReactionCount(targetId);
-      } else {
-        postRepository.decreaseReactionCount(targetId);
-      }
-    } else if (targetType == TargetType.COMMENT) {
-      if (isIncrement) {
-        commentRepository.increaseReactionCount(targetId);
-      } else {
-        commentRepository.decreaseReactionCount(targetId);
-      }
+  /**
+   * Check nhanh isLiked cho 1 target (dùng cho detail).
+   * (PostService có thể gọi trực tiếp repository cũng ok, nhưng helper này sạch
+   * hơn)
+   */
+  @Transactional(readOnly = true)
+  public boolean isReactedByMe(UUID targetId, TargetType targetType) {
+    UUID userId = null;
+    try {
+      userId = currentUserService.getCurrentUserId();
+    } catch (Exception e) {
+      // chưa login -> xem như false
     }
+    if (userId == null)
+      return false;
+    return reactionRepository.existsByUserIdAndTargetIdAndTargetType(userId, targetId, targetType);
+  }
+
+  /**
+   * Batch map isLiked: Tránh N+1 cho list post/comment.
+   * Trả về map: targetId -> boolean
+   */
+  @Transactional(readOnly = true)
+  public Map<UUID, Boolean> mapIsReactedByMe(List<UUID> targetIds, TargetType targetType) {
+    UUID userId = null;
+    try {
+      userId = currentUserService.getCurrentUserId();
+    } catch (Exception e) {
+      // chưa login -> xem như false hết
+    }
+    if (userId == null || targetIds == null || targetIds.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    List<UUID> reactedIds = reactionRepository.findReactedTargetIdsByUser(userId, targetType, targetIds);
+
+    Set<UUID> reactedSet = new HashSet<>(reactedIds);
+    Map<UUID, Boolean> result = new HashMap<>();
+    for (UUID id : targetIds) {
+      result.put(id, reactedSet.contains(id));
+    }
+    return result;
   }
 
   @Transactional(readOnly = true)
   public ReactionSummary getReactionSummary(UUID targetId, TargetType targetType) {
-    // 1. Lấy thống kê số lượng (Group by Type)
-    List<ReactionCountProjection> projections =
-        reactionRepository.countReactionsByTarget(targetId, targetType);
+    // 1) Group by type
+    List<ReactionCountProjection> projections = reactionRepository.countReactionsByTarget(targetId, targetType);
 
-    // Convert List Projection sang Map<Type, Long>
-    Map<ReactionType, Long> counts =
-        projections.stream()
-            .collect(
-                Collectors.toMap(
-                    ReactionCountProjection::getType, ReactionCountProjection::getCount));
+    Map<ReactionType, Long> counts = projections.stream()
+        .collect(Collectors.toMap(ReactionCountProjection::getType, ReactionCountProjection::getCount));
 
-    // Tính tổng số reaction
     long total = counts.values().stream().mapToLong(Long::longValue).sum();
 
-    // 2. Kiểm tra user hiện tại đã thả gì chưa (để highlight nút like)
+    // 2) current user reaction type (để highlight)
     ReactionType currentUserReaction = null;
     try {
       UUID currentUserId = currentUserService.getCurrentUserId();
-      // Nếu user chưa login thì currentUserId có thể null hoặc throw exception, cần handle tùy
-      // logic auth của bạn
       if (currentUserId != null) {
-        Optional<Reaction> myReaction =
-            reactionRepository.findByUserIdAndTargetIdAndTargetType(
-                currentUserId, targetId, targetType);
-        if (myReaction.isPresent()) {
-          currentUserReaction = myReaction.get().getType();
-        }
+        currentUserReaction = reactionRepository
+            .findByUserIdAndTargetIdAndTargetType(currentUserId, targetId, targetType)
+            .map(Reaction::getType)
+            .orElse(null);
       }
     } catch (Exception e) {
-      // User chưa login, bỏ qua
+      // not login -> ignore
     }
 
     return ReactionSummary.builder()
@@ -154,24 +166,52 @@ public class ReactionService {
   @Transactional(readOnly = true)
   public Page<ReactionDetailResponse> getReactions(
       UUID targetId, TargetType targetType, ReactionType filterType, Pageable pageable) {
-    Page<Reaction> page;
 
-    if (filterType != null) {
-      page =
-          reactionRepository.findAllByTargetIdAndTargetTypeAndType(
-              targetId, targetType, filterType, pageable);
-    } else {
-      page = reactionRepository.findAllByTargetIdAndTargetType(targetId, targetType, pageable);
+    Page<Reaction> page = (filterType != null)
+        ? reactionRepository.findAllByTargetIdAndTargetTypeAndType(targetId, targetType, filterType, pageable)
+        : reactionRepository.findAllByTargetIdAndTargetType(targetId, targetType, pageable);
+
+    return page.map(
+        reaction -> ReactionDetailResponse.builder()
+            .userId(reaction.getUser().getId())
+            .username(reaction.getUser().getFullName())
+            .avatarUrl(reaction.getUser().getAvatarUrl())
+            .type(reaction.getType())
+            .build());
+  }
+
+  private UUID resolveReceiverId(TargetType targetType, UUID targetId) {
+    if (targetType == TargetType.POST) {
+      return postRepository
+          .findById(targetId)
+          .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND))
+          .getAuthor()
+          .getId();
+    }
+    if (targetType == TargetType.COMMENT) {
+      return commentRepository
+          .findById(targetId)
+          .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND))
+          .getAuthor()
+          .getId();
+    }
+    return null;
+  }
+
+  private void updateReactionCount(UUID targetId, TargetType targetType, boolean isIncrement) {
+    if (targetType == TargetType.POST) {
+      if (isIncrement)
+        postRepository.increaseReactionCount(targetId);
+      else
+        postRepository.decreaseReactionCount(targetId);
+      return;
     }
 
-    // Map Entity sang DTO
-    return page.map(
-        reaction ->
-            ReactionDetailResponse.builder()
-                .userId(reaction.getUser().getId())
-                .username(reaction.getUser().getFullName()) // Giả sử User entity có field này
-                .avatarUrl(reaction.getUser().getAvatarUrl()) // Giả sử User
-                .type(reaction.getType())
-                .build());
+    if (targetType == TargetType.COMMENT) {
+      if (isIncrement)
+        commentRepository.increaseReactionCount(targetId);
+      else
+        commentRepository.decreaseReactionCount(targetId);
+    }
   }
 }
