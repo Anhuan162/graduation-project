@@ -182,9 +182,9 @@ public class CommentService {
   }
 
   @Transactional
-  public CommentResponse updateComment(String commentId, CommentRequest request) {
+  public CommentResponse updateComment(UUID commentId, CommentRequest request) {
     Comment comment = commentRepository
-        .findById(UUID.fromString(commentId))
+        .findById(commentId)
         .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
@@ -216,9 +216,9 @@ public class CommentService {
   }
 
   @Transactional
-  public CommentResponse softDeleteComment(String commentId) {
+  public CommentResponse softDeleteComment(UUID commentId) {
     Comment comment = commentRepository
-        .findById(UUID.fromString(commentId))
+        .findById(commentId)
         .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();

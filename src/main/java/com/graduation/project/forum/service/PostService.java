@@ -105,6 +105,9 @@ public class PostService {
   public PostResponse updateStatus(UUID postId, PostStatus status) {
     Post post = postRepository.findById(postId)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    if (!post.getPostStatus().canTransitionTo(status)) {
+      throw new AppException(ErrorCode.INVALID_POST_STATUS_TRANSITION);
+    }
 
     post.setPostStatus(status);
     User holUser = currentUserService.getCurrentUserEntity();

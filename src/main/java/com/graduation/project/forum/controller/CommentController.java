@@ -47,7 +47,7 @@ public class CommentController {
 
   @PutMapping("/{commentId}")
   public ApiResponse<CommentResponse> updateComment(
-      @PathVariable @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$") String commentId,
+      @PathVariable UUID commentId,
       @Valid @RequestBody CommentRequest request) {
     return ApiResponse.<CommentResponse>builder()
         .result(commentService.updateComment(commentId, request))
@@ -57,7 +57,7 @@ public class CommentController {
   // ===== SOFT DELETE =====
   @DeleteMapping("/{commentId}/soft-delete")
   public ApiResponse<CommentResponse> softDeleteComment(
-      @PathVariable @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$") String commentId) {
+      @PathVariable UUID commentId) {
     return ApiResponse.<CommentResponse>builder()
         .result(commentService.softDeleteComment(commentId))
         .build();

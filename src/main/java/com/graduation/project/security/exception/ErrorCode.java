@@ -60,7 +60,8 @@ public enum ErrorCode {
   ACCOUNT_ALREADY_VERIFIED(1044, "Account already verified", HttpStatus.CONFLICT),
   CLASS_CODE_INVALID(1045, "Class code is invalid", HttpStatus.BAD_REQUEST),
   FACULTY_CODE_MISMATCH(1046, "Faculty code mismatch", HttpStatus.BAD_REQUEST),
-  INVALID_PARENT_COMMENT(1047, "Invalid parent comment", HttpStatus.BAD_REQUEST);
+  INVALID_PARENT_COMMENT(1047, "Invalid parent comment", HttpStatus.BAD_REQUEST),
+  INVALID_POST_STATUS_TRANSITION(1048, "Invalid post status transition", HttpStatus.BAD_REQUEST);
 
   private final int code;
   private final String message;
