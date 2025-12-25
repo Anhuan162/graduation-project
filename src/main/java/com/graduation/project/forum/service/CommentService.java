@@ -46,93 +46,100 @@ public class CommentService {
   private static final String CREATED_DATE_TIME_FIELD = "createdDateTime";
 
   @Transactional
-  public CommentResponse createRootComment(String postId, CommentRequest request) {
-    Post post = postRepository
-        .findById(UUID.fromString(postId))
+  public CommentResponse createComment(UUID postId, CommentRequest request) {
+    Post post = postRepository.findById(postId)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
-    User user = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.canViewTopic(post.getTopic(), user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+    Comment parent = null;
+    if (request.getParentId() != null) {
+      parent = commentRepository.findById(request.getParentId())
+          .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+      if (!parent.getPost().getId().equals(postId)) {
+        throw new AppException(ErrorCode.INVALID_PARENT_COMMENT);
+      }
     }
 
-    Comment comment = buildComment(post, null, user, request.getContent());
-    Comment saved = commentRepository.save(comment);
+    User holUser = currentUserService.getCurrentUserEntity();
 
-    FileMetadata file = handleFileMetadataReturnEntity(request.getFileMetadataId(), saved, user);
-    List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
-    String legacyUrl = file == null ? null : file.getUrl();
+    Comment comment = Comment.builder()
+        .post(post)
+        .parent(parent)
+        .author(holUser)
+        .content(request.getContent())
+        .deleted(false)
+        .reactionCount(0L)
+        .build();
 
-    publisher.publishEvent(CreatedCommentEvent.from(saved));
+    commentRepository.save(comment);
 
-    return buildCommentResponse(
-        saved,
-        legacyUrl,
-        user,
-        false,
-        authorizationService.canSoftDeletePost(post, user),
-        authorizationService.isCommentCreator(saved, user),
-        attachments);
-  }
-
-  @Transactional
-  public CommentResponse replyToComment(String parentId, CommentRequest request) {
-    Comment parent = commentRepository
-        .findById(UUID.fromString(parentId))
-        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
-
-    User user = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.canViewTopic(parent.getPost().getTopic(), user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
-
-    Comment reply = buildComment(parent.getPost(), parent, user, request.getContent());
-    Comment saved = commentRepository.save(reply);
-
-    FileMetadata file = handleFileMetadataReturnEntity(request.getFileMetadataId(), saved, user);
-    List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
-    String legacyUrl = file == null ? null : file.getUrl();
-
-    publisher.publishEvent(CreatedCommentEvent.from(saved));
-
-    boolean canSoftDeletePost = authorizationService.canSoftDeletePost(parent.getPost(), user);
+    boolean isLiked = false;
+    boolean canSoftDeletePost = authorizationService.canSoftDeletePost(post, holUser);
+    boolean isCreator = true;
 
     return buildCommentResponse(
-        saved, legacyUrl, user, false, canSoftDeletePost, true, attachments);
+        comment,
+        null,
+        holUser,
+        isLiked,
+        canSoftDeletePost,
+        isCreator,
+        List.of());
   }
 
-  /**
-   * Root comments: repo đang trả projection CommentWithReplyCountResponse.
-   * Nếu FE muốn unified shape, khuyên đổi repo trả entity + replyCount map.
-   * Nhưng để "không phá", ta giữ endpoint cũ.
-   *
-   * => Khi em nâng tiếp phase 2, anh sẽ hướng dẫn đổi sang trả
-   * Page<CommentResponse> unified.
-   */
   @Transactional(readOnly = true)
-  public Page<CommentWithReplyCountResponse> getRootComments(String postId, Pageable pageable) {
-    Post post = postRepository
-        .findById(UUID.fromString(postId))
+  public Page<CommentResponse> getRootComments(UUID postId, Pageable pageable) {
+    Post post = postRepository.findById(postId)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
-
-    Page<CommentWithReplyCountResponse> commentPage = commentRepository
-        .findRootCommentsWithCount(UUID.fromString(postId), pageable);
 
     User currentUser = currentUserService.getCurrentUserEntity();
+    if (!authorizationService.canViewTopic(post.getTopic(), currentUser)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    Page<Comment> page = commentRepository.findRootCommentsEntity(postId, pageable);
+    if (page.isEmpty())
+      return Page.empty(pageable);
+
+    // batch file
+    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
+
+    // batch isLiked
+    List<UUID> ids = page.getContent().stream().map(Comment::getId).toList();
+    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(ids, TargetType.COMMENT);
+
+    // batch replyCount
+    Map<UUID, Long> replyCountMap = mapReplyCount(ids);
+
     boolean canSoftDeletePost = authorizationService.canSoftDeletePost(post, currentUser);
 
-    commentPage.getContent().forEach(c -> {
-      boolean isCommentCreator = currentUser.getId().equals(c.getAuthorId());
-      c.setCommentCreator(isCommentCreator);
-      c.setCanSoftDeletePost(canSoftDeletePost);
-    });
+    return page.map(c -> {
+      FileMetadata file = fileMap.get(c.getId());
+      String legacyUrl = file == null ? null : file.getUrl();
+      List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
 
-    return commentPage;
+      boolean isCreator = authorizationService.isCommentCreator(c, currentUser);
+
+      CommentResponse res = buildCommentResponse(
+          c,
+          legacyUrl,
+          currentUser,
+          likedMap.getOrDefault(c.getId(), false),
+          canSoftDeletePost,
+          isCreator,
+          attachments);
+
+      if (res.getStats() != null) {
+        res.getStats().setReplyCount(replyCountMap.getOrDefault(c.getId(), 0L));
+      }
+
+      return res;
+    });
   }
 
   @Transactional(readOnly = true)
-  public Page<CommentResponse> getReplies(String commentId, Pageable pageable) {
-    UUID parentId = UUID.fromString(commentId);
+  public Page<CommentResponse> getReplies(UUID commentId, Pageable pageable) {
+    UUID parentId = commentId;
 
     Comment parent = commentRepository
         .findById(parentId)
@@ -383,17 +390,6 @@ public class CommentService {
         attachments);
   }
 
-  private Comment buildComment(Post post, Comment parent, User user, String content) {
-    return Comment.builder()
-        .post(post)
-        .parent(parent)
-        .author(user)
-        .content(content)
-        .createdDateTime(LocalDateTime.now())
-        .reactionCount(0L)
-        .build();
-  }
-
   private FileMetadata handleFileMetadataReturnEntity(UUID fileId, Comment comment, User user) {
     if (fileId == null)
       return null;
@@ -426,55 +422,6 @@ public class CommentService {
         .type(null)
         .size(null)
         .build();
-  }
-
-  @Transactional(readOnly = true)
-  public Page<CommentResponse> getRootCommentsV2(String postId, Pageable pageable) {
-    Post post = postRepository.findById(UUID.fromString(postId))
-        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
-
-    User currentUser = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.canViewTopic(post.getTopic(), currentUser)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
-
-    Page<Comment> page = commentRepository.findRootCommentsEntity(UUID.fromString(postId), pageable);
-    if (page.isEmpty())
-      return Page.empty(pageable);
-
-    // batch file
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
-
-    // batch isLiked
-    List<UUID> ids = page.getContent().stream().map(Comment::getId).toList();
-    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(ids, TargetType.COMMENT);
-
-    // batch replyCount
-    Map<UUID, Long> replyCountMap = mapReplyCount(ids);
-
-    boolean canSoftDeletePost = authorizationService.canSoftDeletePost(post, currentUser);
-
-    return page.map(c -> {
-      FileMetadata file = fileMap.get(c.getId());
-      String legacyUrl = file == null ? null : file.getUrl();
-      List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
-
-      boolean isCreator = authorizationService.isCommentCreator(c, currentUser);
-
-      CommentResponse res = buildCommentResponse(
-          c,
-          legacyUrl,
-          currentUser,
-          likedMap.getOrDefault(c.getId(), false),
-          canSoftDeletePost,
-          isCreator,
-          attachments);
-
-      if (res.getStats() != null) {
-        res.getStats().setReplyCount(replyCountMap.getOrDefault(c.getId(), 0L));
-      }
-      return res;
-    });
   }
 
   private Map<UUID, Long> mapReplyCount(List<UUID> parentIds) {

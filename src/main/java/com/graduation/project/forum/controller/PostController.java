@@ -6,7 +6,11 @@ import com.graduation.project.forum.dto.DetailPostResponse;
 import com.graduation.project.forum.dto.PostRequest;
 import com.graduation.project.forum.dto.PostResponse;
 import com.graduation.project.forum.dto.SearchPostRequest;
+import com.graduation.project.forum.dto.UpdatePostStatusRequest;
 import com.graduation.project.forum.service.PostService;
+
+import jakarta.validation.Valid;
+
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,6 +31,14 @@ public class PostController {
     return ApiResponse.<PostResponse>builder()
         .result(postService.createPost(topicId, request))
         .build();
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @PatchMapping("/{postId}/status")
+  public ApiResponse<PostResponse> updateStatus(
+      @PathVariable UUID postId,
+      @Valid @RequestBody UpdatePostStatusRequest request) {
+    return ApiResponse.ok(postService.updateStatus(postId, request.getStatus()));
   }
 
   @GetMapping("/{postId}")
@@ -68,6 +80,7 @@ public class PostController {
         .build();
   }
 
+  @Deprecated
   @PreAuthorize("hasRole('ADMIN')")
   @PutMapping("/upgrade-post/{postId}")
   public ApiResponse<PostResponse> upgradePostStatus(

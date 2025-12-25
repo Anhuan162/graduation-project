@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 
+import java.util.UUID;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.validation.annotation.Validated;
@@ -23,37 +25,24 @@ public class CommentController {
   private final CommentService commentService;
 
   @PostMapping("/post/{postId}")
-  public ApiResponse<CommentResponse> createRootComment(
-      @PathVariable @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$") String postId,
+  public ApiResponse<CommentResponse> createComment(
+      @PathVariable UUID postId,
       @Valid @RequestBody CommentRequest request) {
-    return ApiResponse.ok(commentService.createRootComment(postId, request));
+    return ApiResponse.ok(commentService.createComment(postId, request));
   }
 
-  @PostMapping("/reply/{commentId}")
-  public ApiResponse<CommentResponse> replyToComment(
-      @PathVariable @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$") String commentId,
-      @Valid @RequestBody CommentRequest request) {
-    return ApiResponse.<CommentResponse>builder()
-        .result(commentService.replyToComment(commentId, request))
-        .build();
-  }
-
-  @GetMapping("/post/{postId}/roots-v2")
-  public ApiResponse<Page<CommentResponse>> getRootCommentsV2(
-      @PathVariable @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$") String postId,
+  @GetMapping("/post/{postId}")
+  public ApiResponse<Page<CommentResponse>> getRootComments(
+      @PathVariable UUID postId,
       Pageable pageable) {
-    return ApiResponse.<Page<CommentResponse>>builder()
-        .result(commentService.getRootCommentsV2(postId, pageable))
-        .build();
+    return ApiResponse.ok(commentService.getRootComments(postId, pageable));
   }
 
-  @GetMapping("/{commentId}/replies")
+  @GetMapping("/replies/{commentId}")
   public ApiResponse<Page<CommentResponse>> getReplies(
-      @PathVariable @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$") String commentId,
+      @PathVariable UUID commentId,
       Pageable pageable) {
-    return ApiResponse.<Page<CommentResponse>>builder()
-        .result(commentService.getReplies(commentId, pageable))
-        .build();
+    return ApiResponse.ok(commentService.getReplies(commentId, pageable));
   }
 
   @PutMapping("/{commentId}")

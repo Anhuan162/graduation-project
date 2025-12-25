@@ -104,7 +104,6 @@ public class PasswordResetService {
         }
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        userRepository.save(user);
 
         session.setUsed(true);
         passwordResetSessionRepository.save(session);

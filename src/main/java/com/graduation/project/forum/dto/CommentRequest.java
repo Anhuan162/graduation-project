@@ -13,4 +13,5 @@ import lombok.NoArgsConstructor;
 public class CommentRequest {
   private String content;
   private UUID fileMetadataId;
+  private UUID parentId;
 }

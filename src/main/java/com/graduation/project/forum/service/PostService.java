@@ -80,7 +80,6 @@ public class PostService {
 
     User user = currentUserService.getCurrentUserEntity();
 
-    // quyền xem: canViewTopic OR isPostCreator
     if (!authorizationService.canViewTopic(post.getTopic(), user)
         && !authorizationService.isPostCreator(post, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -102,6 +101,39 @@ public class PostService {
   }
 
   // ===================== UPDATE =====================
+  @Transactional
+  public PostResponse updateStatus(UUID postId, PostStatus status) {
+    Post post = postRepository.findById(postId)
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+
+    post.setPostStatus(status);
+    User holUser = currentUserService.getCurrentUserEntity();
+    if (!authorizationService.canManageTopic(holUser, post.getTopic())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    if (status == PostStatus.APPROVED) {
+      post.setApprovedAt(LocalDateTime.now());
+      post.setApprovedBy(holUser);
+    }
+
+    postRepository.save(post);
+    List<FileMetadata> files = fileMetadataRepository
+        .findByResourceTypeAndResourceIdIn(ResourceType.POST, List.of(post.getId()));
+
+    boolean isLiked = reactionRepository.existsByUserIdAndTargetIdAndTargetType(
+        holUser.getId(), post.getId(), TargetType.POST);
+
+    return buildPostResponse(
+        post,
+        files,
+        holUser,
+        isLiked,
+        authorizationService.canManageTopic(holUser, post.getTopic()),
+        authorizationService.isPostCreator(post, holUser));
+
+  }
+
   @Transactional
   public PostResponse update(UUID id, PostRequest request) {
     Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
