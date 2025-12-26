@@ -1,13 +1,15 @@
 package com.graduation.project.forum.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
+import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.forum.constant.PostStatus;
-import com.graduation.project.forum.dto.DetailPostResponse;
-import com.graduation.project.forum.dto.PostRequest;
-import com.graduation.project.forum.dto.PostResponse;
-import com.graduation.project.forum.dto.SearchPostRequest;
+import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.service.PostService;
+
+import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -99,4 +101,26 @@ public class PostController {
         .result(postService.getMyPosts(pageable))
         .build();
   }
+
+  @GetMapping("/post-accepted")
+  public ApiResponse<List<PostAcceptedResonse>> getPostAccepted(
+          @ModelAttribute PostAcceptedFilterRequest postAcceptedRequest
+          ) {
+    List<PostAcceptedResonse> res = postService.searchPostAccepted(postAcceptedRequest);
+    return ApiResponse.<List<PostAcceptedResonse>>builder()
+            .result(res)
+            .build();
+  }
+
+  @PostMapping("/post-accepted/upload")
+  public ApiResponse<FileResponse> postAcceptedSelect(
+     @RequestBody PostAcceptedSelectList postAcceptedSelectList
+  ) throws IOException {
+    String fileName = postAcceptedSelectList.getNameFile() +"-" + UUID.randomUUID().toString();
+    postAcceptedSelectList.setNameFile(fileName);
+    return ApiResponse.<FileResponse>builder()
+            .result(postService.upLoadPostAndCommentToDrive(postAcceptedSelectList))
+            .build();
+  }
+
 }

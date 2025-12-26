@@ -3,8 +3,10 @@ package com.graduation.project.forum.service;
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.ResourceType;
+import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.entity.User;
+import com.graduation.project.common.service.DriveService;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.dto.*;
@@ -13,10 +15,15 @@ import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.mapper.PostMapper;
 import com.graduation.project.forum.repository.PostRepository;
 import com.graduation.project.forum.repository.TopicRepository;
+import com.graduation.project.forum.dto.PostAcceptedFilterRequest;
+import com.graduation.project.forum.dto.PostAcceptedResonse;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,6 +34,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +48,7 @@ public class PostService {
   private final AuthorizationService authorizationService;
   private final FileMetadataRepository fileMetadataRepository;
   private final ApplicationEventPublisher publisher;
+  private final DriveService driveService;
 
   @Transactional
   public PostResponse createPost(UUID topicId, PostRequest request) {
@@ -277,4 +286,27 @@ public class PostService {
                 FileMetadata::getResourceId,
                 Collectors.mapping(FileMetadata::getUrl, Collectors.toList())));
   }
+
+  public List<PostAcceptedResonse> searchPostAccepted(PostAcceptedFilterRequest postAcceptedRequest) {
+    List<Post> posts = postRepository.getPostAccepted(postAcceptedRequest);
+    return posts.stream().map(Post::toPostAcceptedResonse).toList();
+  }
+
+  public FileResponse upLoadPostAndCommentToDrive(PostAcceptedSelectList postAcceptedSelectList) throws IOException {
+    StringBuilder res = new StringBuilder();
+
+    for (PostAcceptedSelect post : postAcceptedSelectList.getPostAcceptedSelects()) {
+      // Thêm thông tin bài post
+      res.append("#").append(post.getTitle());
+      res.append(post.getContent()).append("\n");
+
+      // Comments
+      for (CommentAcceptedResponse comment : post.getComments()) {
+        res.append(comment.getContent()).append("\n");
+      }
+      res.append("\n\n");
+    }
+    return driveService.uploadTextToDrive(postAcceptedSelectList.getNameFile(), res.toString());
+  }
+
 }
