@@ -3,6 +3,8 @@ package com.graduation.project.common.controller;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.dto.FileMetadataResponse;
+import com.graduation.project.common.dto.FileMetadataSelected;
+import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.common.dto.SearchFileRequest;
 import com.graduation.project.common.service.FileService;
 import java.io.IOException;
@@ -86,5 +88,14 @@ public class FileController {
     return ApiResponse.<Page<FileMetadataResponse>>builder()
         .result(fileService.searchFiles(searchFileRequest, pageable))
         .build();
+  }
+
+  @PostMapping("/upload-to-drive")
+  public ApiResponse<FileResponse> uploadToDrive(
+          @RequestBody FileMetadataSelected fileMetadataSelected
+          ) throws IOException {
+    return ApiResponse.<FileResponse>builder()
+            .result(fileService.uploadToDrive(fileMetadataSelected))
+            .build();
   }
 }

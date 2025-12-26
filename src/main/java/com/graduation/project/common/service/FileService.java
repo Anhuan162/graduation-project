@@ -5,6 +5,8 @@ import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;
+import com.graduation.project.common.dto.FileMetadataSelected;
+import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.common.dto.SearchFileRequest;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.entity.User;
@@ -13,6 +15,7 @@ import com.graduation.project.common.permission_handler.FileMetadataPermissionHa
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import java.io.IOException;
+import java.net.URLConnection;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,10 +23,12 @@ import java.util.Objects;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -34,18 +39,20 @@ public class FileService {
   private final CurrentUserService currentUserService;
   private final FileMetadataMapper fileMetadataMapper;
   private final FileMetadataPermissionHandler fileMetadataPermissionHandler;
+  private final DriveService driveService;
 
   public FileService(
-      FirebaseService firebaseService,
-      FileMetadataRepository fileMetadataRepository,
-      CurrentUserService currentUserService,
-      FileMetadataMapper fileMetadataMapper,
-      FileMetadataPermissionHandler fileMetadataPermissionHandler) {
+          FirebaseService firebaseService,
+          FileMetadataRepository fileMetadataRepository,
+          CurrentUserService currentUserService,
+          FileMetadataMapper fileMetadataMapper,
+          FileMetadataPermissionHandler fileMetadataPermissionHandler, DriveService driveService) {
     this.firebaseService = firebaseService;
     this.fileMetadataRepository = fileMetadataRepository;
     this.currentUserService = currentUserService;
     this.fileMetadataMapper = fileMetadataMapper;
     this.fileMetadataPermissionHandler = fileMetadataPermissionHandler;
+    this.driveService = driveService;
   }
 
   public FileMetadataResponse uploadAndSaveFile(
@@ -210,5 +217,28 @@ public class FileService {
     Page<FileMetadata> fileMetadataPage =
         fileMetadataRepository.searchFiles(searchFileRequest, pageable);
     return fileMetadataPage.map(fileMetadataMapper::toFileMetadataResponse);
+  }
+
+  public FileResponse uploadToDrive(FileMetadataSelected fileMetadataSelected) throws IOException {
+
+
+    String fileUrl = fileMetadataSelected.getUrl();
+    // 1. Download file từ Firebase Storage URL
+    RestTemplate rest = new RestTemplate();
+    ResponseEntity<byte[]> response = rest.getForEntity(fileUrl, byte[].class);
+
+    if (!response.getStatusCode().is2xxSuccessful()) {
+      throw new IOException("Không tải được file từ Firebase URL");
+    }
+
+    byte[] fileBytes = response.getBody();
+    String fileName = extractFileName(fileUrl);
+    String contentType = URLConnection.guessContentTypeFromName(fileName);
+
+    return driveService.uploadFile(fileBytes, fileName, contentType);
+  }
+
+  private String extractFileName(String url) {
+    return url.substring(url.lastIndexOf('/') + 1).split("\\?")[0];
   }
 }

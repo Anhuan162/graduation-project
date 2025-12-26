@@ -3,6 +3,8 @@ package com.graduation.project.forum.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.forum.constant.PostStatus;
+import com.graduation.project.forum.dto.CommentAcceptedResponse;
+import com.graduation.project.forum.dto.PostAcceptedResonse;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -62,4 +64,17 @@ public class Post {
   //      joinColumns = @JoinColumn(name = "post_id"),
   //      inverseJoinColumns = @JoinColumn(name = "tag_id"))
   //  private Set<Tag> tags = new HashSet<>();
+
+  public PostAcceptedResonse toPostAcceptedResonse() {
+    return PostAcceptedResonse.builder()
+            .title(this.title)
+            .postId(this.id)
+            .content(this.content)
+            .comments(this.comments.stream().map(comment -> {
+              return CommentAcceptedResponse.builder()
+                      .id(comment.getId())
+                      .content(comment.getContent()).build();
+            }).toList())
+            .build();
+  }
 }
