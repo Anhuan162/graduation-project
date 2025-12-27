@@ -6,13 +6,15 @@ import com.graduation.project.forum.dto.CommentResponse;
 import com.graduation.project.forum.service.CommentService;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,21 +30,27 @@ public class CommentController {
   public ApiResponse<CommentResponse> createComment(
       @PathVariable UUID postId,
       @Valid @RequestBody CommentRequest request) {
-    return ApiResponse.ok(commentService.createComment(postId, request));
+    return ApiResponse.<CommentResponse>builder()
+        .result(commentService.createComment(postId, request))
+        .build();
   }
 
   @GetMapping("/post/{postId}")
   public ApiResponse<Page<CommentResponse>> getRootComments(
       @PathVariable UUID postId,
       Pageable pageable) {
-    return ApiResponse.ok(commentService.getRootComments(postId, pageable));
+    return ApiResponse.<Page<CommentResponse>>builder()
+        .result(commentService.getRootComments(postId, pageable))
+        .build();
   }
 
-  @GetMapping("/replies/{commentId}")
+  @GetMapping("/replies/{rootCommentId}")
   public ApiResponse<Page<CommentResponse>> getReplies(
-      @PathVariable UUID commentId,
-      Pageable pageable) {
-    return ApiResponse.ok(commentService.getReplies(commentId, pageable));
+      @PathVariable UUID rootCommentId,
+      @PageableDefault(page = 0, size = 10, sort = "createdDateTime", direction = Sort.Direction.ASC) Pageable pageable) {
+    return ApiResponse.<Page<CommentResponse>>builder()
+        .result(commentService.getReplies(rootCommentId, pageable))
+        .build();
   }
 
   @PutMapping("/{commentId}")
@@ -54,16 +62,14 @@ public class CommentController {
         .build();
   }
 
-  // ===== SOFT DELETE =====
-  @DeleteMapping("/{commentId}/soft-delete")
-  public ApiResponse<CommentResponse> softDeleteComment(
-      @PathVariable UUID commentId) {
-    return ApiResponse.<CommentResponse>builder()
-        .result(commentService.softDeleteComment(commentId))
+  @DeleteMapping("/{commentId}")
+  public ApiResponse<String> softDeleteComment(@PathVariable UUID commentId) {
+    commentService.softDeleteComment(commentId);
+    return ApiResponse.<String>builder()
+        .result("Comment deleted successfully")
         .build();
   }
 
-  // ===== MY COMMENTS =====
   @GetMapping("/my-comments")
   public ApiResponse<Page<CommentResponse>> getMyComments(Pageable pageable) {
     return ApiResponse.<Page<CommentResponse>>builder()

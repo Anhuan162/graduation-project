@@ -1,7 +1,7 @@
 package com.graduation.project.forum.dto;
 
 import com.graduation.project.forum.entity.Comment;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -22,7 +22,7 @@ public class UpdatedCommentEvent {
   private String senderName;
   private UUID parentCommentId;
   private UUID postId;
-  private LocalDateTime createdDateTime;
+  private Instant createdDateTime;
 
   public static UpdatedCommentEvent from(Comment comment) {
     return UpdatedCommentEvent.builder()

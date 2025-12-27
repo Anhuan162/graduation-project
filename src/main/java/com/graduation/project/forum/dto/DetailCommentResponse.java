@@ -1,7 +1,8 @@
 package com.graduation.project.forum.dto;
 
 import com.graduation.project.forum.entity.Comment;
-import java.time.LocalDateTime;
+
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -19,7 +20,7 @@ public class DetailCommentResponse {
   private UUID authorId;
   private UUID postId;
   private UUID parentId;
-  private LocalDateTime createdDateTime;
+  private Instant createdDateTime;
   private String url;
   private Boolean deleted;
   private Long reactionCount;
@@ -35,7 +36,7 @@ public class DetailCommentResponse {
         .postId(comment.getPost().getId())
         .parentId(Objects.nonNull(comment.getParent()) ? comment.getParent().getId() : null)
         .createdDateTime(comment.getCreatedDateTime())
-        .deleted(comment.getDeleted())
+        .deleted(comment.isDeleted())
         .url(url)
         .reactionCount(comment.getReactionCount())
         .isCommentCreator(isCommentCreator)

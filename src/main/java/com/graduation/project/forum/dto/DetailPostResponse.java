@@ -2,7 +2,7 @@ package com.graduation.project.forum.dto;
 
 import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.entity.Post;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.UUID;
 import lombok.*;
@@ -12,30 +12,25 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class DetailPostResponse {
-  // ===== Core =====
-  private String id;
+  private UUID id;
   private String title;
-  private String excerpt; // NEW
+  private String excerpt;
   private String content;
   private UUID topicId;
   private PostStatus postStatus;
 
-  // ===== Time =====
-  private LocalDateTime createdDateTime;
-  private LocalDateTime lastModifiedDateTime;
-  private LocalDateTime approvedAt;
+  private Instant createdDateTime;
+  private Instant lastModifiedDateTime;
+  private Instant approvedAt;
 
-  // ===== Legacy =====
   private UUID createdById;
   private Long reactionCount;
-  private Boolean isDeleted;
+  private boolean deleted;
   private List<String> urls;
 
-  // ===== Existing flags (legacy UI) =====
   private boolean isPostCreator;
   private boolean canManageTopic;
 
-  // ===== NEW fields =====
   private PostAuthorResponse author;
   private PostStatsResponse stats;
   private PostUserStateResponse userState;
@@ -46,37 +41,31 @@ public class DetailPostResponse {
       Post post,
       Map<UUID, List<String>> urlsByPostId,
       boolean canManageTopic,
-      boolean isPostCreator
-  // Các data NEW này em sẽ truyền thêm từ service khi implement:
-  // PostAuthorResponse author,
-  // PostStatsResponse stats,
-  // PostUserStateResponse userState,
-  // PostPermissionsResponse permissions,
-  // List<AttachmentResponse> attachments
-  ) {
-    final List<String> urls = urlsByPostId.getOrDefault(post.getId(), Collections.emptyList());
+      boolean isPostCreator) {
+    List<String> urls = urlsByPostId.getOrDefault(post.getId(), Collections.emptyList());
 
     return DetailPostResponse.builder()
-        .id(post.getId().toString())
+        .id(post.getId())
         .title(post.getTitle())
         .content(post.getContent())
-        .excerpt(buildExcerpt(post.getContent(), 150)) // NEW
+        .excerpt(buildExcerpt(post.getContent(), 150))
         .topicId(post.getTopic().getId())
         .postStatus(post.getPostStatus())
+
         .createdDateTime(post.getCreatedDateTime())
         .lastModifiedDateTime(post.getLastModifiedDateTime())
         .approvedAt(post.getApprovedAt())
+
         .createdById(post.getAuthor() != null ? post.getAuthor().getId() : null)
         .reactionCount(post.getReactionCount())
-        .isDeleted(Boolean.TRUE.equals(post.getDeleted()))
+        .deleted(Boolean.TRUE.equals(post.isDeleted()))
         .urls(urls)
         .canManageTopic(canManageTopic)
         .isPostCreator(isPostCreator)
+
         .author(null)
         .stats(PostStatsResponse.builder()
-            .reactionCount(post.getReactionCount())
-            .commentCount(null)
-            .viewCount(null)
+            .reactionCount(post.getReactionCount() != null ? post.getReactionCount() : 0L)
             .build())
         .userState(null)
         .permissions(null)
@@ -85,7 +74,7 @@ public class DetailPostResponse {
   }
 
   private static String buildExcerpt(String content, int maxLen) {
-    if (content == null)
+    if (content == null || content.isEmpty())
       return "";
     String plain = content.replaceAll("\\s+", " ").trim();
     if (plain.length() <= maxLen)

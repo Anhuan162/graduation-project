@@ -17,7 +17,7 @@ import com.graduation.project.forum.repository.TopicMemberRepository;
 import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -37,6 +37,7 @@ public class TopicMemberService {
   private final CurrentUserService currentUserService;
   private final UserRepository userRepository;
   private final StreamProducer streamProducer;
+  private final AuthorizationService authorizationService;
 
   public List<TopicMemberResponse> getMembers(UUID topicId) {
     return topicMemberRepository.findByTopicId(topicId).stream()
@@ -61,7 +62,7 @@ public class TopicMemberService {
         .topic(topic)
         .user(user)
         .topicRole(TopicRole.MEMBER)
-        .joinedAt(LocalDateTime.now())
+        .joinedAt(Instant.now())
         .build();
 
     if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) {
@@ -81,12 +82,12 @@ public class TopicMemberService {
     NotificationEventDTO dto = NotificationEventDTO.builder()
         .relatedId(saved.getId())
         .type(ResourceType.TOPIC_MEMBER)
-        .title("Join Topic")
-        .content(user.getFullName() + " wants to join your topic")
+        .title("Join Topic Request")
+        .content(user.getFullName() + " wants to join topic: " + topic.getTitle())
         .senderId(user.getId())
         .senderName(user.getEmail())
         .receiverIds(managerUserIds)
-        .createdAt(LocalDateTime.now())
+        .createdAt(Instant.now())
         .build();
 
     EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
@@ -103,7 +104,7 @@ public class TopicMemberService {
 
     User current = currentUserService.getCurrentUserEntity();
 
-    if (!canManageTopic(current, tm.getTopic())) {
+    if (!authorizationService.canManageTopic(current, tm.getTopic())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
@@ -113,12 +114,12 @@ public class TopicMemberService {
     NotificationEventDTO dto = NotificationEventDTO.builder()
         .relatedId(topicMemberId)
         .type(ResourceType.TOPIC_MEMBER)
-        .title("Approve Member")
-        .content("Bạn đã được chấp thuận là thành viên của Topic")
+        .title("Request Approved")
+        .content("Yêu cầu tham gia Topic " + tm.getTopic().getTitle() + " của bạn đã được chấp thuận.")
         .senderId(current.getId())
         .senderName(current.getEmail())
         .receiverIds(Set.of(tm.getUser().getId()))
-        .createdAt(LocalDateTime.now())
+        .createdAt(Instant.now())
         .build();
 
     EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
@@ -135,7 +136,7 @@ public class TopicMemberService {
 
     User current = currentUserService.getCurrentUserEntity();
 
-    if (!canManageTopic(current, topic)) {
+    if (!authorizationService.canManageTopic(current, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
@@ -156,7 +157,6 @@ public class TopicMemberService {
         .map(TopicMemberResponse::toTopicMemberResponse);
   }
 
-  // ✅ đổi String -> TopicRole (đúng spec, controller nhận body enum)
   @Transactional
   public void addTopicMember(UUID topicId, UUID userId, TopicRole topicRole) {
     Topic topic = topicRepository
@@ -169,10 +169,11 @@ public class TopicMemberService {
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    if (!canManageTopic(currentUser, topic)) {
+    if (!authorizationService.canManageTopic(currentUser, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
+    // Check if member already exists
     boolean existed = topicMemberRepository.existsByUserIdAndTopicId(userId, topicId);
     if (existed) {
       throw new AppException(ErrorCode.TOPIC_MEMBER_EXISTED);
@@ -183,7 +184,7 @@ public class TopicMemberService {
         .user(userToAdd)
         .topicRole(topicRole)
         .approved(true)
-        .joinedAt(LocalDateTime.now())
+        .joinedAt(Instant.now())
         .build();
 
     topicMemberRepository.save(topicMember);
@@ -197,8 +198,7 @@ public class TopicMemberService {
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    boolean canManage = canChangeManagerForTopic(currentUser, topicMember.getTopic());
-    if (!canManage) {
+    if (!authorizationService.canManageTopic(currentUser, topicMember.getTopic())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
@@ -213,7 +213,7 @@ public class TopicMemberService {
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    if (!canManageTopic(currentUser, topicMember.getTopic())) {
+    if (!authorizationService.canManageTopic(currentUser, topicMember.getTopic())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
@@ -222,28 +222,10 @@ public class TopicMemberService {
   }
 
   public boolean isTopicMember(UUID topicId, UUID userId) {
-    return topicMemberRepository.existsByUserIdAndTopicIdAndApprovedIsTrue(userId, topicId);
+    return topicMemberRepository.existsByUserIdAndTopicIdAndApprovedTrue(userId, topicId);
   }
 
   public boolean canViewTopic(Topic topic, User user) {
-    if (topic.getTopicVisibility() == TopicVisibility.PUBLIC)
-      return true;
-    return isTopicMember(topic.getId(), user.getId());
-  }
-
-  private static boolean canChangeManagerForTopic(User currentUser, Topic topic) {
-    return currentUser.getRoles().stream().anyMatch(role -> role.getName().equals("ADMIN"))
-        || topic.getCreatedBy().getId().equals(currentUser.getId());
-  }
-
-  private boolean canManageTopic(User currentUser, Topic topic) {
-    boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().equals("ADMIN"));
-    boolean isCreator = topic.getCreatedBy().getId().equals(currentUser.getId());
-    boolean isManager = topic.getTopicMembers().stream()
-        .anyMatch(
-            m -> m.getUser().getId().equals(currentUser.getId())
-                && m.getTopicRole() == TopicRole.MANAGER);
-
-    return isAdmin || isCreator || isManager;
+    return authorizationService.canViewTopic(topic, user);
   }
 }

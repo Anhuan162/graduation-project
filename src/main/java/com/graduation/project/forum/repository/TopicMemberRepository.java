@@ -10,31 +10,32 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public interface TopicMemberRepository extends JpaRepository<TopicMember, UUID> {
 
-    List<TopicMember> findByTopicId(UUID topicId);
+        List<TopicMember> findByTopicId(UUID topicId);
 
-    boolean existsByUserIdAndTopicId(UUID userId, UUID topicId);
+        boolean existsByUserIdAndTopicIdAndApprovedTrue(UUID userId, UUID topicId);
 
-    Optional<TopicMember> findByUserIdAndTopicId(UUID userId, UUID topicId);
+        boolean existsByUserIdAndTopicIdAndTopicRoleAndApprovedTrue(UUID userId, UUID topicId, TopicRole topicRole);
 
-    Page<TopicMember> findAllByApprovedIsFalse(Pageable pageable);
+        boolean existsByUserIdAndTopicId(UUID userId, UUID topicId);
 
-    Page<TopicMember> findAllByApprovedIsTrue(Pageable pageable);
+        Optional<TopicMember> findByUserIdAndTopicId(UUID userId, UUID topicId);
 
-    boolean existsByUserIdAndTopicIdAndApprovedIsTrue(UUID userId, UUID topicId);
+        Page<TopicMember> findAllByApprovedIsFalse(Pageable pageable);
 
-    void deleteByUserIdAndTopicId(UUID userId, UUID topicId);
+        Page<TopicMember> findAllByApprovedIsTrue(Pageable pageable);
 
-    @Query("SELECT COUNT(tm) > 0 "
-            + "FROM TopicMember tm "
-            + "WHERE tm.user.id = :currentUserId "
-            + "AND tm.topic.id = :topicId "
-            + "AND (:role IS NULL OR tm.topicRole = :role) "
-            + "AND tm.approved = true")
-    boolean checkPermission(
-            @Param("currentUserId") UUID currentUserId,
-            @Param("topicId") UUID topicId,
-            @Param("role") TopicRole role);
+        void deleteByUserIdAndTopicId(UUID userId, UUID topicId);
+
+        @Query("SELECT COUNT(tm) > 0 FROM TopicMember tm " +
+                        "WHERE tm.user.id = :userId AND tm.topic.id = :topicId " +
+                        "AND (:role IS NULL OR tm.topicRole = :role) " +
+                        "AND tm.approved = true")
+        boolean checkPermission(@Param("userId") UUID userId,
+                        @Param("topicId") UUID topicId,
+                        @Param("role") TopicRole role);
 }

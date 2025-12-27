@@ -200,18 +200,30 @@ public class ReactionService {
 
   private void updateReactionCount(UUID targetId, TargetType targetType, boolean isIncrement) {
     if (targetType == TargetType.POST) {
-      if (isIncrement)
+      if (isIncrement) {
         postRepository.increaseReactionCount(targetId);
-      else
-        postRepository.decreaseReactionCount(targetId);
+      } else {
+        int updatedRows = postRepository.decreaseReactionCount(targetId);
+        if (updatedRows == 0) {
+          log.warn(
+              "Data Inconsistency: Attempted to decrease reaction count for Post {} but count was already 0 or Post not found.",
+              targetId);
+        }
+      }
       return;
     }
 
     if (targetType == TargetType.COMMENT) {
-      if (isIncrement)
+      if (isIncrement) {
         commentRepository.increaseReactionCount(targetId);
-      else
-        commentRepository.decreaseReactionCount(targetId);
+      } else {
+        int updatedRows = commentRepository.decreaseReactionCount(targetId);
+        if (updatedRows == 0) {
+          log.warn(
+              "Data Inconsistency: Attempted to decrease reaction count for Comment {} but count was already 0 or Comment not found.",
+              targetId);
+        }
+      }
     }
   }
 }

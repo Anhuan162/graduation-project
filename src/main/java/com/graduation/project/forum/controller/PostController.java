@@ -27,7 +27,7 @@ public class PostController {
 
   @PostMapping("/topic/{topicId}")
   public ApiResponse<PostResponse> createPost(
-      @PathVariable UUID topicId, @RequestBody PostRequest request) {
+      @PathVariable UUID topicId, @Valid @RequestBody PostRequest request) {
     return ApiResponse.<PostResponse>builder()
         .result(postService.createPost(topicId, request))
         .build();
@@ -38,32 +38,41 @@ public class PostController {
   public ApiResponse<PostResponse> updateStatus(
       @PathVariable UUID postId,
       @Valid @RequestBody UpdatePostStatusRequest request) {
-    return ApiResponse.ok(postService.updateStatus(postId, request.getStatus()));
+    return ApiResponse.<PostResponse>builder()
+        .result(postService.updateStatus(postId, request.getStatus()))
+        .build();
   }
 
   @GetMapping("/{postId}")
   public ApiResponse<PostResponse> getOne(@PathVariable UUID postId) {
-    return ApiResponse.<PostResponse>builder().result(postService.getOne(postId)).build();
+    return ApiResponse.<PostResponse>builder()
+        .result(postService.getOne(postId))
+        .build();
   }
 
   @PutMapping("/{postId}")
   public ApiResponse<PostResponse> update(
-      @PathVariable UUID postId, @RequestBody PostRequest request) {
-    return ApiResponse.<PostResponse>builder().result(postService.update(postId, request)).build();
+      @PathVariable UUID postId, @Valid @RequestBody PostRequest request) {
+    return ApiResponse.<PostResponse>builder()
+        .result(postService.update(postId, request))
+        .build();
   }
 
   @DeleteMapping("/{postId}")
-  public ApiResponse<String> delete(@PathVariable String postId) {
+  public ApiResponse<String> delete(@PathVariable UUID postId) {
     postService.delete(postId);
-    return ApiResponse.<String>builder().result("Deleted successfully").build();
+    return ApiResponse.<String>builder()
+        .result("Deleted successfully")
+        .build();
   }
 
   @DeleteMapping("/soft-delete/{postId}")
   public ApiResponse<PostResponse> softDelete(@PathVariable UUID postId) {
-    return ApiResponse.<PostResponse>builder().result(postService.softDelete(postId)).build();
+    return ApiResponse.<PostResponse>builder()
+        .result(postService.softDelete(postId))
+        .build();
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
   public ApiResponse<Page<PostResponse>> searchPosts(
       @ModelAttribute SearchPostRequest request, Pageable pageable) {
@@ -80,19 +89,11 @@ public class PostController {
         .build();
   }
 
-  @Deprecated
-  @PreAuthorize("hasRole('ADMIN')")
-  @PutMapping("/upgrade-post/{postId}")
-  public ApiResponse<PostResponse> upgradePostStatus(
-      @PathVariable UUID postId, @RequestParam PostStatus postStatus) {
-    return ApiResponse.<PostResponse>builder()
-        .result(postService.upgradePostStatus(postId, postStatus))
-        .build();
-  }
-
   @GetMapping("/topic/{topicId}/search")
   public ApiResponse<Page<PostResponse>> searchPostsByTopic(
-      @PathVariable UUID topicId, @RequestParam PostStatus postStatus, Pageable pageable) {
+      @PathVariable UUID topicId,
+      @RequestParam(required = false) PostStatus postStatus,
+      Pageable pageable) {
     return ApiResponse.<Page<PostResponse>>builder()
         .result(postService.searchPostsByTopic(topicId, postStatus, pageable))
         .build();

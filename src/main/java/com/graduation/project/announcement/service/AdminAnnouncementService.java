@@ -18,8 +18,9 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
+
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -84,7 +85,7 @@ public class AdminAnnouncementService {
         .content(announcement.getContent())
         .senderId(user.getId())
         .senderName(user.getEmail())
-        .createdAt(LocalDateTime.now())
+        .createdAt(Instant.now())
         .receiverIds(receiverUserIds)
         .build();
 

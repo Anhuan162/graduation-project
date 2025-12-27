@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.forum.constant.PostStatus;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import lombok.*;
 
@@ -25,27 +25,30 @@ public class Post {
   @Column(columnDefinition = "TEXT")
   private String content;
 
-  private LocalDateTime createdDateTime = LocalDateTime.now();
-  private LocalDateTime lastModifiedDateTime = LocalDateTime.now();
+  @Builder.Default
+  private Instant createdDateTime = Instant.now();
+
+  @Builder.Default
+  private Instant lastModifiedDateTime = Instant.now();
 
   @Enumerated(EnumType.STRING)
   @Builder.Default
   private PostStatus postStatus = PostStatus.PENDING;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "approved_by")
   @JsonIgnore
   private User approvedBy;
 
-  private LocalDateTime approvedAt;
+  private Instant approvedAt;
 
   @JsonIgnore
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "topic_id")
   private Topic topic;
 
   @JsonIgnore
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "author_id")
   private User author;
 
@@ -53,13 +56,14 @@ public class Post {
   private List<Comment> comments = new ArrayList<>();
 
   @Column(name = "reaction_count")
+  @Builder.Default
   private Long reactionCount = 0L;
 
-  @Builder.Default private Boolean deleted = Boolean.FALSE;
-  //  @ManyToMany
-  //  @JoinTable(
-  //      name = "post_tags",
-  //      joinColumns = @JoinColumn(name = "post_id"),
-  //      inverseJoinColumns = @JoinColumn(name = "tag_id"))
-  //  private Set<Tag> tags = new HashSet<>();
+  @Builder.Default
+  private boolean deleted = false;
+
+  @PreUpdate
+  public void onUpdate() {
+    this.lastModifiedDateTime = Instant.now();
+  }
 }

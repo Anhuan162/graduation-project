@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -16,18 +17,22 @@ import org.springframework.stereotype.Repository;
 public interface PostRepository
     extends JpaRepository<Post, UUID>, JpaSpecificationExecutor<Post> {
 
+  @EntityGraph(attributePaths = { "author", "topic" })
   Page<Post> findByTopicIdAndPostStatusAndDeletedFalse(
       UUID topicId, PostStatus postStatus, Pageable pageable);
+
+  @Override
+  @EntityGraph(attributePaths = { "author", "topic" })
+  Page<Post> findAll(Specification<Post> spec, Pageable pageable);
+
+  @EntityGraph(attributePaths = { "topic" })
+  Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
 
   @Modifying
   @Query("UPDATE Post p SET p.reactionCount = p.reactionCount + 1 WHERE p.id = :postId")
   void increaseReactionCount(UUID postId);
 
   @Modifying
-  @Query("UPDATE Post p SET p.reactionCount = p.reactionCount - 1 WHERE p.id = :postId")
-  void decreaseReactionCount(UUID postId);
-
-  Page<Post> findAll(Specification<Post> spec, Pageable pageable);
-
-  Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
+  @Query("UPDATE Post p SET p.reactionCount = p.reactionCount - 1 WHERE p.id = :postId AND p.reactionCount > 0")
+  int decreaseReactionCount(UUID postId);
 }

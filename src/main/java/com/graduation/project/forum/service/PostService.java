@@ -19,6 +19,7 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -116,7 +117,7 @@ public class PostService {
     }
 
     if (status == PostStatus.APPROVED) {
-      post.setApprovedAt(LocalDateTime.now());
+      post.setApprovedAt(Instant.now());
       post.setApprovedBy(holUser);
     }
 
@@ -165,16 +166,14 @@ public class PostService {
         true);
   }
 
-  // ===================== DELETE (HARD) =====================
   @Transactional
-  public void delete(String id) {
+  public void delete(UUID id) {
     Post post = postRepository
-        .findById(UUID.fromString(id))
+        .findById(id)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
 
-    // giữ đúng logic cũ: chỉ ADMIN được hard delete
     if (!authorizationService.isAdmin(user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
@@ -182,7 +181,6 @@ public class PostService {
     postRepository.delete(post);
   }
 
-  // ===================== SOFT DELETE =====================
   @Transactional
   public PostResponse softDelete(UUID id) {
     Post post = postRepository
@@ -198,7 +196,6 @@ public class PostService {
     post.setDeleted(true);
     Post saved = postRepository.save(post);
 
-    // soft delete không cần files
     return buildPostResponse(
         saved,
         Collections.emptyList(),
@@ -208,7 +205,6 @@ public class PostService {
         authorizationService.isPostCreator(saved, user));
   }
 
-  // ===================== SEARCH (ADMIN) =====================
   @Transactional
   public Page<PostResponse> searchPosts(SearchPostRequest request, Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();
@@ -269,8 +265,6 @@ public class PostService {
         });
   }
 
-  // ===================== APPROVED POSTS BY TOPIC (PUBLIC VIEW OF TOPIC)
-  // =====================
   @Transactional
   public Page<DetailPostResponse> getApprovedPostsByTopic(UUID topicId, Pageable pageable) {
     Topic topic = topicRepository
@@ -299,7 +293,6 @@ public class PostService {
         });
   }
 
-  // ===================== UPGRADE STATUS =====================
   @Transactional
   public PostResponse upgradePostStatus(UUID postId, PostStatus postStatus) {
     Post post = postRepository
@@ -314,7 +307,7 @@ public class PostService {
 
     post.setPostStatus(postStatus);
     post.setApprovedBy(user);
-    post.setApprovedAt(LocalDateTime.now());
+    post.setApprovedAt(Instant.now());
     Post saved = postRepository.save(post);
 
     List<FileMetadata> files = fileMetadataRepository.findByResourceTypeAndResourceIdIn(
@@ -332,7 +325,6 @@ public class PostService {
         authorizationService.isPostCreator(saved, user));
   }
 
-  // ===================== SEARCH POSTS BY TOPIC (MANAGER) =====================
   @Transactional
   public Page<PostResponse> searchPostsByTopic(UUID topicId, PostStatus postStatus, Pageable pageable) {
     Topic topic = topicRepository
@@ -365,7 +357,6 @@ public class PostService {
         });
   }
 
-  // ===================== GET POSTS BY USER =====================
   @Transactional
   public Page<PostResponse> getPostsByUserId(UUID userId, Pageable pageable) {
     Page<Post> postPage = postRepository.findAllByAuthor_Id(userId, pageable);
@@ -388,7 +379,6 @@ public class PostService {
     });
   }
 
-  // ===================== GET MY POSTS =====================
   @Transactional
   public Page<PostResponse> getMyPosts(Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();
@@ -411,8 +401,6 @@ public class PostService {
     });
   }
 
-  // ===================== HELPERS =====================
-
   private PostResponse buildPostResponse(
       Post post,
       List<FileMetadata> files,
@@ -431,17 +419,14 @@ public class PostService {
           .build();
     }
 
-    // stats (commentCount/viewCount để null ở phase này)
     PostStatsResponse stats = PostStatsResponse.builder()
         .reactionCount(post.getReactionCount() == null ? 0L : post.getReactionCount())
         .commentCount(null)
         .viewCount(null)
         .build();
 
-    // user state
     PostUserStateResponse userState = PostUserStateResponse.builder().isLiked(Boolean.TRUE.equals(isLiked)).build();
 
-    // permissions
     boolean canEdit = isPostCreator || canManageTopic || authorizationService.isAdmin(currentUser);
     boolean canDelete = canEdit;
     PostPermissionsResponse permissions = PostPermissionsResponse.builder()

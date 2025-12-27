@@ -1,8 +1,7 @@
 package com.graduation.project.forum.dto;
 
 import com.graduation.project.forum.entity.Comment;
-import java.time.LocalDateTime;
-import java.util.Objects;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,19 +21,41 @@ public class CreatedCommentEvent {
   private String senderName;
   private UUID parentCommentId;
   private UUID postId;
-  private LocalDateTime createdDateTime;
+
+  private Instant createdDateTime;
 
   public static CreatedCommentEvent from(Comment comment) {
+    UUID parentOwnerId = null;
+    UUID parentId = null;
+
+    if (comment.getParent() != null) {
+      parentId = comment.getParent().getId();
+      if (comment.getParent().getAuthor() != null) {
+        parentOwnerId = comment.getParent().getAuthor().getId();
+      }
+    }
+
+    UUID postOwnerId = (comment.getPost().getAuthor() != null)
+        ? comment.getPost().getAuthor().getId()
+        : null;
+
+    String senderName = (comment.getAuthor() != null)
+        ? comment.getAuthor().getFullName()
+        : "Unknown User";
+
+    UUID authorId = (comment.getAuthor() != null)
+        ? comment.getAuthor().getId()
+        : null;
+
     return CreatedCommentEvent.builder()
         .id(comment.getId())
-        .parentCommentOwnerId(
-            Objects.nonNull(comment.getParent()) ? comment.getParent().getAuthor().getId() : null)
-        .parentCommentId(Objects.nonNull(comment.getParent()) ? comment.getParent().getId() : null)
-        .postOwnerId(comment.getPost().getAuthor().getId())
+        .parentCommentOwnerId(parentOwnerId)
+        .parentCommentId(parentId)
+        .postOwnerId(postOwnerId)
         .postId(comment.getPost().getId())
         .content(comment.getContent())
-        .authorId(comment.getAuthor().getId())
-        .senderName(comment.getAuthor().getFullName())
+        .authorId(authorId)
+        .senderName(senderName)
         .createdDateTime(comment.getCreatedDateTime())
         .build();
   }

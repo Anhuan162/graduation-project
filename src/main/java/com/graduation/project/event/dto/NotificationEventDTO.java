@@ -2,7 +2,7 @@ package com.graduation.project.event.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.graduation.project.common.constant.ResourceType;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import lombok.*;
@@ -23,5 +23,5 @@ public class NotificationEventDTO {
   private Set<UUID> receiverIds;
 
   @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-  private LocalDateTime createdAt;
+  private Instant createdAt;
 }
