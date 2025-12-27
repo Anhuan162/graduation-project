@@ -1,18 +1,20 @@
 package com.graduation.project.forum.service;
 
 import com.graduation.project.auth.service.CurrentUserService;
-import com.graduation.project.forum.constant.CategoryType;
-import com.graduation.project.event.constant.EventType;
 import com.graduation.project.common.constant.ResourceType;
-import com.graduation.project.forum.entity.Category;
-import com.graduation.project.forum.repository.CategoryRepository;
+import com.graduation.project.common.entity.User;
+import com.graduation.project.event.constant.EventType;
 import com.graduation.project.event.dto.ActivityLogDTO;
 import com.graduation.project.event.dto.EventEnvelope;
 import com.graduation.project.event.producer.StreamProducer;
+import com.graduation.project.forum.constant.CategoryType;
 import com.graduation.project.forum.dto.CategoryRequest;
 import com.graduation.project.forum.dto.CategoryResponse;
+import com.graduation.project.forum.entity.Category;
 import com.graduation.project.forum.mapper.CategoryMapper;
-import com.graduation.project.common.entity.User;
+import com.graduation.project.forum.repository.CategoryRepository;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.UUID;
@@ -54,7 +56,7 @@ public class CategoryService {
     Category category =
         categoryRepository
             .findById(id)
-            .orElseThrow(() -> new RuntimeException("Category not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
     return categoryMapper.toCategoryResponse(category);
   }
 
@@ -66,7 +68,7 @@ public class CategoryService {
     Category category =
         categoryRepository
             .findById(id)
-            .orElseThrow(() -> new RuntimeException("Category not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
     category.setName(updateReq.getName());
     category.setDescription(updateReq.getDescription());
@@ -80,7 +82,7 @@ public class CategoryService {
     Category category =
         categoryRepository
             .findById(id)
-            .orElseThrow(() -> new RuntimeException("Category not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
     categoryRepository.delete(category);
   }
 }

@@ -1,29 +1,27 @@
 package com.graduation.project.common.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import lombok.*;
 
 @Data
 @Entity
 @Table(name = "password_reset_session")
 public class PasswordResetSession {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
-    private String email;
-    private String otp;
+  private String email;
+  private String otp;
 
-    @Column(name = "is_verified")
-    private Boolean isVerified;
+  @Column(name = "is_verified")
+  private Boolean isVerified;
 
-    @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
+  @Column(name = "expires_at")
+  private LocalDateTime expiresAt;
 
-    private Boolean used;
+  private Boolean used;
 }

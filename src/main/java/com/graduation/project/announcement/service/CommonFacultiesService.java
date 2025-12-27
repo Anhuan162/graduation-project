@@ -16,6 +16,6 @@ public class CommonFacultiesService {
 
     public List<FacultyResponse> getAllFaculties() {
         List<Faculty> faculties = facultyRepository.findAll();
-        return faculties.stream().map(Faculty::toFacultyResponse).collect(Collectors.toList());
+        return faculties.stream().map(Faculty::toFacultyResponse).toList();
     }
 }

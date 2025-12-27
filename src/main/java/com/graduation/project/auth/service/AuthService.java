@@ -3,13 +3,13 @@ package com.graduation.project.auth.service;
 import com.graduation.project.auth.dto.request.AuthenticationRequest;
 import com.graduation.project.auth.dto.request.IntrospectRequest;
 import com.graduation.project.auth.dto.response.*;
+import com.graduation.project.auth.dto.response.PermissionResponse;
+import com.graduation.project.auth.repository.InvalidatedTokenRepository;
+import com.graduation.project.auth.repository.UserRepository;
+import com.graduation.project.common.entity.*;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import com.graduation.project.auth.repository.UserRepository;
-import com.graduation.project.auth.dto.response.PermissionResponse;
-import com.graduation.project.common.entity.*;
-import com.graduation.project.auth.repository.InvalidatedTokenRepository;
-import com.graduation.project.common.entity.User;
 import com.nimbusds.jose.*;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.transaction.Transactional;
@@ -39,7 +39,7 @@ public class AuthService {
 
     boolean authenticated = passwordEncoder.matches(request.getPassword(), user.getPassword());
 
-    if (!user.getEnabled()) {
+    if (Boolean.FALSE.equals(user.getEnabled())) {
       throw new AppException(ErrorCode.ACCOUNT_NOT_VERIFIED);
     }
     if (!authenticated) {
