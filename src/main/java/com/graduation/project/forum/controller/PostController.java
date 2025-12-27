@@ -66,7 +66,8 @@ public class PostController {
         .build();
   }
 
-  @DeleteMapping("/soft-delete/{postId}")
+  @PreAuthorize("hasRole('ADMIN')")
+  @PatchMapping("/{postId}/archive")
   public ApiResponse<PostResponse> softDelete(@PathVariable UUID postId) {
     return ApiResponse.<PostResponse>builder()
         .result(postService.softDelete(postId))

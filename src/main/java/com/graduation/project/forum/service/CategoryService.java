@@ -16,7 +16,6 @@ import com.graduation.project.forum.repository.CategoryRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -74,11 +73,14 @@ public class CategoryService {
     category.setName(request.getName());
     category.setDescription(request.getDescription());
 
-    if (request.getCategoryType() == null
-        || Arrays.stream(CategoryType.values()).noneMatch(e -> e.name().equals(request.getCategoryType()))) {
+    if (request.getCategoryType() == null) {
       throw new AppException(ErrorCode.INVALID_CATEGORY_TYPE);
     }
-    category.setCategoryType(CategoryType.valueOf(request.getCategoryType()));
+    try {
+      category.setCategoryType(CategoryType.valueOf(request.getCategoryType()));
+    } catch (IllegalArgumentException e) {
+      throw new AppException(ErrorCode.INVALID_CATEGORY_TYPE);
+    }
 
     Category savedCategory = categoryRepository.save(category);
 

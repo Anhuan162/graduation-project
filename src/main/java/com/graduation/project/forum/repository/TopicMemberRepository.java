@@ -2,8 +2,10 @@ package com.graduation.project.forum.repository;
 
 import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.forum.entity.TopicMember;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,5 +39,16 @@ public interface TopicMemberRepository extends JpaRepository<TopicMember, UUID> 
                         "AND tm.approved = true")
         boolean checkPermission(@Param("userId") UUID userId,
                         @Param("topicId") UUID topicId,
+                        @Param("role") TopicRole role);
+
+        @Query("SELECT tm.user.id FROM TopicMember tm WHERE tm.topic.id = :topicId AND tm.topicRole = :role AND tm.approved = true")
+        Set<UUID> findUserIdsByTopicIdAndRole(@Param("topicId") UUID topicId, @Param("role") TopicRole role);
+
+        @Query("SELECT tm.topic.id FROM TopicMember tm " +
+                        "WHERE tm.user.id = :userId " +
+                        "AND tm.topicRole = :role " +
+                        "AND tm.approved = true " +
+                        "AND tm.topic.id IN :topicIds")
+        Set<UUID> findManagedTopicIds(@Param("userId") UUID userId, @Param("topicIds") Collection<UUID> topicIds,
                         @Param("role") TopicRole role);
 }

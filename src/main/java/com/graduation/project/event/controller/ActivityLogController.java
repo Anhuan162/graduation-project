@@ -1,6 +1,7 @@
 package com.graduation.project.event.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
+import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.event.dto.ActivityLogResponse;
 import com.graduation.project.event.dto.ActivityLogSearchRequest;
 import com.graduation.project.event.service.ActivityLogService;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class ActivityLogController {
 
   private final ActivityLogService activityLogService;
+  private final CurrentUserService currentUserService;
 
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
@@ -30,11 +32,12 @@ public class ActivityLogController {
   @GetMapping("/me")
   public ApiResponse<Page<ActivityLogResponse>> getMyLogs(
       @ModelAttribute ActivityLogSearchRequest request, Pageable pageable) {
+    request.setUserId(currentUserService.getCurrentUserId());
     return ApiResponse.ok(activityLogService.searchLogs(request, pageable));
   }
 
   @GetMapping("/{id}")
   public ApiResponse<ActivityLogResponse> getLogDetail(@PathVariable UUID id) {
-    return ApiResponse.ok(null);
+    return ApiResponse.ok(activityLogService.getLogById(id));
   }
 }

@@ -1,6 +1,6 @@
 package com.graduation.project.forum.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,6 +16,6 @@ public class CategoryResponse {
   private String name;
   private String description;
   private String categoryType;
-  private LocalDateTime createdAt;
+  private Instant createdAt;
   private String createdById;
 }

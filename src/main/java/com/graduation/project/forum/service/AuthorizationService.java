@@ -98,6 +98,8 @@ public class AuthorizationService {
   }
 
   public boolean isTopicCreator(User user, Topic topic) {
+    if (user == null || topic == null)
+      return false;
     return topic.getCreatedBy() != null && topic.getCreatedBy().getId().equals(user.getId());
   }
 

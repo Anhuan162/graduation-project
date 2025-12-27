@@ -68,5 +68,4 @@ public class ReportController {
       @PathVariable UUID id, @Valid @RequestBody ProcessReportRequest request) {
     return ApiResponse.ok(reportService.processReport(id, request));
   }
-
 }

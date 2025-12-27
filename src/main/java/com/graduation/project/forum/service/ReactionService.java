@@ -94,15 +94,11 @@ public class ReactionService {
    */
   @Transactional(readOnly = true)
   public boolean isReactedByMe(UUID targetId, TargetType targetType) {
-    UUID userId = null;
-    try {
-      userId = currentUserService.getCurrentUserId();
-    } catch (Exception e) {
-      // chưa login -> xem như false
-    }
-    if (userId == null)
+    Optional<UUID> userIdOptional = currentUserService.getCurrentUserIdOptional();
+    if (userIdOptional.isEmpty()) {
       return false;
-    return reactionRepository.existsByUserIdAndTargetIdAndTargetType(userId, targetId, targetType);
+    }
+    return reactionRepository.existsByUserIdAndTargetIdAndTargetType(userIdOptional.get(), targetId, targetType);
   }
 
   /**
@@ -111,16 +107,12 @@ public class ReactionService {
    */
   @Transactional(readOnly = true)
   public Map<UUID, Boolean> mapIsReactedByMe(List<UUID> targetIds, TargetType targetType) {
-    UUID userId = null;
-    try {
-      userId = currentUserService.getCurrentUserId();
-    } catch (Exception e) {
-      // chưa login -> xem như false hết
-    }
-    if (userId == null || targetIds == null || targetIds.isEmpty()) {
+    Optional<UUID> userIdOptional = currentUserService.getCurrentUserIdOptional();
+    if (userIdOptional.isEmpty() || targetIds == null || targetIds.isEmpty()) {
       return Collections.emptyMap();
     }
 
+    UUID userId = userIdOptional.get();
     List<UUID> reactedIds = reactionRepository.findReactedTargetIdsByUser(userId, targetType, targetIds);
 
     Set<UUID> reactedSet = new HashSet<>(reactedIds);
@@ -143,16 +135,12 @@ public class ReactionService {
 
     // 2) current user reaction type (để highlight)
     ReactionType currentUserReaction = null;
-    try {
-      UUID currentUserId = currentUserService.getCurrentUserId();
-      if (currentUserId != null) {
-        currentUserReaction = reactionRepository
-            .findByUserIdAndTargetIdAndTargetType(currentUserId, targetId, targetType)
-            .map(Reaction::getType)
-            .orElse(null);
-      }
-    } catch (Exception e) {
-      // not login -> ignore
+    Optional<UUID> userIdOptional = currentUserService.getCurrentUserIdOptional();
+    if (userIdOptional.isPresent()) {
+      currentUserReaction = reactionRepository
+          .findByUserIdAndTargetIdAndTargetType(userIdOptional.get(), targetId, targetType)
+          .map(Reaction::getType)
+          .orElse(null);
     }
 
     return ReactionSummary.builder()
@@ -195,7 +183,9 @@ public class ReactionService {
           .getAuthor()
           .getId();
     }
+    log.warn("Unknown TargetType: {}. Cannot resolve receiver.", targetType);
     return null;
+    // Or throw: throw new AppException(ErrorCode.UNSUPPORTED_TARGET_TYPE);
   }
 
   private void updateReactionCount(UUID targetId, TargetType targetType, boolean isIncrement) {

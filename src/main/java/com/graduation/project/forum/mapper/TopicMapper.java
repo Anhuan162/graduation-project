@@ -13,7 +13,7 @@ public interface TopicMapper {
   @Mapping(target = "createdBy", source = "user")
   @Mapping(target = "posts", ignore = true)
   @Mapping(target = "category", source = "category")
-  @Mapping(target = "id", ignore = true) // ignore id vì nó tự generate
+  @Mapping(target = "id", ignore = true)
   Topic toTopic(TopicRequest request, Category category, User user);
 
   @Mapping(target = "categoryName", source = "category.name")

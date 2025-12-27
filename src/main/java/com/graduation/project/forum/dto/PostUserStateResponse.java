@@ -7,7 +7,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class PostUserStateResponse {
-    private Boolean isLiked;
-    private Boolean isSaved;
-    private Boolean isFollowing;
+    private Boolean liked;
+    private Boolean saved;
+    private Boolean following;
 }

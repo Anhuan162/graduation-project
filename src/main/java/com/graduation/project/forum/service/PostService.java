@@ -1,5 +1,6 @@
 package com.graduation.project.forum.service;
 
+import com.github.slugify.Slugify;
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.ResourceType;
@@ -20,10 +21,11 @@ import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,7 +47,8 @@ public class PostService {
   private final FileMetadataRepository fileMetadataRepository;
   private final ApplicationEventPublisher publisher;
 
-  // ===================== CREATE =====================
+  private final Slugify slugify = Slugify.builder().build();
+
   @Transactional
   public PostResponse createPost(UUID topicId, PostRequest request) {
     Topic topic = topicRepository
@@ -57,13 +60,33 @@ public class PostService {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    Post post = postMapper.toPost(request, topic, user);
+    String cleanContent = Jsoup.clean(request.getContent(), Safelist.relaxed());
+
+    String slug = slugify.slugify(request.getTitle()) + "-" + UUID.randomUUID().toString().substring(0, 8);
+
+    PostStatus status = (request.getStatus() == PostStatus.DRAFT) ? PostStatus.DRAFT : PostStatus.PENDING;
+
+    Post post = Post.builder()
+        .title(request.getTitle())
+        .content(cleanContent)
+        .slug(slug)
+        .topic(topic)
+        .author(user)
+        .postStatus(status)
+        .createdDateTime(Instant.now())
+        .lastModifiedDateTime(Instant.now())
+        .deleted(false)
+        .reactionCount(0L)
+        .build();
+
     Post saved = postRepository.save(post);
 
     List<FileMetadata> files = fileService.updateFileMetadataList(
         request.getFileMetadataIds(), saved.getId(), ResourceType.POST, user.getId());
 
-    publisher.publishEvent(CreatedPostEvent.from(saved));
+    if (status != PostStatus.DRAFT) {
+      publisher.publishEvent(CreatedPostEvent.from(saved));
+    }
 
     return buildPostResponse(
         saved,
@@ -74,7 +97,6 @@ public class PostService {
         true);
   }
 
-  // ===================== READ ONE =====================
   @Transactional
   public PostResponse getOne(UUID id) {
     Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
@@ -101,21 +123,22 @@ public class PostService {
         authorizationService.isPostCreator(post, user));
   }
 
-  // ===================== UPDATE =====================
+  // UPDATE STATUS (Approve/Reject)
   @Transactional
   public PostResponse updateStatus(UUID postId, PostStatus status) {
     Post post = postRepository.findById(postId)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+
     if (!post.getPostStatus().canTransitionTo(status)) {
       throw new AppException(ErrorCode.INVALID_POST_STATUS_TRANSITION);
     }
 
-    post.setPostStatus(status);
     User holUser = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canManageTopic(holUser, post.getTopic())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
+    post.setPostStatus(status);
     if (status == PostStatus.APPROVED) {
       post.setApprovedAt(Instant.now());
       post.setApprovedBy(holUser);
@@ -135,9 +158,9 @@ public class PostService {
         isLiked,
         authorizationService.canManageTopic(holUser, post.getTopic()),
         authorizationService.isPostCreator(post, holUser));
-
   }
 
+  // UPDATE CONTENT
   @Transactional
   public PostResponse update(UUID id, PostRequest request) {
     Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
@@ -148,7 +171,23 @@ public class PostService {
     }
 
     post.setTitle(request.getTitle());
-    post.setContent(request.getContent());
+
+    if (StringUtils.hasText(request.getContent())) {
+      post.setContent(Jsoup.clean(request.getContent(), Safelist.relaxed()));
+    }
+
+    if (request.getStatus() != null && request.getStatus() != post.getPostStatus()) {
+      if (!post.getPostStatus().canTransitionTo(request.getStatus())) {
+        throw new AppException(ErrorCode.INVALID_POST_STATUS_TRANSITION);
+      }
+      if (request.getStatus() == PostStatus.APPROVED && !authorizationService.canManageTopic(user, post.getTopic())) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+      post.setPostStatus(request.getStatus());
+    }
+
+    post.setLastModifiedDateTime(Instant.now());
+
     Post saved = postRepository.save(post);
 
     List<FileMetadata> files = fileService.updateFileMetadataList(
@@ -299,6 +338,10 @@ public class PostService {
         .findById(postId)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
+    if (!post.getPostStatus().canTransitionTo(postStatus)) {
+      throw new AppException(ErrorCode.INVALID_STATUS_TRANSITION);
+    }
+
     User user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.canManageTopic(user, post.getTopic())) {
@@ -306,8 +349,13 @@ public class PostService {
     }
 
     post.setPostStatus(postStatus);
-    post.setApprovedBy(user);
-    post.setApprovedAt(Instant.now());
+    if (postStatus == PostStatus.APPROVED) {
+      post.setApprovedBy(user);
+      post.setApprovedAt(Instant.now());
+    } else {
+      post.setApprovedBy(null);
+      post.setApprovedAt(null);
+    }
     Post saved = postRepository.save(post);
 
     List<FileMetadata> files = fileMetadataRepository.findByResourceTypeAndResourceIdIn(
@@ -359,11 +407,17 @@ public class PostService {
 
   @Transactional
   public Page<PostResponse> getPostsByUserId(UUID userId, Pageable pageable) {
-    Page<Post> postPage = postRepository.findAllByAuthor_Id(userId, pageable);
+    User currentUser = currentUserService.getCurrentUserEntity();
+    boolean canViewAll = currentUser.getId().equals(userId) || authorizationService.isAdmin(currentUser);
+    List<PostStatus> statuses = canViewAll
+        ? Arrays.asList(PostStatus.PENDING, PostStatus.APPROVED, PostStatus.REJECTED, PostStatus.DRAFT,
+            PostStatus.ARCHIVED)
+        : List.of(PostStatus.APPROVED);
+
+    Page<Post> postPage = postRepository.findAllByAuthor_IdAndPostStatusInAndDeletedFalse(userId, statuses, pageable);
     if (postPage.isEmpty())
       return Page.empty(pageable);
 
-    User currentUser = currentUserService.getCurrentUserEntity();
     Map<UUID, List<FileMetadata>> filesMap = mapFiles(postPage.getContent());
     Map<UUID, Boolean> likedMap = mapIsLiked(postPage.getContent(), currentUser);
 
@@ -409,7 +463,6 @@ public class PostService {
       boolean canManageTopic,
       boolean isPostCreator) {
 
-    // author
     PostAuthorResponse author = null;
     if (post.getAuthor() != null) {
       author = PostAuthorResponse.builder()
@@ -425,7 +478,7 @@ public class PostService {
         .viewCount(null)
         .build();
 
-    PostUserStateResponse userState = PostUserStateResponse.builder().isLiked(Boolean.TRUE.equals(isLiked)).build();
+    PostUserStateResponse userState = PostUserStateResponse.builder().liked(Boolean.TRUE.equals(isLiked)).build();
 
     boolean canEdit = isPostCreator || canManageTopic || authorizationService.isAdmin(currentUser);
     boolean canDelete = canEdit;
@@ -438,10 +491,13 @@ public class PostService {
     List<String> urls = files == null ? List.of() : files.stream().map(FileMetadata::getUrl).toList();
     List<AttachmentResponse> attachments = toAttachments(files);
 
+    String excerpt = Jsoup.parse(post.getContent()).text();
+    excerpt = excerpt.length() > 150 ? excerpt.substring(0, 150) + "..." : excerpt;
+
     return postMapper.toPostResponse(
         post,
         urls,
-        buildExcerpt(post.getContent(), 150),
+        excerpt,
         author,
         stats,
         userState,
@@ -491,14 +547,5 @@ public class PostService {
     return files.stream()
         .map(f -> AttachmentResponse.builder().id(f.getId().toString()).url(f.getUrl()).build())
         .toList();
-  }
-
-  private String buildExcerpt(String content, int maxLen) {
-    if (content == null)
-      return "";
-    String plain = content.replaceAll("\\s+", " ").trim();
-    if (plain.length() <= maxLen)
-      return plain;
-    return plain.substring(0, maxLen).trim() + "...";
   }
 }

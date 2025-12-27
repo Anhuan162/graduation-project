@@ -1,8 +1,9 @@
 package com.graduation.project.forum.dto;
 
+import java.time.Instant;
+
 import com.graduation.project.forum.constant.TopicVisibility;
 import com.graduation.project.forum.entity.Topic;
-import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Value;
@@ -13,8 +14,8 @@ public class DetailTopicResponse {
   private String categoryName;
   private String title;
   private String content;
-  private LocalDateTime createdAt;
-  private LocalDateTime lastModifiedAt;
+  private Instant createdAt;
+  private Instant lastModifiedAt;
   private TopicVisibility topicVisibility;
   private boolean isDeleted;
   private String createdBy;

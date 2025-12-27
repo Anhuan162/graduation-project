@@ -67,9 +67,6 @@ public class ActivityLogService {
                 cb.like(cb.lower(root.get("action")), likePattern)));
       }
 
-      // Sắp xếp mặc định mới nhất lên đầu
-      Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdAt")));
-
       return cb.and(predicates.toArray(new Predicate[0]));
     };
 
@@ -77,7 +74,7 @@ public class ActivityLogService {
   }
 
   @Transactional(readOnly = true)
-  public ActivityLogResponse getLogDetail(UUID id) {
+  public ActivityLogResponse getLogById(UUID id) {
     ActivityLog log = activityLogRepository.findById(id)
         .orElseThrow(() -> new AppException(ErrorCode.ACTIVITY_LOG_NOT_FOUND));
 

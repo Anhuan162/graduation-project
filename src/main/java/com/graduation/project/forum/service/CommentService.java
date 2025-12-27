@@ -7,12 +7,15 @@ import com.graduation.project.common.entity.FileMetadata;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.forum.constant.TargetType;
+import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.mapper.CommentMapper;
 import com.graduation.project.forum.repository.CommentRepository;
 import com.graduation.project.forum.repository.PostRepository;
+import com.graduation.project.forum.repository.TopicMemberRepository;
+import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
@@ -34,6 +37,8 @@ public class CommentService {
 
   private final PostRepository postRepository;
   private final CommentRepository commentRepository;
+  private final TopicRepository topicRepository;
+  private final TopicMemberRepository topicMemberRepository;
   private final CurrentUserService currentUserService;
   private final AuthorizationService authorizationService;
   private final FileMetadataRepository fileMetadataRepository;
@@ -63,7 +68,6 @@ public class CommentService {
       }
 
       rootComment = parent.getRootComment() != null ? parent.getRootComment() : parent;
-
       replyToUser = parent.getAuthor();
     }
 
@@ -84,7 +88,18 @@ public class CommentService {
     FileMetadata file = handleFileMetadataReturnEntity(request.getFileMetadataId(), comment, currentUser);
     List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
 
-    return buildCommentResponse(comment, currentUser, false, 0L, true, attachments);
+    CommentPermissionsResponse permissions = CommentPermissionsResponse.builder()
+        .canEdit(true)
+        .canDelete(true)
+        .canReport(false)
+        .build();
+
+    return commentMapper.toResponse(
+        comment,
+        CommentStatsResponse.builder().reactionCount(0L).replyCount(0L).build(),
+        CommentUserStateResponse.builder().liked(false).build(),
+        permissions,
+        attachments);
   }
 
   @Transactional(readOnly = true)
@@ -103,24 +118,24 @@ public class CommentService {
 
     List<UUID> commentIds = page.getContent().stream().map(Comment::getId).toList();
 
+    boolean isAdmin = authorizationService.isAdmin(currentUser);
+    boolean isTopicManager = authorizationService.isTopicManager(currentUser, post.getTopic());
+    boolean isPostAuthor = post.getAuthor().getId().equals(currentUser.getId());
+
+    boolean canModeratePost = isAdmin || isTopicManager || isPostAuthor;
+
     Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
-
     Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(commentIds, TargetType.COMMENT);
-
     Map<UUID, Long> replyCountMap = mapReplyCount(commentIds);
 
-    return page.map(c -> {
-      FileMetadata file = fileMap.get(c.getId());
-      List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
-
-      return buildCommentResponse(
-          c,
-          currentUser,
-          likedMap.getOrDefault(c.getId(), false),
-          replyCountMap.getOrDefault(c.getId(), 0L),
-          false,
-          attachments);
-    });
+    return page.map(c -> buildCommentResponse(
+        c,
+        currentUser,
+        likedMap.getOrDefault(c.getId(), false),
+        replyCountMap.getOrDefault(c.getId(), 0L),
+        false,
+        fileMap.get(c.getId()),
+        canModeratePost));
   }
 
   @Transactional(readOnly = true)
@@ -138,21 +153,23 @@ public class CommentService {
       return Page.empty(pageable);
 
     List<UUID> ids = page.getContent().stream().map(Comment::getId).toList();
+
+    boolean isAdmin = authorizationService.isAdmin(currentUser);
+    boolean isTopicManager = authorizationService.isTopicManager(currentUser, root.getPost().getTopic());
+    boolean isPostAuthor = root.getPost().getAuthor().getId().equals(currentUser.getId());
+    boolean canModeratePost = isAdmin || isTopicManager || isPostAuthor;
+
     Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
     Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(ids, TargetType.COMMENT);
 
-    return page.map(c -> {
-      FileMetadata file = fileMap.get(c.getId());
-      List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
-
-      return buildCommentResponse(
-          c,
-          currentUser,
-          likedMap.getOrDefault(c.getId(), false),
-          0L,
-          false,
-          attachments);
-    });
+    return page.map(c -> buildCommentResponse(
+        c,
+        currentUser,
+        likedMap.getOrDefault(c.getId(), false),
+        0L,
+        false,
+        fileMap.get(c.getId()),
+        canModeratePost));
   }
 
   @Transactional
@@ -169,13 +186,16 @@ public class CommentService {
     Comment saved = commentRepository.save(comment);
 
     FileMetadata file = handleUpdateFile(request.getFileMetadataId(), saved, user);
-    List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
 
     boolean isLiked = reactionService.isReactedByMe(saved.getId(), TargetType.COMMENT);
-
     long replyCount = (saved.getParent() == null) ? commentRepository.countByRootCommentId(saved.getId()) : 0L;
 
-    return buildCommentResponse(saved, user, isLiked, replyCount, true, attachments);
+    boolean isAdmin = authorizationService.isAdmin(user);
+    boolean isTopicManager = authorizationService.isTopicManager(user, comment.getPost().getTopic());
+    boolean isPostAuthor = comment.getPost().getAuthor().getId().equals(user.getId());
+    boolean canModeratePost = isAdmin || isTopicManager || isPostAuthor;
+
+    return buildCommentResponse(saved, user, isLiked, replyCount, true, file, canModeratePost);
   }
 
   @Transactional
@@ -184,6 +204,7 @@ public class CommentService {
         .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
+
     if (!authorizationService.canSoftDeleteComment(comment, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
@@ -194,8 +215,12 @@ public class CommentService {
 
   @Transactional(readOnly = true)
   public Page<CommentResponse> searchComments(SearchCommentRequest request, Pageable pageable) {
+    User user = currentUserService.getCurrentUserEntity();
+    Set<UUID> accessibleTopicIds = topicRepository.findAccessibleTopicIdsByUserId(user.getId());
+
     Specification<Comment> spec = (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
+      predicates.add(root.get("post").get("topic").get("id").in(accessibleTopicIds));
 
       if (request.getAuthorId() != null)
         predicates.add(cb.equal(root.get("author").get("id"), request.getAuthorId()));
@@ -206,14 +231,51 @@ public class CommentService {
         predicates.add(cb.greaterThanOrEqualTo(root.get(CREATED_DATE_TIME_FIELD),
             request.getFromDate().atStartOfDay(ZoneId.systemDefault()).toInstant()));
       }
-
       return cb.and(predicates.toArray(new Predicate[0]));
     };
 
     Page<Comment> page = commentRepository.findAll(spec, pageable);
+    return page.map(c -> buildCommentResponse(c, user, false, 0L, false, null, false));
+  }
 
+  @Transactional(readOnly = true)
+  public Page<CommentResponse> getMyComments(Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();
-    return page.map(c -> buildCommentResponse(c, user, false, 0L, false, List.of()));
+    Page<Comment> page = commentRepository.findAllByAuthorIdAndDeletedFalse(user.getId(), pageable);
+
+    if (page.isEmpty())
+      return Page.empty(pageable);
+
+    List<UUID> ids = page.getContent().stream().map(Comment::getId).toList();
+
+    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
+    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(ids, TargetType.COMMENT);
+    Map<UUID, Long> replyCountMap = mapReplyCount(ids);
+
+    Set<UUID> topicIds = page.getContent().stream()
+        .map(c -> c.getPost().getTopic().getId())
+        .collect(Collectors.toSet());
+
+    Set<UUID> managedTopicIds = topicIds.isEmpty()
+        ? Collections.emptySet()
+        : topicMemberRepository.findManagedTopicIds(user.getId(), topicIds, TopicRole.MANAGER);
+
+    boolean isAdmin = authorizationService.isAdmin(user);
+
+    return page.map(c -> {
+      boolean isManager = managedTopicIds.contains(c.getPost().getTopic().getId());
+
+      boolean canModeratePost = isAdmin || isManager || c.getPost().getAuthor().getId().equals(user.getId());
+
+      return buildCommentResponse(
+          c,
+          user,
+          likedMap.getOrDefault(c.getId(), false),
+          replyCountMap.getOrDefault(c.getId(), 0L),
+          false,
+          fileMap.get(c.getId()),
+          canModeratePost);
+    });
   }
 
   private CommentResponse buildCommentResponse(
@@ -222,15 +284,16 @@ public class CommentService {
       boolean isLiked,
       Long replyCount,
       boolean isJustCreated,
-      List<AttachmentResponse> attachments) {
+      FileMetadata file,
+      boolean canModeratePost) {
 
-    boolean isCreator = authorizationService.isCommentCreator(comment, currentUser);
-    boolean canSoftDeletePost = authorizationService.canSoftDeletePost(comment.getPost(), currentUser);
-    boolean isAdmin = authorizationService.isAdmin(currentUser);
+    boolean isCreator = comment.getAuthor().getId().equals(currentUser.getId());
+
+    boolean canDelete = isCreator || canModeratePost;
 
     CommentPermissionsResponse permissions = CommentPermissionsResponse.builder()
         .canEdit(isCreator)
-        .canDelete(isCreator || canSoftDeletePost || isAdmin)
+        .canDelete(canDelete)
         .canReport(!isCreator)
         .build();
 
@@ -242,6 +305,8 @@ public class CommentService {
     CommentUserStateResponse userState = CommentUserStateResponse.builder()
         .liked(isLiked)
         .build();
+
+    List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
 
     return commentMapper.toResponse(
         comment,
@@ -283,10 +348,10 @@ public class CommentService {
     if (comments.isEmpty())
       return Collections.emptyMap();
     List<UUID> ids = comments.stream().map(Comment::getId).toList();
-    return fileMetadataRepository
-        .findAllByResourceIdInAndResourceType(ids, ResourceType.COMMENT)
-        .stream()
-        .collect(Collectors.toMap(FileMetadata::getResourceId, Function.identity(), (a, b) -> a));
+    List<FileMetadata> files = fileMetadataRepository.findAllByResourceIdInAndResourceType(ids, ResourceType.COMMENT);
+    return files.stream()
+        .collect(
+            Collectors.toMap(FileMetadata::getResourceId, Function.identity(), (existing, replacement) -> existing));
   }
 
   private AttachmentResponse toAttachment(FileMetadata f) {
@@ -296,36 +361,5 @@ public class CommentService {
         .type(f.getContentType())
         .name(f.getFileName())
         .build();
-  }
-
-  @Transactional(readOnly = true)
-  public Page<CommentResponse> getMyComments(Pageable pageable) {
-    User user = currentUserService.getCurrentUserEntity();
-
-    Page<Comment> page = commentRepository.findAllByAuthorIdAndDeletedFalse(user.getId(), pageable);
-
-    if (page.isEmpty())
-      return Page.empty(pageable);
-
-    List<UUID> ids = page.getContent().stream().map(Comment::getId).toList();
-
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
-
-    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(ids, TargetType.COMMENT);
-
-    Map<UUID, Long> replyCountMap = mapReplyCount(ids);
-
-    return page.map(c -> {
-      FileMetadata file = fileMap.get(c.getId());
-      List<AttachmentResponse> attachments = file == null ? List.of() : List.of(toAttachment(file));
-
-      return buildCommentResponse(
-          c,
-          user,
-          likedMap.getOrDefault(c.getId(), false),
-          replyCountMap.getOrDefault(c.getId(), 0L),
-          false,
-          attachments);
-    });
   }
 }

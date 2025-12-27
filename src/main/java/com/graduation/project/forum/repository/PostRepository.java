@@ -2,6 +2,7 @@ package com.graduation.project.forum.repository;
 
 import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.entity.Post;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,24 +16,28 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface PostRepository
-    extends JpaRepository<Post, UUID>, JpaSpecificationExecutor<Post> {
+        extends JpaRepository<Post, UUID>, JpaSpecificationExecutor<Post> {
 
-  @EntityGraph(attributePaths = { "author", "topic" })
-  Page<Post> findByTopicIdAndPostStatusAndDeletedFalse(
-      UUID topicId, PostStatus postStatus, Pageable pageable);
+    @EntityGraph(attributePaths = { "author", "topic" })
+    Page<Post> findByTopicIdAndPostStatusAndDeletedFalse(
+            UUID topicId, PostStatus postStatus, Pageable pageable);
 
-  @Override
-  @EntityGraph(attributePaths = { "author", "topic" })
-  Page<Post> findAll(Specification<Post> spec, Pageable pageable);
+    @Override
+    @EntityGraph(attributePaths = { "author", "topic" })
+    Page<Post> findAll(Specification<Post> spec, Pageable pageable);
 
-  @EntityGraph(attributePaths = { "topic" })
-  Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
+    @EntityGraph(attributePaths = { "topic" })
+    Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
 
-  @Modifying
-  @Query("UPDATE Post p SET p.reactionCount = p.reactionCount + 1 WHERE p.id = :postId")
-  void increaseReactionCount(UUID postId);
+    @EntityGraph(attributePaths = { "topic" })
+    Page<Post> findAllByAuthor_IdAndPostStatusInAndDeletedFalse(UUID userId, List<PostStatus> statuses,
+            Pageable pageable);
 
-  @Modifying
-  @Query("UPDATE Post p SET p.reactionCount = p.reactionCount - 1 WHERE p.id = :postId AND p.reactionCount > 0")
-  int decreaseReactionCount(UUID postId);
+    @Modifying
+    @Query("UPDATE Post p SET p.reactionCount = p.reactionCount + 1 WHERE p.id = :postId")
+    void increaseReactionCount(UUID postId);
+
+    @Modifying
+    @Query("UPDATE Post p SET p.reactionCount = p.reactionCount - 1 WHERE p.id = :postId AND p.reactionCount > 0")
+    int decreaseReactionCount(UUID postId);
 }

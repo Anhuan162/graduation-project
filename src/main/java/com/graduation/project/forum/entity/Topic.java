@@ -4,7 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.forum.constant.TopicVisibility;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+
+import java.time.Instant;
 import java.util.*;
 import lombok.*;
 
@@ -26,8 +27,8 @@ public class Topic {
   private Category category;
 
   private String title;
-  private LocalDateTime createdAt = LocalDateTime.now();
-  private LocalDateTime lastModifiedAt = LocalDateTime.now();
+  private Instant createdAt = Instant.now();
+  private Instant lastModifiedAt = Instant.now();
 
   @Column(columnDefinition = "TEXT")
   private String content;
@@ -35,7 +36,8 @@ public class Topic {
   @Enumerated(EnumType.STRING)
   private TopicVisibility topicVisibility = TopicVisibility.PUBLIC;
 
-  @Builder.Default private Boolean deleted = Boolean.FALSE;
+  @Builder.Default
+  private Boolean deleted = Boolean.FALSE;
 
   @JsonIgnore
   @ManyToOne

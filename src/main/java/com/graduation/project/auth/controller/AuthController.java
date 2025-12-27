@@ -115,6 +115,11 @@ public class AuthController {
         }
       }
     }
+
+    if (refreshToken == null) {
+      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
+
     authService.logout(refreshToken);
     return ApiResponse.ok("Logout successfully");
   }

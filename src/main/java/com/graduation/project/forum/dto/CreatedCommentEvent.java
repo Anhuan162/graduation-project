@@ -27,7 +27,6 @@ public class CreatedCommentEvent {
   public static CreatedCommentEvent from(Comment comment) {
     UUID parentOwnerId = null;
     UUID parentId = null;
-
     if (comment.getParent() != null) {
       parentId = comment.getParent().getId();
       if (comment.getParent().getAuthor() != null) {
@@ -35,7 +34,7 @@ public class CreatedCommentEvent {
       }
     }
 
-    UUID postOwnerId = (comment.getPost().getAuthor() != null)
+    UUID postOwnerId = (comment.getPost() != null && comment.getPost().getAuthor() != null)
         ? comment.getPost().getAuthor().getId()
         : null;
 
@@ -46,6 +45,10 @@ public class CreatedCommentEvent {
     UUID authorId = (comment.getAuthor() != null)
         ? comment.getAuthor().getId()
         : null;
+
+    if (comment.getPost() == null) {
+      throw new IllegalStateException("Comment must have an associated post");
+    }
 
     return CreatedCommentEvent.builder()
         .id(comment.getId())

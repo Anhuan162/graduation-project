@@ -66,4 +66,7 @@ public class Post {
   public void onUpdate() {
     this.lastModifiedDateTime = Instant.now();
   }
+
+  @Column(unique = true)
+  private String slug;
 }

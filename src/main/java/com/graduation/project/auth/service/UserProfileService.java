@@ -133,13 +133,28 @@ public class UserProfileService {
             String newAvatarUrl = firebaseService.uploadFile(image, AVATAR_FOLDER);
 
             user.setAvatarUrl(newAvatarUrl);
-            userRepository.save(user);
+            try {
+                userRepository.save(user);
 
-            if (oldAvatarUrl != null && !oldAvatarUrl.isEmpty()) {
+                if (oldAvatarUrl != null && !oldAvatarUrl.isEmpty()) {
+                    try {
+                        firebaseService.deleteFile(oldAvatarUrl);
+                    } catch (Exception e) {
+                        log.warn("Failed to delete old avatar: {}", oldAvatarUrl, e);
+                    }
+                }
+            } catch (Exception e) {
+                // Save failed, delete the new file
                 try {
-                    firebaseService.deleteFile(oldAvatarUrl);
-                } catch (Exception e) {
-                    log.warn("Failed to delete old avatar: {}", oldAvatarUrl, e);
+                    firebaseService.deleteFile(newAvatarUrl);
+                } catch (Exception deleteException) {
+                    log.warn("Failed to delete uploaded avatar after save failure: {}", newAvatarUrl, deleteException);
+                }
+                // Rethrow the original exception, wrapping if necessary
+                if (e instanceof AppException) {
+                    throw e;
+                } else {
+                    throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to update user profile");
                 }
             }
         } catch (IOException e) {
@@ -195,15 +210,18 @@ public class UserProfileService {
             throw new AppException(ErrorCode.BAD_REQUEST, "studentCode/classCode is required");
         }
 
-        if (studentCode.length() != 10) {
+        String trimmedStudentCode = studentCode.trim().toUpperCase();
+        String trimmedClassCode = classCode.trim().toUpperCase();
+
+        if (trimmedStudentCode.length() != 10) {
             throw new AppException(ErrorCode.BAD_REQUEST, "studentCode is invalid");
         }
-        if (classCode.length() < 10) {
+        if (trimmedClassCode.length() < 10) {
             throw new AppException(ErrorCode.BAD_REQUEST, "classCode is invalid");
         }
 
-        String facultiesCodeFromStudent = studentCode.trim().toUpperCase().substring(5, 7);
-        String facultiesCodeFromClass = classCode.trim().toUpperCase().substring(5, 7);
+        String facultiesCodeFromStudent = trimmedStudentCode.substring(5, 7);
+        String facultiesCodeFromClass = trimmedClassCode.substring(5, 7);
 
         if (!facultiesCodeFromStudent.equals(facultiesCodeFromClass)) {
             throw new AppException(ErrorCode.BAD_REQUEST, "faculties code mismatch");

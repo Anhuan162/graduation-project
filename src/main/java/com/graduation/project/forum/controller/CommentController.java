@@ -8,7 +8,6 @@ import com.graduation.project.forum.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;

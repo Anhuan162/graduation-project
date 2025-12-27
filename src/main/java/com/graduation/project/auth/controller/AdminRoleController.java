@@ -42,8 +42,8 @@ public class AdminRoleController {
   }
 
   @DeleteMapping("/{role}")
-  public ApiResponse<String> delete(@PathVariable("role") String role) {
+  public ApiResponse<Void> delete(@PathVariable("role") String role) {
     roleService.delete(role);
-    return ApiResponse.ok("ROLE_DELETED");
+    return ApiResponse.ok(null);
   }
 }

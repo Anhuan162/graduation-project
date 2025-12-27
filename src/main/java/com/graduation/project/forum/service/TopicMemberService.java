@@ -74,10 +74,7 @@ public class TopicMemberService {
     topicMember.setApproved(false);
     TopicMember saved = topicMemberRepository.save(topicMember);
 
-    Set<UUID> managerUserIds = topic.getTopicMembers().stream()
-        .filter(t -> t.getTopicRole() == TopicRole.MANAGER)
-        .map(tm -> tm.getUser().getId())
-        .collect(Collectors.toSet());
+    Set<UUID> managerUserIds = topicMemberRepository.findUserIdsByTopicIdAndRole(topicId, TopicRole.MANAGER);
 
     NotificationEventDTO dto = NotificationEventDTO.builder()
         .relatedId(saved.getId())

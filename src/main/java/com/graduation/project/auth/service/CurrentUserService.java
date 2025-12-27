@@ -5,6 +5,7 @@ import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.common.entity.User;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -36,6 +37,14 @@ public class CurrentUserService {
 
   public UUID getCurrentUserId() {
     return getCurrentUserPrincipal().getId();
+  }
+
+  public Optional<UUID> getCurrentUserIdOptional() {
+    try {
+      return Optional.of(getCurrentUserId());
+    } catch (AppException e) {
+      return Optional.empty();
+    }
   }
 
   public User getCurrentUserEntity() {

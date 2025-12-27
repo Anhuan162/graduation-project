@@ -65,16 +65,17 @@ public class FileController {
   public record DeleteFilesRequest(List<UUID> fileIds) {
   }
 
+  @PreAuthorize("hasAuthority('DELETE_FILES') or hasAuthority('DELETE_OWN_FILES')")
   @DeleteMapping("/{fileId}")
   public ApiResponse<String> deleteFile(@PathVariable UUID fileId) {
     fileService.deleteFile(fileId);
     return ApiResponse.ok("Deleted successfully");
   }
 
+  @PreAuthorize("hasAuthority('DELETE_FILES') or hasAuthority('DELETE_ALL_FILES')")
   @PostMapping("/delete-all-files")
   public ApiResponse<String> deleteAllFiles(@RequestBody DeleteFilesRequest request) {
     fileService.deleteAllFiles(request.fileIds().stream().map(UUID::toString).toList());
     return ApiResponse.ok("Deleted successfully");
   }
-
 }

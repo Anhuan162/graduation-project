@@ -75,7 +75,6 @@ public class NotificationEventListener {
       }
 
       String action = "";
-      String targetName = "";
 
       if (event.getTargetType() == TargetType.POST) {
         action = "bài viết";

@@ -41,7 +41,7 @@ public enum ErrorCode {
 
   FAILED_ATTEMPTS(1028, "Failed attempts", HttpStatus.TOO_MANY_REQUESTS),
   SESSION_RESET_PASSWORD_NOT_FOUND(1029, "Reset password session not found", HttpStatus.NOT_FOUND),
-  SESSION_RESET_PASSWORD_HAS_USED(1030, "Reset password session has used", HttpStatus.BAD_REQUEST),
+  SESSION_RESET_PASSWORD_HAS_USED(1030, "Reset password session has already been used", HttpStatus.BAD_REQUEST),
 
   EMAIL_NOT_FOUND(1031, "Email not found", HttpStatus.NOT_FOUND),
   CAN_NOT_SEND_EMAIL(1032, "Can not send email", HttpStatus.SERVICE_UNAVAILABLE),
@@ -62,7 +62,8 @@ public enum ErrorCode {
   FACULTY_CODE_MISMATCH(1046, "Faculty code mismatch", HttpStatus.BAD_REQUEST),
   INVALID_PARENT_COMMENT(1047, "Invalid parent comment", HttpStatus.BAD_REQUEST),
   INVALID_POST_STATUS_TRANSITION(1048, "Invalid post status transition", HttpStatus.BAD_REQUEST),
-  INVALID_CATEGORY_TYPE(1049, "Invalid category type", HttpStatus.BAD_REQUEST);
+  INVALID_STATUS_TRANSITION(1049, "Invalid status transition", HttpStatus.BAD_REQUEST),
+  INVALID_CATEGORY_TYPE(1050, "Invalid category type", HttpStatus.BAD_REQUEST);
 
   private final int code;
   private final String message;
