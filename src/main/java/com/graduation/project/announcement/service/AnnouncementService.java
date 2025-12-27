@@ -166,7 +166,7 @@ public class AnnouncementService {
     return DetailedAnnouncementResponse.from(announcement, fileMetadataList);
   }
 
-  //  ThieuNN
+  @Transactional
   public Page<AnnouncementResponse> searchAnnouncement(
       SearchAnnouncementRequest request, Pageable pageable) {
     Specification<Announcement> specification =
@@ -187,6 +187,11 @@ public class AnnouncementService {
           if (Objects.nonNull(request.getAnnouncementStatus())) {
             predicates.add(
                 cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
+          }
+
+          if (Objects.nonNull(request.getAnnouncementProvider())) {
+            predicates.add(
+                cb.equal(root.get("announcementProvider"), request.getAnnouncementProvider()));
           }
 
           if (Objects.nonNull(request.getFromDate())) {
@@ -219,8 +224,11 @@ public class AnnouncementService {
     announcementRepository.delete(announcement);
   }
 
-  public Page<AnnouncementResponse> searchActiveAnnouncements(Pageable pageable) {
-    Page<Announcement> announcementPage = announcementRepository.findAll(pageable);
+  @Transactional
+  public Page<AnnouncementResponse> searchActiveAnnouncements(
+      SearchActiveAnnouncementRequest request, Pageable pageable) {
+    Page<Announcement> announcementPage =
+        announcementRepository.findAllActiveAnnouncements(request, pageable);
     return announcementPage.map(announcementMapper::toResponse);
   }
 }

@@ -8,6 +8,7 @@ public class SearchAnnouncementRequest {
   String title;
   String announcementType;
   Boolean announcementStatus;
+  String announcementProvider;
   LocalDate fromDate;
   LocalDate toDate;
 }
