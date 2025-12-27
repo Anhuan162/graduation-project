@@ -1,7 +1,6 @@
 package com.graduation.project.security.exception;
 
 import lombok.Getter;
-import org.apache.commons.codec.net.BCodec;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
@@ -46,6 +45,10 @@ public enum ErrorCode {
   INVALID_REQUEST(1035, "Invalid request", HttpStatus.BAD_REQUEST),
   UPDATE_FALSE(1036, "Update failed", HttpStatus.BAD_REQUEST),
   DOCUMENT_NOT_FOUND(1037, "Document not found", HttpStatus.NOT_FOUND),
+  INVALID_CLASS_CODE(1038, "Class code is invalid", HttpStatus.BAD_REQUEST),
+  INVALID_FACULTY_CODE(1039, "Faculty code is invalid", HttpStatus.BAD_REQUEST),
+  UPLOAD_FILE_FAILED(1040, "Can not upload this file", HttpStatus.BAD_REQUEST),
+  FACULTY_EXISTED(1041, "Faculty already existed", HttpStatus.BAD_REQUEST),
   ;
 
   private final int code;

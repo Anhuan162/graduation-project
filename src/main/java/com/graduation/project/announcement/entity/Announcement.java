@@ -1,5 +1,6 @@
 package com.graduation.project.announcement.entity;
 
+import com.graduation.project.announcement.constant.AnnouncementProvider;
 import com.graduation.project.announcement.constant.AnnouncementType;
 import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
@@ -36,6 +37,13 @@ public class Announcement {
 
   private LocalDate modifiedDate;
   private Boolean announcementStatus;
+
+  @Column(unique = true)
+  private String sourceUrl;
+
+  @Builder.Default
+  @Enumerated(EnumType.STRING)
+  private AnnouncementProvider announcementProvider = AnnouncementProvider.LOCAL;
 
   @Enumerated(EnumType.STRING)
   private AnnouncementType announcementType;

@@ -7,6 +7,9 @@ import com.graduation.project.announcement.entity.Faculty;
 import com.graduation.project.announcement.repository.FacultyRepository;
 import java.util.List;
 import java.util.UUID;
+
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +20,7 @@ public class AdminFacultyService {
 
   public FacultyResponse createFaculty(CreatedFacultyRequest request) {
     if (facultyRepository.existsByFacultyCode(request.getFacultyCode())) {
-      throw new IllegalArgumentException("Faculty code already exists");
+      throw new AppException(ErrorCode.FACULTY_EXISTED);
     }
 
     Faculty faculty = new Faculty();

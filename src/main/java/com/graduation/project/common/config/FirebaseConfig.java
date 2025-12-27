@@ -47,10 +47,6 @@ public class FirebaseConfig {
     String clientSecret = driveProperties.getClientSecret();
     String refreshToken = driveProperties.getRefreshToken();
 
-    // Check log để test (xóa khi chạy thật)
-    System.out.println("Client ID đang dùng: " + clientId);
-      System.out.println("DEBUG Client ID: " + clientId);
-      System.out.println("DEBUG Refresh Token: " + refreshToken);
     UserCredentials credentials =
         UserCredentials.newBuilder()
             .setClientId(clientId)

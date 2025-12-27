@@ -81,7 +81,9 @@ app:
     refreshTokenExpirationMs: 604800000 # 7 days
   oauth2:
     authorizedRedirectUri: http://localhost:3000/oauth2/redirect
-
+  crawler:
+    schedule:
+      cron: 0 0 2 * * *
 
 redis:
   stream:

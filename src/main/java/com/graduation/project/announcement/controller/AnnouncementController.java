@@ -2,6 +2,7 @@ package com.graduation.project.announcement.controller;
 
 import com.graduation.project.announcement.dto.AnnouncementResponse;
 import com.graduation.project.announcement.dto.DetailedAnnouncementResponse;
+import com.graduation.project.announcement.dto.SearchActiveAnnouncementRequest;
 import com.graduation.project.announcement.service.AnnouncementService;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import java.util.UUID;
@@ -10,10 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
@@ -24,10 +22,11 @@ public class AnnouncementController {
 
   @GetMapping
   public ApiResponse<Page<AnnouncementResponse>> searchAnnouncements(
+      @ModelAttribute SearchActiveAnnouncementRequest request,
       @PageableDefault(page = 0, size = 10, sort = "createdDate", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return ApiResponse.<Page<AnnouncementResponse>>builder()
-        .result(announcementService.searchActiveAnnouncements(pageable))
+        .result(announcementService.searchActiveAnnouncements(request, pageable))
         .build();
   }
 
