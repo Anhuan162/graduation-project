@@ -8,36 +8,40 @@ import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.constant.TopicRole;
+import com.graduation.project.forum.constant.TopicVisibility; // Đảm bảo import đúng Enum này
 import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
+import com.graduation.project.forum.entity.Topic;
+import com.graduation.project.forum.entity.TopicMember;
 import com.graduation.project.forum.mapper.CommentMapper;
 import com.graduation.project.forum.repository.CommentRepository;
 import com.graduation.project.forum.repository.PostRepository;
 import com.graduation.project.forum.repository.TopicMemberRepository;
-import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import jakarta.persistence.criteria.Predicate;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import jakarta.persistence.criteria.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CommentService {
 
   private final PostRepository postRepository;
   private final CommentRepository commentRepository;
-  private final TopicRepository topicRepository;
   private final TopicMemberRepository topicMemberRepository;
   private final CurrentUserService currentUserService;
   private final AuthorizationService authorizationService;
@@ -55,6 +59,10 @@ public class CommentService {
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
+
+    if (!authorizationService.canViewTopic(post.getTopic(), currentUser)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
 
     Comment rootComment = null;
     User replyToUser = null;
@@ -113,29 +121,7 @@ public class CommentService {
     }
 
     Page<Comment> page = commentRepository.findRootComments(postId, pageable);
-    if (page.isEmpty())
-      return Page.empty(pageable);
-
-    List<UUID> commentIds = page.getContent().stream().map(Comment::getId).toList();
-
-    boolean isAdmin = authorizationService.isAdmin(currentUser);
-    boolean isTopicManager = authorizationService.isTopicManager(currentUser, post.getTopic());
-    boolean isPostAuthor = post.getAuthor().getId().equals(currentUser.getId());
-
-    boolean canModeratePost = isAdmin || isTopicManager || isPostAuthor;
-
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
-    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(commentIds, TargetType.COMMENT);
-    Map<UUID, Long> replyCountMap = mapReplyCount(commentIds);
-
-    return page.map(c -> buildCommentResponse(
-        c,
-        currentUser,
-        likedMap.getOrDefault(c.getId(), false),
-        replyCountMap.getOrDefault(c.getId(), 0L),
-        false,
-        fileMap.get(c.getId()),
-        canModeratePost));
+    return processCommentPage(page, currentUser, post.getTopic(), post.getAuthor().getId());
   }
 
   @Transactional(readOnly = true)
@@ -149,27 +135,7 @@ public class CommentService {
     }
 
     Page<Comment> page = commentRepository.findAllRepliesByRootId(rootCommentId, pageable);
-    if (page.isEmpty())
-      return Page.empty(pageable);
-
-    List<UUID> ids = page.getContent().stream().map(Comment::getId).toList();
-
-    boolean isAdmin = authorizationService.isAdmin(currentUser);
-    boolean isTopicManager = authorizationService.isTopicManager(currentUser, root.getPost().getTopic());
-    boolean isPostAuthor = root.getPost().getAuthor().getId().equals(currentUser.getId());
-    boolean canModeratePost = isAdmin || isTopicManager || isPostAuthor;
-
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
-    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(ids, TargetType.COMMENT);
-
-    return page.map(c -> buildCommentResponse(
-        c,
-        currentUser,
-        likedMap.getOrDefault(c.getId(), false),
-        0L,
-        false,
-        fileMap.get(c.getId()),
-        canModeratePost));
+    return processCommentPage(page, currentUser, root.getPost().getTopic(), root.getPost().getAuthor().getId());
   }
 
   @Transactional
@@ -189,17 +155,14 @@ public class CommentService {
 
     boolean isLiked = reactionService.isReactedByMe(saved.getId(), TargetType.COMMENT);
     long replyCount = (saved.getParent() == null) ? commentRepository.countByRootCommentId(saved.getId()) : 0L;
+    boolean canModerate = checkModerationRights(user, comment.getPost().getTopic(),
+        comment.getPost().getAuthor().getId());
 
-    boolean isAdmin = authorizationService.isAdmin(user);
-    boolean isTopicManager = authorizationService.isTopicManager(user, comment.getPost().getTopic());
-    boolean isPostAuthor = comment.getPost().getAuthor().getId().equals(user.getId());
-    boolean canModeratePost = isAdmin || isTopicManager || isPostAuthor;
-
-    return buildCommentResponse(saved, user, isLiked, replyCount, true, file, canModeratePost);
+    return buildCommentResponse(saved, user, isLiked, replyCount, false, file, canModerate);
   }
 
   @Transactional
-  public void softDeleteComment(UUID commentId) {
+  public void delete(UUID commentId) {
     Comment comment = commentRepository.findById(commentId)
         .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
@@ -209,32 +172,70 @@ public class CommentService {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    comment.setDeleted(true);
-    commentRepository.save(comment);
+    long childrenCount = commentRepository.countByParentId(commentId);
+
+    if (childrenCount > 0) {
+      comment.setDeleted(true);
+
+      fileService.deleteFileByResourceId(comment.getId(), ResourceType.COMMENT);
+
+      commentRepository.save(comment);
+      log.info("Soft deleted comment {} because it has replies", commentId);
+    } else {
+
+      fileService.deleteFileByResourceId(comment.getId(), ResourceType.COMMENT);
+
+      commentRepository.delete(comment);
+
+      postRepository.decreaseCommentCount(comment.getPost().getId());
+
+      log.info("Hard deleted comment {}", commentId);
+    }
   }
 
   @Transactional(readOnly = true)
   public Page<CommentResponse> searchComments(SearchCommentRequest request, Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();
-    Set<UUID> accessibleTopicIds = topicRepository.findAccessibleTopicIdsByUserId(user.getId());
+    boolean isAdmin = authorizationService.isAdmin(user);
 
     Specification<Comment> spec = (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
-      predicates.add(root.get("post").get("topic").get("id").in(accessibleTopicIds));
 
-      if (request.getAuthorId() != null)
+      Join<Comment, Post> postJoin = root.join("post", JoinType.INNER);
+      Join<Post, Topic> topicJoin = postJoin.join("topic", JoinType.INNER);
+
+      if (!isAdmin) {
+        Predicate isPublic = cb.equal(topicJoin.get("topicVisibility"), TopicVisibility.PUBLIC);
+
+        Subquery<Long> memberSubquery = query.subquery(Long.class);
+        Root<TopicMember> memberRoot = memberSubquery.from(TopicMember.class);
+        memberSubquery.select(cb.literal(1L));
+        memberSubquery.where(
+            cb.equal(memberRoot.get("topic"), topicJoin),
+            cb.equal(memberRoot.get("user").get("id"), user.getId()),
+            cb.isTrue(memberRoot.get("approved")));
+
+        predicates.add(cb.or(isPublic, cb.exists(memberSubquery)));
+      }
+
+      if (request.getAuthorId() != null) {
         predicates.add(cb.equal(root.get("author").get("id"), request.getAuthorId()));
-      if (request.getPostId() != null)
-        predicates.add(cb.equal(root.get("post").get("id"), request.getPostId()));
-
+      }
+      if (request.getPostId() != null) {
+        predicates.add(cb.equal(postJoin.get("id"), request.getPostId()));
+      }
       if (request.getFromDate() != null) {
         predicates.add(cb.greaterThanOrEqualTo(root.get(CREATED_DATE_TIME_FIELD),
             request.getFromDate().atStartOfDay(ZoneId.systemDefault()).toInstant()));
       }
+
+      predicates.add(cb.equal(root.get("deleted"), false));
+
       return cb.and(predicates.toArray(new Predicate[0]));
     };
 
     Page<Comment> page = commentRepository.findAll(spec, pageable);
+
     return page.map(c -> buildCommentResponse(c, user, false, 0L, false, null, false));
   }
 
@@ -246,13 +247,14 @@ public class CommentService {
     if (page.isEmpty())
       return Page.empty(pageable);
 
-    List<UUID> ids = page.getContent().stream().map(Comment::getId).toList();
+    List<Comment> comments = page.getContent();
+    List<UUID> commentIds = comments.stream().map(Comment::getId).toList();
 
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
-    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(ids, TargetType.COMMENT);
-    Map<UUID, Long> replyCountMap = mapReplyCount(ids);
+    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(comments);
+    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(commentIds, TargetType.COMMENT);
+    Map<UUID, Long> replyCountMap = mapReplyCount(commentIds);
 
-    Set<UUID> topicIds = page.getContent().stream()
+    Set<UUID> topicIds = comments.stream()
         .map(c -> c.getPost().getTopic().getId())
         .collect(Collectors.toSet());
 
@@ -264,8 +266,8 @@ public class CommentService {
 
     return page.map(c -> {
       boolean isManager = managedTopicIds.contains(c.getPost().getTopic().getId());
-
-      boolean canModeratePost = isAdmin || isManager || c.getPost().getAuthor().getId().equals(user.getId());
+      boolean isPostAuthor = c.getPost().getAuthor().getId().equals(user.getId());
+      boolean canModeratePost = isAdmin || isManager || isPostAuthor;
 
       return buildCommentResponse(
           c,
@@ -278,6 +280,37 @@ public class CommentService {
     });
   }
 
+  private Page<CommentResponse> processCommentPage(Page<Comment> page, User currentUser, Topic topic,
+      UUID postAuthorId) {
+    if (page.isEmpty())
+      return Page.empty(page.getPageable());
+
+    List<UUID> commentIds = page.getContent().stream().map(Comment::getId).toList();
+
+    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(page.getContent());
+    Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(commentIds, TargetType.COMMENT);
+    Map<UUID, Long> replyCountMap = mapReplyCount(commentIds);
+
+    boolean canModeratePost = checkModerationRights(currentUser, topic, postAuthorId);
+
+    return page.map(c -> buildCommentResponse(
+        c,
+        currentUser,
+        likedMap.getOrDefault(c.getId(), false),
+        replyCountMap.getOrDefault(c.getId(), 0L),
+        false,
+        fileMap.get(c.getId()),
+        canModeratePost));
+  }
+
+  private boolean checkModerationRights(User user, Topic topic, UUID postAuthorId) {
+    if (authorizationService.isAdmin(user))
+      return true;
+    if (authorizationService.isTopicManager(user, topic))
+      return true;
+    return postAuthorId.equals(user.getId());
+  }
+
   private CommentResponse buildCommentResponse(
       Comment comment,
       User currentUser,
@@ -288,7 +321,6 @@ public class CommentService {
       boolean canModeratePost) {
 
     boolean isCreator = comment.getAuthor().getId().equals(currentUser.getId());
-
     boolean canDelete = isCreator || canModeratePost;
 
     CommentPermissionsResponse permissions = CommentPermissionsResponse.builder()
@@ -321,6 +353,7 @@ public class CommentService {
       return null;
     FileMetadata fileMetadata = fileMetadataRepository.findById(fileId)
         .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+
     fileService.updateResourceTarget(comment.getId(), ResourceType.COMMENT, user.getId(), fileMetadata);
     return fileMetadataRepository.save(fileMetadata);
   }
@@ -328,10 +361,15 @@ public class CommentService {
   private FileMetadata handleUpdateFile(UUID newFileId, Comment comment, User user) {
     Optional<FileMetadata> oldFile = fileMetadataRepository
         .findByResourceIdAndResourceType(comment.getId(), ResourceType.COMMENT);
-    oldFile.ifPresent(f -> {
-      f.setResourceId(null);
-      fileMetadataRepository.save(f);
-    });
+
+    if (oldFile.isPresent()) {
+      FileMetadata f = oldFile.get();
+      if (newFileId == null || !f.getId().equals(newFileId)) {
+        f.setResourceId(null);
+        fileMetadataRepository.save(f);
+      }
+    }
+
     return handleFileMetadataReturnEntity(newFileId, comment, user);
   }
 
@@ -350,8 +388,10 @@ public class CommentService {
     List<UUID> ids = comments.stream().map(Comment::getId).toList();
     List<FileMetadata> files = fileMetadataRepository.findAllByResourceIdInAndResourceType(ids, ResourceType.COMMENT);
     return files.stream()
-        .collect(
-            Collectors.toMap(FileMetadata::getResourceId, Function.identity(), (existing, replacement) -> existing));
+        .collect(Collectors.toMap(
+            FileMetadata::getResourceId,
+            Function.identity(),
+            (existing, replacement) -> existing));
   }
 
   private AttachmentResponse toAttachment(FileMetadata f) {

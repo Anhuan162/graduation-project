@@ -22,7 +22,7 @@ public class FileController {
     this.fileService = fileService;
   }
 
-  @PreAuthorize("hasAuthority('CREATE_ANY_FILES') or hasAuthority('CREATE_ALL_FILES')")
+  @PreAuthorize("hasAuthority('CREATE_OWN_FILE') or hasAuthority('MANAGE_ALL_FILE')")
   @PostMapping("/upload")
   public ApiResponse<FileMetadataResponse> uploadFile(
       @RequestParam("file") MultipartFile file,

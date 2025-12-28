@@ -11,27 +11,26 @@ import com.graduation.project.forum.dto.TopicRequest;
 import com.graduation.project.forum.dto.TopicResponse;
 import com.graduation.project.forum.entity.Category;
 import com.graduation.project.forum.entity.Topic;
+import com.graduation.project.forum.entity.TopicMember;
 import com.graduation.project.forum.mapper.TopicMapper;
 import com.graduation.project.forum.repository.CategoryRepository;
 import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Predicate;
-
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import jakarta.persistence.criteria.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +43,29 @@ public class TopicService {
   private final AuthorizationService authorizationService;
   private final ApplicationEventPublisher publisher;
 
+  private static final String CREATED_AT_FIELD = "createdAt";
+
+  private Specification<Topic> getTopicVisibilitySpec(User user) {
+    return (root, query, cb) -> {
+      if (authorizationService.isAdmin(user)) {
+        return cb.conjunction();
+      }
+
+      Predicate isPublic = cb.equal(root.get("topicVisibility"), TopicVisibility.PUBLIC);
+
+      Subquery<Long> memberSubquery = query.subquery(Long.class);
+      Root<TopicMember> memberRoot = memberSubquery.from(TopicMember.class);
+      memberSubquery.select(cb.literal(1L));
+      memberSubquery.where(
+          cb.equal(memberRoot.get("topic"), root),
+          cb.equal(memberRoot.get("user").get("id"), user.getId()),
+          cb.isTrue(memberRoot.get("approved")));
+
+      return cb.or(isPublic, cb.exists(memberSubquery));
+    };
+  }
+
+  @Transactional
   public TopicResponse create(UUID categoryId, TopicRequest request) {
     Category category = categoryRepository
         .findById(categoryId)
@@ -56,6 +78,7 @@ public class TopicService {
 
     Topic topic = topicMapper.toTopic(request, category, user);
     topicRepository.save(topic);
+
     ActivityLogDTO activityLogDTO = ActivityLogDTO.from(
         user.getId(),
         "CREATE",
@@ -68,11 +91,16 @@ public class TopicService {
     return topicMapper.toTopicResponse(topic);
   }
 
+  @Transactional(readOnly = true)
   public DetailTopicResponse getOneTopic(UUID topicId) {
     User user = currentUserService.getCurrentUserEntity();
     Topic topic = topicRepository
         .findById(topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+
+    if (!authorizationService.canViewTopic(topic, user)) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
 
     boolean isTopicCreator = authorizationService.isTopicCreator(user, topic);
     boolean isTopicManager = authorizationService.isTopicManager(user, topic);
@@ -83,73 +111,69 @@ public class TopicService {
     return DetailTopicResponse.from(topic, currentUserContext);
   }
 
+  @Transactional(readOnly = true)
   public Page<TopicResponse> searchTopics(SearchTopicRequest request, Pageable pageable) {
-    Specification<Topic> spec = (root, query, cb) -> {
+    User user = currentUserService.getCurrentUserEntity();
+
+    Specification<Topic> spec = getTopicVisibilitySpec(user);
+
+    Specification<Topic> filterSpec = (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
-      Join<Object, Object> categoryJoin = root.join("category", JoinType.LEFT);
 
-      if (Objects.nonNull(request.getCategoryId())) {
-        predicates.add(cb.equal(categoryJoin.get("id"), request.getCategoryId()));
-      }
+      predicates.add(cb.equal(root.get("deleted"), false));
 
-      if (Objects.nonNull(request.getKeyword()) && !request.getKeyword().trim().isEmpty()) {
-        String pattern = "%" + request.getKeyword().trim().toLowerCase() + "%";
-
-        Predicate hasTitle = cb.like(cb.lower(root.get("title")), pattern);
-        Predicate hasContent = cb.like(cb.lower(root.get("content")), pattern);
-
-        predicates.add(cb.or(hasTitle, hasContent));
-      }
-
-      if (Objects.nonNull(request.getVisibility())) {
-        predicates.add(
-            cb.equal(
-                root.get("visibility").as(TopicVisibility.class), request.getVisibility()));
-      }
-
-      if (Objects.nonNull(request.getFromDate())) {
-        predicates.add(
-            cb.greaterThanOrEqualTo(
-                root.get("createdAt"), request.getFromDate().atStartOfDay()));
-      }
-
-      if (Objects.nonNull(request.getToDate())) {
-        predicates.add(
-            cb.lessThanOrEqualTo(
-                root.get("createdAt"), request.getToDate().atTime(23, 59, 59)));
-      }
-
-      Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdAt")));
+      query.orderBy(cb.desc(root.get(CREATED_AT_FIELD)));
 
       return cb.and(predicates.toArray(new Predicate[0]));
     };
 
-    return topicRepository.findAll(spec, pageable).map(topicMapper::toTopicResponse);
-  }
-
-  public Page<TopicResponse> getByCategory(UUID categoryId, Pageable pageable) {
-    return topicRepository
-        .findByCategoryIdAndDeletedIsFalse(categoryId, pageable)
+    return topicRepository.findAll(spec.and(filterSpec), pageable)
         .map(topicMapper::toTopicResponse);
   }
 
+  @Transactional(readOnly = true)
+  public Page<TopicResponse> getByCategory(UUID categoryId, Pageable pageable) {
+    User user = currentUserService.getCurrentUserEntity();
+
+    Specification<Topic> categorySpec = (root, query, cb) -> cb.equal(root.get("category").get("id"), categoryId);
+
+    Specification<Topic> notDeletedSpec = (root, query, cb) -> cb.equal(root.get("deleted"), false);
+
+    Specification<Topic> securitySpec = getTopicVisibilitySpec(user);
+
+    Specification<Topic> finalSpec = Specification.where(categorySpec)
+        .and(notDeletedSpec)
+        .and(securitySpec);
+
+    return topicRepository.findAll(finalSpec, pageable)
+        .map(topicMapper::toTopicResponse);
+  }
+
+  @Transactional
   public TopicResponse update(UUID topicId, TopicRequest request) {
     Topic topic = topicRepository
         .findById(topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
+
     if (!authorizationService.canManageTopic(user, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
+
     topic.setTitle(request.getTitle());
     topic.setContent(request.getContent());
-    topic.setTopicVisibility(TopicVisibility.valueOf(request.getTopicVisibility()));
+    try {
+      topic.setTopicVisibility(TopicVisibility.valueOf(request.getTopicVisibility()));
+    } catch (IllegalArgumentException e) {
+      throw new AppException(ErrorCode.INVALID_REQUEST);
+    }
     topic.setLastModifiedAt(Instant.now());
 
     topicRepository.save(topic);
     return topicMapper.toTopicResponse(topic);
   }
 
+  @Transactional
   public void delete(UUID id) {
     Topic topic = topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
@@ -159,6 +183,7 @@ public class TopicService {
     topicRepository.delete(topic);
   }
 
+  @Transactional
   public TopicResponse softDelete(UUID id) {
     Topic topic = topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();

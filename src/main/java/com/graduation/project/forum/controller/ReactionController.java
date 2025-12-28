@@ -6,6 +6,7 @@ import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.dto.ReactionDetailResponse;
 import com.graduation.project.forum.dto.ReactionRequest;
 import com.graduation.project.forum.dto.ReactionSummary;
+import com.graduation.project.forum.dto.ReactionToggleResponse;
 import com.graduation.project.forum.service.ReactionService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,9 +22,8 @@ public class ReactionController {
   private final ReactionService reactionService;
 
   @PostMapping
-  public ApiResponse<String> react(@RequestBody ReactionRequest request) {
-    reactionService.toggleReaction(request);
-    return ApiResponse.<String>builder().result("Success").build();
+  public ApiResponse<ReactionToggleResponse> react(@RequestBody ReactionRequest request) {
+    return ApiResponse.ok(reactionService.toggleReaction(request));
   }
 
   @GetMapping("/summary")

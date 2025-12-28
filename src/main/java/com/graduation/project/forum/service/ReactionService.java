@@ -8,6 +8,7 @@ import com.graduation.project.forum.dto.ReactionDetailResponse;
 import com.graduation.project.forum.dto.ReactionEvent;
 import com.graduation.project.forum.dto.ReactionRequest;
 import com.graduation.project.forum.dto.ReactionSummary;
+import com.graduation.project.forum.dto.ReactionToggleResponse;
 import com.graduation.project.forum.entity.Reaction;
 import com.graduation.project.forum.repository.CommentRepository;
 import com.graduation.project.forum.repository.PostRepository;
@@ -37,53 +38,84 @@ public class ReactionService {
   private final CommentRepository commentRepository;
   private final ApplicationEventPublisher publisher;
 
-  /**
-   * Toggle reaction:
-   * - Nếu đã reaction cùng type -> delete (unlike)
-   * - Nếu đã reaction khác type -> update type (không đổi count)
-   * - Nếu chưa reaction -> create (like)
-   */
   @Transactional
-  public void toggleReaction(ReactionRequest request) {
+  public ReactionToggleResponse toggleReaction(ReactionRequest request) { // <--- Thay đổi return type
     User user = currentUserService.getCurrentUserEntity();
+    UUID targetId = request.getTargetId();
+    TargetType targetType = request.getTargetType();
 
     Optional<Reaction> existingOpt = reactionRepository.findByUserIdAndTargetIdAndTargetType(
-        user.getId(), request.getTargetId(), request.getTargetType());
+        user.getId(), targetId, targetType);
 
-    // ===== Case: đã có reaction =====
+    boolean isReacted;
+    ReactionType currentType;
+
+    // ===== Case 1: Đã có reaction =====
     if (existingOpt.isPresent()) {
       Reaction existing = existingOpt.get();
 
-      // A) bấm lại y hệt -> UNLIKE
+      // 1.1: Bấm lại y hệt -> UNLIKE
       if (existing.getType() == request.getReactionType()) {
         reactionRepository.delete(existing);
-        updateReactionCount(request.getTargetId(), request.getTargetType(), false);
-        return;
-      }
+        updateReactionCount(targetId, targetType, false); // Giảm count
 
-      // B) đổi reaction type -> UPDATE (không đổi count)
-      existing.setType(request.getReactionType());
-      reactionRepository.save(existing);
-      return;
+        isReacted = false;
+        currentType = null;
+      }
+      // 1.2: Đổi reaction type -> UPDATE (Count không đổi)
+      else {
+        existing.setType(request.getReactionType());
+        reactionRepository.save(existing);
+
+        isReacted = true;
+        currentType = request.getReactionType();
+      }
+    }
+    // ===== Case 2: Chưa có reaction -> CREATE =====
+    else {
+      Reaction created = Reaction.builder()
+          .user(user)
+          .targetId(targetId)
+          .targetType(targetType)
+          .type(request.getReactionType())
+          .createdAt(LocalDateTime.now())
+          .build();
+
+      reactionRepository.save(created);
+      updateReactionCount(targetId, targetType, true); // Tăng count
+
+      // Gửi noti (Async càng tốt)
+      notifyAuthor(targetId, targetType, user, created);
+
+      isReacted = true;
+      currentType = request.getReactionType();
     }
 
-    // ===== Case: chưa có reaction =====
-    UUID receiverId = resolveReceiverId(request.getTargetType(), request.getTargetId());
+    // ===== Lấy count mới nhất để trả về =====
+    long newCount = getLatestReactionCount(targetId, targetType);
 
-    Reaction created = Reaction.builder()
-        .user(user)
-        .targetId(request.getTargetId())
-        .targetType(request.getTargetType())
-        .type(request.getReactionType())
-        .createdAt(LocalDateTime.now())
+    return ReactionToggleResponse.builder()
+        .reacted(isReacted)
+        .type(currentType)
+        .totalReactions(newCount)
         .build();
+  }
 
-    reactionRepository.save(created);
-    updateReactionCount(request.getTargetId(), request.getTargetType(), true);
+  // Helper lấy count nhanh (không select *)
+  private long getLatestReactionCount(UUID targetId, TargetType targetType) {
+    if (targetType == TargetType.POST) {
+      return postRepository.getReactionCount(targetId);
+    } else if (targetType == TargetType.COMMENT) {
+      return commentRepository.getReactionCount(targetId);
+    }
+    return 0;
+  }
 
-    // Publish event nếu không self-like
-    if (receiverId != null && !receiverId.equals(user.getId())) {
-      publisher.publishEvent(ReactionEvent.from(created, user, receiverId));
+  // Tách hàm notify ra cho gọn code
+  private void notifyAuthor(UUID targetId, TargetType targetType, User actor, Reaction reaction) {
+    UUID receiverId = resolveReceiverId(targetType, targetId);
+    if (receiverId != null && !receiverId.equals(actor.getId())) {
+      publisher.publishEvent(ReactionEvent.from(reaction, actor, receiverId));
     }
   }
 

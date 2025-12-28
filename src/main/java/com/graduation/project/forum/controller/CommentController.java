@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,11 +63,10 @@ public class CommentController {
   }
 
   @DeleteMapping("/{commentId}")
-  public ApiResponse<String> softDeleteComment(@PathVariable UUID commentId) {
-    commentService.softDeleteComment(commentId);
-    return ApiResponse.<String>builder()
-        .result("Comment deleted successfully")
-        .build();
+  @PreAuthorize("isAuthenticated()")
+  public ApiResponse<String> delete(@PathVariable UUID commentId) {
+    commentService.delete(commentId);
+    return ApiResponse.ok("Deleted successfully");
   }
 
   @GetMapping("/my-comments")

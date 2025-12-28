@@ -6,9 +6,9 @@ import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;
 import com.graduation.project.common.entity.*;
-import com.graduation.project.common.entity.User;
 import com.graduation.project.common.mapper.FileMetadataMapper;
 import com.graduation.project.common.permission_handler.FileMetadataPermissionHandler;
+import com.graduation.project.forum.service.AuthorizationService;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import java.io.IOException;
@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,23 +28,28 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class FileService {
 
+  private static final Logger log = LoggerFactory.getLogger(FileService.class);
+
   private final FirebaseService firebaseService;
   private final FileMetadataRepository fileMetadataRepository;
   private final CurrentUserService currentUserService;
   private final FileMetadataMapper fileMetadataMapper;
   private final FileMetadataPermissionHandler fileMetadataPermissionHandler;
+  private final AuthorizationService authorizationService;
 
   public FileService(
       FirebaseService firebaseService,
       FileMetadataRepository fileMetadataRepository,
       CurrentUserService currentUserService,
       FileMetadataMapper fileMetadataMapper,
-      FileMetadataPermissionHandler fileMetadataPermissionHandler) {
+      FileMetadataPermissionHandler fileMetadataPermissionHandler,
+      AuthorizationService authorizationService) {
     this.firebaseService = firebaseService;
     this.fileMetadataRepository = fileMetadataRepository;
     this.currentUserService = currentUserService;
     this.fileMetadataMapper = fileMetadataMapper;
     this.fileMetadataPermissionHandler = fileMetadataPermissionHandler;
+    this.authorizationService = authorizationService;
   }
 
   public FileMetadataResponse uploadAndSaveFile(
@@ -56,24 +63,22 @@ public class FileService {
     String fileName = firebaseService.uploadFile(file, folderName);
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    String url =
-        AccessType.PUBLIC.equals(accessType)
-            ? firebaseService.getPublicUrl(folderName + fileName)
-            : null;
+    String url = AccessType.PUBLIC.equals(accessType)
+        ? firebaseService.getPublicUrl(folderName + fileName)
+        : null;
 
     // Lưu metadata vào DB
-    FileMetadata metadata =
-        FileMetadata.builder()
-            .user(currentUser)
-            .fileName(fileName)
-            .folder(folderName)
-            .url(url)
-            .contentType(file.getContentType())
-            .accessType(accessType)
-            .resourceType(Objects.isNull(resourceType) ? null : ResourceType.valueOf(resourceType))
-            .resourceId(Objects.isNull(resourceId) ? null : UUID.fromString(resourceId))
-            .createdAt(LocalDateTime.now())
-            .build();
+    FileMetadata metadata = FileMetadata.builder()
+        .user(currentUser)
+        .fileName(fileName)
+        .folder(folderName)
+        .url(url)
+        .contentType(file.getContentType())
+        .accessType(accessType)
+        .resourceType(Objects.isNull(resourceType) ? null : ResourceType.valueOf(resourceType))
+        .resourceId(Objects.isNull(resourceId) ? null : UUID.fromString(resourceId))
+        .createdAt(LocalDateTime.now())
+        .build();
     fileMetadataRepository.save(metadata);
     return fileMetadataMapper.toFileMetadataResponse(metadata);
   }
@@ -84,10 +89,9 @@ public class FileService {
   }
 
   public FileMetadataResponse replaceFile(UUID fileId, MultipartFile newFile) throws IOException {
-    FileMetadata oldMetadata =
-        fileMetadataRepository
-            .findById(fileId)
-            .orElseThrow(() -> new RuntimeException("File not found"));
+    FileMetadata oldMetadata = fileMetadataRepository
+        .findById(fileId)
+        .orElseThrow(() -> new RuntimeException("File not found"));
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (!fileMetadataPermissionHandler.hasPermission(auth, oldMetadata, "UPDATE")) {
       throw new AccessDeniedException("No permission to update this file");
@@ -102,10 +106,9 @@ public class FileService {
     firebaseService.deleteFile(oldMetadata.getFileName());
     String newFileName = firebaseService.uploadFile(newFile, oldMetadata.getFolder());
 
-    String newUrl =
-        oldMetadata.getAccessType() == AccessType.PUBLIC
-            ? firebaseService.getPublicUrl(oldMetadata.getFolder() + newFileName)
-            : null;
+    String newUrl = oldMetadata.getAccessType() == AccessType.PUBLIC
+        ? firebaseService.getPublicUrl(oldMetadata.getFolder() + newFileName)
+        : null;
 
     oldMetadata.setFileName(newFileName);
     oldMetadata.setUrl(newUrl);
@@ -160,10 +163,9 @@ public class FileService {
   }
 
   public void deleteFile(UUID fileId) {
-    FileMetadata metadata =
-        fileMetadataRepository
-            .findById(fileId)
-            .orElseThrow(() -> new RuntimeException("File not found"));
+    FileMetadata metadata = fileMetadataRepository
+        .findById(fileId)
+        .orElseThrow(() -> new RuntimeException("File not found"));
     User user = currentUserService.getCurrentUserEntity();
     if (!user.getId().equals(metadata.getUser().getId())) {
       throw new AccessDeniedException("No permission to delete this file");
@@ -201,4 +203,30 @@ public class FileService {
       UUID resourceId, ResourceType resourceType) {
     return fileMetadataRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
   }
+
+  public void deleteFileByResourceId(UUID resourceId, ResourceType resourceType) {
+    List<FileMetadata> files = fileMetadataRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
+
+    if (files.isEmpty()) {
+      return;
+    }
+
+    User currentUser = currentUserService.getCurrentUserEntity();
+
+    for (FileMetadata file : files) {
+      if (!currentUser.getId().equals(file.getUser().getId()) && !authorizationService.isAdmin(currentUser)) {
+        throw new AccessDeniedException("No permission to delete this file");
+      }
+
+      try {
+        firebaseService.deleteFile(file.getFolder() + file.getFileName());
+        fileMetadataRepository.delete(file);
+      } catch (Exception e) {
+        log.error("Failed to delete file from Firebase and database: path={}, error={}",
+            file.getFolder() + file.getFileName(), e.getMessage(), e);
+        throw e; // Rethrow to abort the loop/transaction
+      }
+    }
+  }
+
 }

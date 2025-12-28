@@ -14,7 +14,11 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "posts")
+@Table(name = "posts", indexes = {
+    @Index(name = "idx_post_slug", columnList = "slug"),
+    @Index(name = "idx_post_status_deleted", columnList = "post_status, deleted"),
+    @Index(name = "idx_post_author", columnList = "author_id")
+})
 public class Post {
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -58,6 +62,10 @@ public class Post {
   @Column(name = "reaction_count")
   @Builder.Default
   private Long reactionCount = 0L;
+
+  @Column(name = "comment_count", nullable = false)
+  @Builder.Default
+  private long commentCount = 0L;
 
   @Builder.Default
   private boolean deleted = false;

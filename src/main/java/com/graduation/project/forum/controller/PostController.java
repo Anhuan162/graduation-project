@@ -26,6 +26,7 @@ public class PostController {
   private final PostService postService;
 
   @PostMapping("/topic/{topicId}")
+  @PreAuthorize("isAuthenticated()")
   public ApiResponse<PostResponse> createPost(
       @PathVariable UUID topicId, @Valid @RequestBody PostRequest request) {
     return ApiResponse.<PostResponse>builder()
@@ -59,11 +60,10 @@ public class PostController {
   }
 
   @DeleteMapping("/{postId}")
+  @PreAuthorize("isAuthenticated()")
   public ApiResponse<String> delete(@PathVariable UUID postId) {
     postService.delete(postId);
-    return ApiResponse.<String>builder()
-        .result("Deleted successfully")
-        .build();
+    return ApiResponse.ok("Deleted successfully");
   }
 
   @PreAuthorize("hasRole('ADMIN')")

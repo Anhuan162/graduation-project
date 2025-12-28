@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface TopicRepository extends JpaRepository<Topic, UUID> {
+
   Page<Topic> findByCategoryIdAndDeletedIsFalse(UUID categoryId, Pageable pageable);
 
   Page<Topic> findAll(Specification<Topic> spec, Pageable pageable);
