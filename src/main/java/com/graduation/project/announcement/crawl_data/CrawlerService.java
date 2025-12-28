@@ -72,7 +72,7 @@ public class CrawlerService {
 
   // 2. Hàm chạy tự động (Scheduled)
   @Scheduled(cron = "${app.crawler.schedule.cron}", zone = "Asia/Ho_Chi_Minh")
-  //  @Scheduled(fixedRate = 3600000)
+//    @Scheduled(fixedRate = 3600000)
   public void autoCrawl() {
     log.info("Bắt đầu tiến trình tự động crawl...");
     crawlAll();

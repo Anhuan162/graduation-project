@@ -10,8 +10,10 @@ import com.graduation.project.announcement.repository.ClassroomRepository;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.ResourceType;
+import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.common.entity.FileMetadata;
 import com.graduation.project.common.entity.User;
+import com.graduation.project.common.service.DriveService;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.cpa.constant.CohortCode;
 import com.graduation.project.event.dto.NotificationEventDTO;
@@ -19,11 +21,14 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
+
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +47,7 @@ public class AnnouncementService {
   private final FileService fileService;
   private final UserRepository userRepository;
   private final AnnouncementMapper announcementMapper;
+  private final DriveService driveService;
 
   @Transactional
   public CreatedAnnonucementResponse createAnnouncement(
@@ -230,5 +236,20 @@ public class AnnouncementService {
     Page<Announcement> announcementPage =
         announcementRepository.findAllActiveAnnouncements(request, pageable);
     return announcementPage.map(announcementMapper::toResponse);
+  }
+
+  public FileResponse addAnnouncementToDrive(String announcementId) throws IOException {
+    UUID id = null;
+    try {
+      id = UUID.fromString(announcementId);
+    } catch (Exception e) {
+      throw new AppException(ErrorCode.UUID_IS_INVALID);
+    }
+    Optional<Announcement> announcement = announcementRepository.findById(id);
+    if (announcement.isEmpty()){
+      throw new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND);
+    }
+    FileResponse FileResponse = driveService.uploadTextToDrive(announcement.get().getTitle(), announcement.get().getContent());
+    return FileResponse;
   }
 }

@@ -5,7 +5,10 @@ import com.graduation.project.announcement.service.AnnouncementService;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.security.UserPrincipal;
+import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.common.entity.User;
+
+import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -63,13 +66,20 @@ public class AdminAnnouncementController {
         .build();
   }
 
-  //  ThieuNN
+
   @GetMapping("/all")
   public ApiResponse<Page<AnnouncementResponse>> searchAnnouncements(
       @ModelAttribute SearchAnnouncementRequest request, Pageable pageable) {
     Page<AnnouncementResponse> announcementResponses =
         announcementService.searchAnnouncement(request, pageable);
     return ApiResponse.<Page<AnnouncementResponse>>builder().result(announcementResponses).build();
+  }
+
+  @PostMapping("/add-to-drive/{announcementId}")
+  public ApiResponse<FileResponse> addToDrive(
+    @PathVariable String announcementId
+  ) throws IOException {
+    return ApiResponse.<FileResponse>builder().result(announcementService.addAnnouncementToDrive (announcementId)).build();
   }
 
   @DeleteMapping("/{announcementId}")
