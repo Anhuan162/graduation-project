@@ -49,7 +49,7 @@ public class CrawlerService {
             .nextPageSelector("a.next.page-numbers")
             .itemSelector(".posts-gv li .content") // Cần F12 để xem class thực tế
             .linkSelector(".post-title a")
-            .titleSelector(".post-title")
+            .titleSelector("h1.post-title")
             .contentSelector(".post-content")
             .subLinkSelector(".a")
             .build());
@@ -62,7 +62,7 @@ public class CrawlerService {
             .nextPageSelector("a.next.page-numbers")
             .itemSelector(".content")
             .linkSelector(".post-title a")
-            .titleSelector(".post-title")
+            .titleSelector("h1.post-title")
             .contentSelector(".post-content")
             .subLinkSelector(".a")
             .build());
@@ -71,8 +71,8 @@ public class CrawlerService {
   }
 
   // 2. Hàm chạy tự động (Scheduled)
-  @Scheduled(cron = "${app.crawler.schedule.cron}", zone = "Asia/Ho_Chi_Minh")
-  //  @Scheduled(fixedRate = 3600000)
+//  @Scheduled(cron = "${app.crawler.schedule.cron}", zone = "Asia/Ho_Chi_Minh")
+    @Scheduled(fixedRate = 3600000)
   public void autoCrawl() {
     log.info("Bắt đầu tiến trình tự động crawl...");
     crawlAll();
