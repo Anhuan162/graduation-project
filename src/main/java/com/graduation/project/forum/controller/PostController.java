@@ -102,6 +102,7 @@ public class PostController {
         .build();
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @GetMapping("/post-accepted")
   public ApiResponse<List<PostAcceptedResonse>> getPostAccepted(
           @ModelAttribute PostAcceptedFilterRequest postAcceptedRequest
@@ -112,6 +113,7 @@ public class PostController {
             .build();
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @PostMapping("/post-accepted/upload")
   public ApiResponse<FileResponse> postAcceptedSelect(
      @RequestBody PostAcceptedSelectList postAcceptedSelectList
