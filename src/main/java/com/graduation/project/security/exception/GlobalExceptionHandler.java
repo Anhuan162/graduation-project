@@ -2,6 +2,7 @@ package com.graduation.project.security.exception;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -10,12 +11,16 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+  @Value("${spring.servlet.multipart.max-file-size:2MB}")
+  private String maxFileSize;
 
   @ExceptionHandler(BadCredentialsException.class)
   public ResponseEntity<ApiResponse<?>> handleBadCredentials(BadCredentialsException ex) {
@@ -51,7 +56,7 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ApiResponse<?>> handleNotReadable(HttpMessageNotReadableException ex) {
-    log.warn("Malformed JSON request: {}", ex.getMessage());
+    log.warn("Malformed JSON request received");
     return buildResponse(ErrorCode.BAD_REQUEST, "Malformed JSON request");
   }
 
@@ -68,5 +73,11 @@ public class GlobalExceptionHandler {
         .build();
 
     return ResponseEntity.status(errorCode.getHttpStatusCode()).body(apiResponse);
+  }
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+    log.warn(ex.getMessage());
+    return buildResponse(ErrorCode.PAYLOAD_TOO_LARGE, "File quá lớn! Vui lòng upload file nhỏ hơn " + maxFileSize);
   }
 }

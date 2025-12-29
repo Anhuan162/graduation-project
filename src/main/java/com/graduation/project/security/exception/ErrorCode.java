@@ -63,7 +63,8 @@ public enum ErrorCode {
   INVALID_PARENT_COMMENT(1047, "Invalid parent comment", HttpStatus.BAD_REQUEST),
   INVALID_POST_STATUS_TRANSITION(1048, "Invalid post status transition", HttpStatus.BAD_REQUEST),
   INVALID_STATUS_TRANSITION(1049, "Invalid status transition", HttpStatus.BAD_REQUEST),
-  INVALID_CATEGORY_TYPE(1050, "Invalid category type", HttpStatus.BAD_REQUEST);
+  INVALID_CATEGORY_TYPE(1050, "Invalid category type", HttpStatus.BAD_REQUEST),
+  PAYLOAD_TOO_LARGE(1051, "Payload too large", HttpStatus.PAYLOAD_TOO_LARGE);
 
   private final int code;
   private final String message;

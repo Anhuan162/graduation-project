@@ -55,7 +55,6 @@ public class TopicController {
     return ApiResponse.<TopicResponse>builder().result(topicService.softDelete(topicId)).build();
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
   public ApiResponse<Page<TopicResponse>> searchTopics(
       @ModelAttribute SearchTopicRequest request, Pageable pageable) {

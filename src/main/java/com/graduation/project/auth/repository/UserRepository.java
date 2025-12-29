@@ -24,4 +24,6 @@ public interface UserRepository
   Page<User> findAll(Specification<User> spec, Pageable pageable);
 
   User findUserByEmail(String email);
+
+  List<User> findByStudentCodeIsNotNull(Pageable pageable);
 }
