@@ -97,9 +97,7 @@ public class PostService {
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.canCreatePost(topic, user)) {
-      throw new AppException(ErrorCode.FORBIDDEN);
-    }
+    // Auth check moved to Controller @PreAuthorize
     String slug = generateUniqueSlug(request.getTitle());
     String cleanContent = Jsoup.clean(request.getContent(), getCustomSafelist());
     PostStatus status = (request.getStatus() == PostStatus.DRAFT) ? PostStatus.DRAFT : PostStatus.PENDING;
@@ -654,15 +652,4 @@ public class PostService {
     return str.matches("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
   }
 
-  /**
-   * Fix existing attachment URLs that have malformed encoding for a batch of
-   * files
-   *
-   * @param page the page number to process (0-based)
-   * @param size the number of files to process per batch
-   * @return the number of files processed
-   */
-  public int fixExistingAttachmentUrls(int page, int size) {
-    return fileService.fixExistingAttachmentUrls(page, size);
-  }
 }

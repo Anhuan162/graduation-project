@@ -3,6 +3,7 @@ package com.graduation.project.auth.controller;
 import com.graduation.project.auth.dto.VerifyUserDto;
 import com.graduation.project.auth.dto.request.*;
 import com.graduation.project.auth.dto.response.*;
+import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.auth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,10 +11,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
@@ -21,6 +26,26 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
   private final UserService userService;
+  private final com.graduation.project.auth.service.FollowService followService;
+
+  @PreAuthorize("isAuthenticated()")
+  @PostMapping("/{userId}/follow")
+  public ApiResponse<String> followUser(@AuthenticationPrincipal UserPrincipal currentUser, @PathVariable UUID userId) {
+    if (currentUser.getId().equals(userId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot follow yourself");
+    }
+    followService.follow(currentUser.getId(), userId);
+    return ApiResponse.<String>builder().result("Followed successfully").build();
+  }
+
+  @PreAuthorize("isAuthenticated()")
+  @DeleteMapping("/{userId}/follow")
+  public ApiResponse<String> unfollowUser(@PathVariable UUID userId) {
+    var currentUser = (com.graduation.project.auth.security.UserPrincipal) org.springframework.security.core.context.SecurityContextHolder
+        .getContext().getAuthentication().getPrincipal();
+    followService.unfollow(currentUser.getId(), userId);
+    return ApiResponse.<String>builder().result("Unfollowed successfully").build();
+  }
 
   @PostMapping("/register")
   public ApiResponse<SignupResponse> register(@Valid @RequestBody SignupRequest request) {
@@ -100,6 +125,13 @@ public class UserController {
   @GetMapping("/me")
   public ApiResponse<UserAuthResponse> getAuthInfo() {
     return ApiResponse.<UserAuthResponse>builder().result(userService.getAuthInfo()).build();
+  }
+
+  @GetMapping("/{userId}/profile")
+  public ApiResponse<UserProfileResponse> getUserProfile(@PathVariable("userId") String userId) {
+    return ApiResponse.<UserProfileResponse>builder()
+        .result(userService.getUserProfile(userId))
+        .build();
   }
 
   @PreAuthorize("isAuthenticated()")

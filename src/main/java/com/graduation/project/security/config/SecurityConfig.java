@@ -82,6 +82,8 @@ public class SecurityConfig {
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/users/public/{userId}")
                 .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/users/{userId}/profile")
+                .permitAll()
                 .requestMatchers(
                     "/api/auth/**",
                     "/oauth2/**",

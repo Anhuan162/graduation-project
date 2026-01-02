@@ -73,7 +73,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID>, JpaSpec
       """)
   long countByRootCommentId(@Param("rootId") UUID rootId);
 
-  @EntityGraph(attributePaths = { "post" })
+  @EntityGraph(attributePaths = { "post", "post.topic", "post.author", "author" })
   Page<Comment> findAllByAuthorIdAndDeletedFalse(UUID authorId, Pageable pageable);
 
   @Query("""

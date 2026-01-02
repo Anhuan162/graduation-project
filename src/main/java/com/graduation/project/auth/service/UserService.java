@@ -3,6 +3,7 @@ package com.graduation.project.auth.service;
 import com.graduation.project.auth.dto.VerifyUserDto;
 import com.graduation.project.auth.dto.request.*;
 import com.graduation.project.auth.dto.response.*;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -46,7 +47,14 @@ public class UserService {
   }
 
   public PublicUserProfileResponse getPublicProfile(String userId) {
-    return userProfileService.getPublicProfile(userId);
+    // Legacy support or just map it
+    UserProfileResponse response = userProfileService.getUserProfile(userId);
+    return PublicUserProfileResponse.builder()
+        .id(UUID.fromString(response.getId()))
+        .fullName(response.getFullName())
+        .avatarUrl(response.getAvatarUrl())
+        .facultyName(response.getFacultyName())
+        .build();
   }
 
   public UserAuthResponse getAuthInfo() {
@@ -54,7 +62,11 @@ public class UserService {
   }
 
   public UserProfileResponse getUserProfile() {
-    return userProfileService.getUserProfile();
+    return userProfileService.getMyProfile();
+  }
+
+  public UserProfileResponse getUserProfile(String userId) {
+    return userProfileService.getUserProfile(userId);
   }
 
   public UserProfileResponse updateProfileInfo(UserProfileUpdateRequest request) {

@@ -27,6 +27,7 @@ public class CommentController {
   private final CommentService commentService;
 
   @PostMapping("/post/{postId}")
+  @PreAuthorize("@authorizationService.canCreateComment(#postId)")
   public ApiResponse<CommentResponse> createComment(
       @PathVariable UUID postId,
       @Valid @RequestBody CommentRequest request) {
@@ -36,6 +37,7 @@ public class CommentController {
   }
 
   @GetMapping("/post/{postId}")
+  @PreAuthorize("@authorizationService.canViewPost(#postId)")
   public ApiResponse<Page<CommentResponse>> getRootComments(
       @PathVariable UUID postId,
       Pageable pageable) {
@@ -45,6 +47,7 @@ public class CommentController {
   }
 
   @GetMapping("/replies/{rootCommentId}")
+  @PreAuthorize("@authorizationService.canViewComment(#rootCommentId)")
   public ApiResponse<Page<CommentResponse>> getReplies(
       @PathVariable UUID rootCommentId,
       @PageableDefault(page = 0, size = 10, sort = "createdDateTime", direction = Sort.Direction.ASC) Pageable pageable) {
@@ -54,6 +57,7 @@ public class CommentController {
   }
 
   @PutMapping("/{commentId}")
+  @PreAuthorize("@authorizationService.isCommentCreator(#commentId)")
   public ApiResponse<CommentResponse> updateComment(
       @PathVariable UUID commentId,
       @Valid @RequestBody CommentRequest request) {
@@ -63,7 +67,7 @@ public class CommentController {
   }
 
   @DeleteMapping("/{commentId}")
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("@authorizationService.canSoftDeleteComment(#commentId)")
   public ApiResponse<String> delete(@PathVariable UUID commentId) {
     commentService.delete(commentId);
     return ApiResponse.ok("Deleted successfully");

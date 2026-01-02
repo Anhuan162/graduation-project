@@ -1,6 +1,5 @@
 package com.graduation.project.forum.service;
 
-import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.FileMetadata;
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -54,8 +52,6 @@ public class CommentService {
   private final TopicMemberRepository topicMemberRepository;
   private final CurrentUserService currentUserService;
   private final AuthorizationService authorizationService;
-
-  private final FileMetadataRepository fileMetadataRepository;
   private final FileService fileService;
 
   private final ReactionService reactionService;
@@ -89,9 +85,7 @@ public class CommentService {
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    if (!authorizationService.canViewTopic(post.getTopic(), currentUser)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
+    // Auth check moved to Controller @PreAuthorize
 
     Comment rootComment = null;
     User replyToUser = null;
@@ -124,7 +118,8 @@ public class CommentService {
 
     commentRepository.save(comment);
 
-    FileMetadata file = handleFileMetadataReturnEntity(request.getFileMetadataId(), comment, currentUser);
+    FileMetadata file = fileService.attachFileToResource(request.getFileMetadataId(), comment.getId(),
+        ResourceType.COMMENT);
 
     // Hardcoded isLiked=false and replyCount=0L for performance since this is a
     // newly created comment with no likes or replies yet
@@ -140,9 +135,7 @@ public class CommentService {
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.canViewTopic(post.getTopic(), currentUser)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
+    // Auth check moved to Controller @PreAuthorize
 
     Page<Comment> page = commentRepository.findRootComments(postId, pageable);
     return processCommentPage(page, currentUser, post.getTopic(), post.getAuthor().getId(), true);
@@ -157,9 +150,7 @@ public class CommentService {
         .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.canViewTopic(root.getPost().getTopic(), currentUser)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
+    // Auth check moved to Controller @PreAuthorize
 
     Page<Comment> page = commentRepository.findAllRepliesByRootId(rootCommentId, pageable);
     return processCommentPage(page, currentUser, root.getPost().getTopic(), root.getPost().getAuthor().getId(), false);
@@ -175,9 +166,7 @@ public class CommentService {
         .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.isCommentCreator(comment, currentUser)) {
-      throw new AppException(ErrorCode.FORBIDDEN);
-    }
+    // Auth check moved to Controller @PreAuthorize
 
     // 2. Update Content (Dirty Checking)
     String cleanContent = Jsoup.clean(request.getContent(), getCommentSafelist());
@@ -186,7 +175,8 @@ public class CommentService {
     // và entity đang ở trạng thái Managed. Nhưng gọi explicit cũng không sao.
 
     // 3. Handle File Attachment (Logic tách riêng, gọn gàng)
-    FileMetadata currentFile = syncCommentAttachment(comment, request.getFileMetadataId(), currentUser);
+    FileMetadata currentFile = fileService.syncFileAttachment(request.getFileMetadataId(), comment.getId(),
+        ResourceType.COMMENT);
 
     // 4. Build Response (Tối ưu: Không query lại những thứ không đổi)
     // Số like và số reply KHÔNG ĐỔI khi edit content -> Lấy từ entity hiện tại hoặc
@@ -209,57 +199,6 @@ public class CommentService {
     return buildCommentResponse(comment, currentUser, isLiked, replyCount, false, currentFile, canModerate);
   }
 
-  /**
-   * Xử lý file đính kèm cho Comment.
-   * Cơ chế: Clean Replace (Xóa liên kết cũ -> Gắn liên kết mới)
-   */
-  private FileMetadata syncCommentAttachment(Comment comment, UUID newFileId, User user) {
-    // 1. Lấy danh sách file hiện tại của comment (Dùng List để an toàn, tránh lỗi
-    // NonUnique)
-    List<FileMetadata> existingFiles = fileMetadataRepository
-        .findAllByResourceIdAndResourceType(comment.getId(), ResourceType.COMMENT);
-
-    // 2. Nếu không có file mới (User xóa file) hoặc file mới khác file cũ
-    // -> Gỡ bỏ tất cả file cũ
-    boolean isRemovingOrChanging = newFileId == null ||
-        existingFiles.stream().noneMatch(f -> f.getId().equals(newFileId));
-
-    if (isRemovingOrChanging && !existingFiles.isEmpty()) {
-      for (FileMetadata oldFile : existingFiles) {
-        oldFile.setResourceId(null);
-        oldFile.setResourceType(null);
-        // Nếu muốn xóa luôn file vật lý thì gọi fileService.delete(oldFile.getId())
-      }
-      fileMetadataRepository.saveAll(existingFiles);
-    }
-
-    // 3. Nếu có file mới được gửi lên -> Gắn vào comment
-    if (newFileId != null) {
-      // Check xem file này đã gắn chưa để đỡ query/update thừa
-      boolean alreadyAttached = existingFiles.stream()
-          .anyMatch(f -> f.getId().equals(newFileId));
-
-      if (!alreadyAttached) {
-        FileMetadata newFile = fileMetadataRepository.findById(newFileId)
-            .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
-
-        // Security check: File này phải của chính user đó
-        if (!newFile.getUser().getId().equals(user.getId())) {
-          throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
-
-        newFile.setResourceId(comment.getId());
-        newFile.setResourceType(ResourceType.COMMENT);
-        return fileMetadataRepository.save(newFile);
-      }
-      // Nếu đã gắn rồi thì trả về luôn file đó
-      return existingFiles.stream()
-          .filter(f -> f.getId().equals(newFileId)).findFirst().orElse(null);
-    }
-
-    return null;
-  }
-
   @Transactional
   public void delete(UUID commentId) {
     Comment comment = commentRepository.findById(commentId)
@@ -267,36 +206,28 @@ public class CommentService {
 
     User user = currentUserService.getCurrentUserEntity();
 
-    if (!authorizationService.canSoftDeleteComment(comment, user)) {
-      throw new AppException(ErrorCode.FORBIDDEN);
-    }
-
-    fileService.deleteFileByResourceId(comment.getId(), ResourceType.COMMENT);
+    // Auth check moved to Controller @PreAuthorize
 
     long childrenCount = commentRepository.countByParentId(commentId);
 
+    fileService.deleteFileByResourceId(comment.getId(), ResourceType.COMMENT);
+
     if (childrenCount > 0) {
       comment.setDeleted(true);
-      comment.setContent("[deleted]");
-      commentRepository.save(comment);
+      comment.setContent(null);
+
+      commentRepository.saveAndFlush(comment);
 
       postRepository.decreaseCommentCount(comment.getPost().getId());
-      log.info("Soft deleted comment {} because it has replies", commentId);
-      return;
+
+      log.info("Soft deleted comment {} (hidden content) because it has {} replies", commentId, childrenCount);
+    } else {
+      postRepository.decreaseCommentCount(comment.getPost().getId());
+
+      commentRepository.delete(comment);
+
+      log.info("Hard deleted comment {}", commentId);
     }
-
-    Post post = comment.getPost();
-
-    entityManager.detach(comment);
-    comment.setPost(null);
-
-    if (post != null) {
-      postRepository.decreaseCommentCount(post.getId());
-    }
-
-    commentRepository.deleteCommentNative(commentId);
-
-    log.info("Hard deleted comment {}", commentId);
   }
 
   @Transactional(readOnly = true)
@@ -342,7 +273,7 @@ public class CommentService {
     List<UUID> commentIds = comments.stream().map(Comment::getId).toList();
     Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(commentIds, TargetType.COMMENT);
     Map<UUID, Long> replyCountMap = mapReplyCount(commentIds);
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(comments);
+    Map<UUID, FileMetadata> fileMap = fileService.getFileMapByResourceIds(commentIds, ResourceType.COMMENT);
     return page.map(c -> {
       boolean canModerate = checkModerationRights(user, c.getPost().getTopic(), c.getPost().getAuthor().getId());
       return buildCommentResponse(c, user, likedMap.getOrDefault(c.getId(), false),
@@ -364,7 +295,7 @@ public class CommentService {
     List<Comment> comments = page.getContent();
     List<UUID> commentIds = comments.stream().map(Comment::getId).toList();
 
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(comments);
+    Map<UUID, FileMetadata> fileMap = fileService.getFileMapByResourceIds(commentIds, ResourceType.COMMENT);
     Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(commentIds, TargetType.COMMENT);
     Map<UUID, Long> replyCountMap = mapReplyCount(commentIds);
 
@@ -393,7 +324,7 @@ public class CommentService {
       return Page.empty(page.getPageable());
     List<Comment> comments = page.getContent();
     List<UUID> commentIds = comments.stream().map(Comment::getId).toList();
-    Map<UUID, FileMetadata> fileMap = mapSingleFileByCommentId(comments);
+    Map<UUID, FileMetadata> fileMap = fileService.getFileMapByResourceIds(commentIds, ResourceType.COMMENT);
     Map<UUID, Boolean> likedMap = reactionService.mapIsReactedByMe(commentIds, TargetType.COMMENT);
     Map<UUID, Long> replyCountMap = isRoot ? mapReplyCount(commentIds) : Collections.emptyMap();
     boolean canModeratePost = checkModerationRights(currentUser, topic, postAuthorId);
@@ -423,29 +354,11 @@ public class CommentService {
     return postAuthorId != null && postAuthorId.equals(user.getId());
   }
 
-  private FileMetadata handleFileMetadataReturnEntity(UUID fileId, Comment comment, User user) {
-    if (fileId == null)
-      return null;
-    FileMetadata fileMetadata = fileMetadataRepository.findById(fileId)
-        .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
-    fileService.updateResourceTarget(comment.getId(), ResourceType.COMMENT, fileMetadata);
-    return fileMetadataRepository.save(fileMetadata);
-  }
-
   private Map<UUID, Long> mapReplyCount(List<UUID> rootIds) {
     if (rootIds == null || rootIds.isEmpty())
       return Collections.emptyMap();
     List<Object[]> rows = commentRepository.countRepliesByRootIds(rootIds);
     return rows.stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
-  }
-
-  private Map<UUID, FileMetadata> mapSingleFileByCommentId(List<Comment> comments) {
-    if (comments == null || comments.isEmpty())
-      return Collections.emptyMap();
-    List<UUID> ids = comments.stream().map(Comment::getId).toList();
-    List<FileMetadata> files = fileMetadataRepository.findAllByResourceIdInAndResourceType(ids, ResourceType.COMMENT);
-    return files.stream().collect(
-        Collectors.toMap(FileMetadata::getResourceId, Function.identity(), (existing, replacement) -> existing));
   }
 
   private AttachmentResponse toAttachment(FileMetadata f) {

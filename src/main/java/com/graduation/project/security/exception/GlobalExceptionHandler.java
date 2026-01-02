@@ -54,6 +54,13 @@ public class GlobalExceptionHandler {
     return buildResponse(ErrorCode.BAD_REQUEST, message);
   }
 
+  @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+  public ResponseEntity<ApiResponse<?>> handleResponseStatus(
+      org.springframework.web.server.ResponseStatusException ex) {
+    String message = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+    return buildResponse(ErrorCode.BAD_REQUEST, message);
+  }
+
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ApiResponse<?>> handleNotReadable(HttpMessageNotReadableException ex) {
     log.warn("Malformed JSON request received");

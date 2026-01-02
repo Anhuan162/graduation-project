@@ -39,15 +39,26 @@ public class User {
 
   private String phone;
 
-  @Enumerated(EnumType.STRING)
   @Column(nullable = false)
+  @Enumerated(EnumType.STRING)
   private Provider provider;
+
+  @Column(columnDefinition = "TEXT")
+  private String bio;
 
   private String studentCode;
 
   private String classCode;
 
   private LocalDateTime registrationDate;
+
+  @Builder.Default
+  @Column(columnDefinition = "bigint default 0")
+  private Long followerCount = 0L;
+
+  @Builder.Default
+  @Column(columnDefinition = "bigint default 0")
+  private Long followingCount = 0L;
 
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   @Builder.Default

@@ -371,4 +371,48 @@ public class FileService {
     return url.substring(tokenIndex + 6); // 6 is length of "token="
   }
 
+  @Transactional
+  public FileMetadata attachFileToResource(UUID fileId, UUID resourceId, ResourceType resourceType) {
+    if (fileId == null)
+      return null;
+    FileMetadata fileMetadata = fileRepository.findById(fileId)
+        .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+    updateResourceTarget(resourceId, resourceType, fileMetadata);
+    return fileRepository.save(fileMetadata);
+  }
+
+  @Transactional
+  public FileMetadata syncFileAttachment(UUID newFileId, UUID resourceId, ResourceType resourceType) {
+    // 1. Get existing files
+    List<FileMetadata> existingFiles = fileRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
+
+    // 2. If no file provided/changing -> remove old files
+    boolean isRemovingOrChanging = newFileId == null ||
+        existingFiles.stream().noneMatch(f -> f.getId().equals(newFileId));
+
+    if (isRemovingOrChanging && !existingFiles.isEmpty()) {
+      deleteAttachments(existingFiles);
+    }
+
+    // 3. Attach new file if provided
+    if (newFileId != null) {
+      boolean alreadyAttached = existingFiles.stream().anyMatch(f -> f.getId().equals(newFileId));
+      if (!alreadyAttached) {
+        return attachFileToResource(newFileId, resourceId, resourceType);
+      }
+      return existingFiles.stream().filter(f -> f.getId().equals(newFileId)).findFirst().orElse(null);
+    }
+    return null;
+  }
+
+  @Transactional(readOnly = true)
+  public java.util.Map<UUID, FileMetadata> getFileMapByResourceIds(List<UUID> resourceIds, ResourceType resourceType) {
+    if (resourceIds == null || resourceIds.isEmpty()) {
+      return java.util.Collections.emptyMap();
+    }
+    List<FileMetadata> files = fileRepository.findAllByResourceIdInAndResourceType(resourceIds, resourceType);
+    return files.stream().collect(
+        java.util.stream.Collectors.toMap(FileMetadata::getResourceId, java.util.function.Function.identity(),
+            (existing, replacement) -> existing));
+  }
 }

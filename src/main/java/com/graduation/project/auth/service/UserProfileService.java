@@ -15,6 +15,7 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import org.springframework.dao.DataAccessException;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Optional;
@@ -32,10 +33,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserProfileService {
 
     private final UserRepository userRepository;
+    private final com.graduation.project.auth.repository.UserRelationRepository userRelationRepository;
     private final CurrentUserService currentUserService;
     private final FirebaseService firebaseService;
     private final FacultyRepository facultyRepository;
     private final Validator validator;
+    private final com.graduation.project.auth.mapper.UserAccessMapper userAccessMapper;
 
     private static final String AVATAR_FOLDER = "avatars";
 
@@ -53,27 +56,62 @@ public class UserProfileService {
     }
 
     @Transactional(readOnly = true)
-    public PublicUserProfileResponse getPublicProfile(String userId) {
-        UUID id;
+    public UserProfileResponse getUserProfile(String userId) {
+        UUID targetId;
         try {
-            id = UUID.fromString(userId);
+            targetId = UUID.fromString(userId);
         } catch (IllegalArgumentException e) {
             throw new AppException(ErrorCode.UUID_IS_INVALID);
         }
 
-        User user = userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return PublicUserProfileResponse.from(user);
+        User targetUser = userRepository.findById(targetId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        User currentUser = null;
+        try {
+            currentUser = currentUserService.getCurrentUserEntity();
+        } catch (AppException e) {
+            if (e.getErrorCode() != ErrorCode.UNAUTHENTICATED) {
+                // Re-throw non-authentication exceptions to avoid hiding real errors
+                throw e;
+            }
+            // Anonymous viewer - UNAUTHENTICATED exception is expected
+        }
+
+        var stats = userRepository.getUserStats(targetId);
+
+        String facultyName = null;
+        if (targetUser.getStudentCode() != null && targetUser.getClassCode() != null) {
+            try {
+                facultyName = getAndValidateFacultiesCode(targetUser.getStudentCode(), targetUser.getClassCode());
+            } catch (AppException e) {
+                log.warn("Validation error resolving faculty name for user {}: studentCode={}, classCode={}, error={}",
+                        targetId, targetUser.getStudentCode(), targetUser.getClassCode(), e.getMessage());
+            } catch (DataAccessException e) {
+                log.error("Data access error resolving faculty name for user {}: studentCode={}, classCode={}",
+                        targetId, targetUser.getStudentCode(), targetUser.getClassCode(), e);
+                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION,
+                        "Failed to resolve faculty name due to data access issue", e);
+            } catch (Exception e) {
+                log.error("Unexpected error resolving faculty name for user {}: studentCode={}, classCode={}",
+                        targetId, targetUser.getStudentCode(), targetUser.getClassCode(), e);
+                throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to resolve faculty name", e);
+            }
+        }
+
+        boolean isFollowing = false;
+        if (currentUser != null && !currentUser.getId().equals(targetId)) {
+            isFollowing = userRelationRepository.existsById(
+                    new com.graduation.project.auth.entity.UserRelation.UserRelationId(currentUser.getId(), targetId));
+        }
+
+        return userAccessMapper.toResponse(targetUser, currentUser, stats, facultyName, isFollowing);
     }
 
     @Transactional(readOnly = true)
-    public UserProfileResponse getUserProfile() {
+    public UserProfileResponse getMyProfile() {
         User user = currentUserService.getCurrentUserEntity();
-
-        UserProfileResponse response = user.toUserProfileResponse();
-        if (user.getStudentCode() != null && user.getClassCode() != null) {
-            response.setFacultyName(getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
-        }
-        return response;
+        return getUserProfile(user.getId().toString());
     }
 
     @Transactional

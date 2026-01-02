@@ -22,10 +22,10 @@ public interface PostRepository extends JpaRepository<Post, UUID>, JpaSpecificat
     @EntityGraph(attributePaths = { "author", "topic" })
     Page<Post> findAll(Specification<Post> spec, Pageable pageable);
 
-    @EntityGraph(attributePaths = { "topic" })
+    @EntityGraph(attributePaths = { "topic", "author" })
     Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
 
-    @EntityGraph(attributePaths = { "topic" })
+    @EntityGraph(attributePaths = { "topic", "author" })
     Page<Post> findAllByAuthor_IdAndPostStatusInAndDeletedFalse(UUID userId, List<PostStatus> statuses,
             Pageable pageable);
 
