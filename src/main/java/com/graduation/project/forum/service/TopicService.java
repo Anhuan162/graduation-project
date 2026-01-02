@@ -17,7 +17,9 @@ import com.graduation.project.forum.repository.CategoryRepository;
 import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import jakarta.persistence.criteria.*;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -29,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -70,10 +71,11 @@ public class TopicService {
     Category category = categoryRepository
         .findById(categoryId)
         .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
-    var user = currentUserService.getCurrentUserEntity();
+
+    User user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.canCreateTopic(category, user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
 
     Topic topic = topicMapper.toTopic(request, category, user);
@@ -88,18 +90,20 @@ public class TopicService {
         "Người dùng " + user.getEmail() + " đã tạo topic mới: " + topic.getTitle(),
         "127.0.0.1");
     publisher.publishEvent(activityLogDTO);
+
     return topicMapper.toTopicResponse(topic);
   }
 
   @Transactional(readOnly = true)
   public DetailTopicResponse getOneTopic(UUID topicId) {
     User user = currentUserService.getCurrentUserEntity();
+
     Topic topic = topicRepository
         .findById(topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     if (!authorizationService.canViewTopic(topic, user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
 
     boolean isTopicCreator = authorizationService.isTopicCreator(user, topic);
@@ -108,6 +112,7 @@ public class TopicService {
 
     DetailTopicResponse.CurrentUserContext currentUserContext = DetailTopicResponse.CurrentUserContext
         .from(isTopicCreator, isTopicMember, isTopicManager);
+
     return DetailTopicResponse.from(topic, currentUserContext);
   }
 
@@ -115,19 +120,15 @@ public class TopicService {
   public Page<TopicResponse> searchTopics(SearchTopicRequest request, Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();
 
-    Specification<Topic> spec = getTopicVisibilitySpec(user);
+    Specification<Topic> visibilitySpec = getTopicVisibilitySpec(user);
 
     Specification<Topic> filterSpec = (root, query, cb) -> {
       List<Predicate> predicates = new ArrayList<>();
-
-      predicates.add(cb.equal(root.get("deleted"), false));
-
-      query.orderBy(cb.desc(root.get(CREATED_AT_FIELD)));
-
+      predicates.add(cb.isFalse(root.get("deleted")));
       return cb.and(predicates.toArray(new Predicate[0]));
     };
 
-    return topicRepository.findAll(spec.and(filterSpec), pageable)
+    return topicRepository.findAll(visibilitySpec.and(filterSpec), pageable)
         .map(topicMapper::toTopicResponse);
   }
 
@@ -137,7 +138,7 @@ public class TopicService {
 
     Specification<Topic> categorySpec = (root, query, cb) -> cb.equal(root.get("category").get("id"), categoryId);
 
-    Specification<Topic> notDeletedSpec = (root, query, cb) -> cb.equal(root.get("deleted"), false);
+    Specification<Topic> notDeletedSpec = (root, query, cb) -> cb.isFalse(root.get("deleted"));
 
     Specification<Topic> securitySpec = getTopicVisibilitySpec(user);
 
@@ -149,15 +150,29 @@ public class TopicService {
         .map(topicMapper::toTopicResponse);
   }
 
+  @Transactional(readOnly = true)
+  public Page<TopicResponse> getPostableTopics(Pageable pageable) {
+    User user = currentUserService.getCurrentUserEntity();
+
+    if (authorizationService.isAdmin(user)) {
+      return topicRepository.findAllByDeletedFalseOrderByCreatedAtDesc(pageable)
+          .map(topicMapper::toTopicResponse);
+    }
+
+    return topicRepository.findPostableTopicsByUser(user.getId(), pageable)
+        .map(topicMapper::toTopicResponse);
+  }
+
   @Transactional
   public TopicResponse update(UUID topicId, TopicRequest request) {
     Topic topic = topicRepository
         .findById(topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+
     User user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.canManageTopic(user, topic)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
 
     topic.setTitle(request.getTitle());
@@ -175,21 +190,29 @@ public class TopicService {
 
   @Transactional
   public void delete(UUID id) {
-    Topic topic = topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository.findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+
     User user = currentUserService.getCurrentUserEntity();
+
     if (!authorizationService.isAdmin(user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
+
     topicRepository.delete(topic);
   }
 
   @Transactional
   public TopicResponse softDelete(UUID id) {
-    Topic topic = topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository.findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+
     User user = currentUserService.getCurrentUserEntity();
+
     if (!authorizationService.canManageTopic(user, topic)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
+
     topic.setDeleted(true);
     topicRepository.save(topic);
     return topicMapper.toTopicResponse(topic);

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentService {
   private final FirebaseService firebaseService;
   private final DocumentRepository documentRepository;
@@ -42,29 +44,42 @@ public class DocumentService {
       throw new RuntimeException("document name already exist!!!");
     }
 
-    String documentName = firebaseService.uploadFile(document, FOLDER_DOCUMENT);
-    String imageName = firebaseService.uploadFile(image, FOLDER_IMAGE);
+    FirebaseService.FileUploadResult documentResult = null;
+    FirebaseService.FileUploadResult imageResult = null;
+    try {
+      documentResult = firebaseService.uploadFile(document, FOLDER_DOCUMENT);
+      imageResult = firebaseService.uploadFile(image, FOLDER_IMAGE);
+    } catch (IOException e) {
+      if (documentResult != null) {
+        try {
+          firebaseService.deleteFile(documentResult.storagePath());
+          log.info("Cleaned up uploaded document file due to image upload failure");
+        } catch (Exception deleteEx) {
+          log.error("Failed to delete document file after upload failure: {}", deleteEx.getMessage(), deleteEx);
+        }
+      }
+      log.error("Upload failed: {}", e.getMessage(), e);
+      throw e;
+    }
 
-    String filePath = firebaseService.getPublicUrl(FOLDER_DOCUMENT + documentName);
-    String imageUrl = firebaseService.getPublicUrl(FOLDER_IMAGE + imageName);
-    Document documentEntity =
-        Document.builder()
-            .title(documentRequest.getTitle())
-            .description(documentRequest.getDescription())
-            .documentType(documentRequest.getDocumentType())
-            .filePath(filePath)
-            .imageUrl(imageUrl)
-            .subject(subject.get())
-            .build();
+    String filePath = documentResult.url();
+    String imageUrl = imageResult.url();
+    Document documentEntity = Document.builder()
+        .title(documentRequest.getTitle())
+        .description(documentRequest.getDescription())
+        .documentType(documentRequest.getDocumentType())
+        .filePath(filePath)
+        .imageUrl(imageUrl)
+        .subject(subject.get())
+        .build();
     documentRepository.save(documentEntity);
     return documentEntity.toDocumentResponse();
   }
 
   public Page<DocumentResponse> searchDocuments(
       UUID subjectId, String title, DocumentType documentType, Pageable pageable) {
-    Page<Document> documentOptionals =
-        documentRepository.findByTitleAndDocumentTypeAndSubjectId(
-            title, documentType, subjectId, pageable);
+    Page<Document> documentOptionals = documentRepository.findByTitleAndDocumentTypeAndSubjectId(
+        title, documentType, subjectId, pageable);
     return documentOptionals.map(Document::toDocumentResponse);
   }
 }

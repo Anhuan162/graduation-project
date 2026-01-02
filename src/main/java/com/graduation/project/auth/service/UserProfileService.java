@@ -129,32 +129,34 @@ public class UserProfileService {
         User user = currentUserService.getCurrentUserEntity();
 
         try {
-            String oldAvatarUrl = user.getAvatarUrl();
-            String newAvatarUrl = firebaseService.uploadFile(image, AVATAR_FOLDER);
+            String oldAvatarStoragePath = user.getAvatarStoragePath();
+            FirebaseService.FileUploadResult result = firebaseService.uploadFile(image, AVATAR_FOLDER);
 
-            user.setAvatarUrl(newAvatarUrl);
+            user.setAvatarUrl(result.url());
+            user.setAvatarStoragePath(result.storagePath());
             try {
                 userRepository.save(user);
 
-                if (oldAvatarUrl != null && !oldAvatarUrl.isEmpty()) {
+                if (oldAvatarStoragePath != null && !oldAvatarStoragePath.isEmpty()) {
                     try {
-                        firebaseService.deleteFile(oldAvatarUrl);
+                        firebaseService.deleteFile(oldAvatarStoragePath);
                     } catch (Exception e) {
-                        log.warn("Failed to delete old avatar: {}", oldAvatarUrl, e);
+                        log.warn("Failed to delete old avatar: {}", oldAvatarStoragePath, e);
                     }
                 }
             } catch (Exception e) {
                 // Save failed, delete the new file
                 try {
-                    firebaseService.deleteFile(newAvatarUrl);
+                    firebaseService.deleteFile(result.storagePath());
                 } catch (Exception deleteException) {
-                    log.warn("Failed to delete uploaded avatar after save failure: {}", newAvatarUrl, deleteException);
+                    log.warn("Failed to delete uploaded avatar after save failure: {}", result.storagePath(),
+                            deleteException);
                 }
                 // Rethrow the original exception, wrapping if necessary
                 if (e instanceof AppException) {
                     throw e;
                 } else {
-                    throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to update user profile");
+                    throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION, "Failed to update user profile", e);
                 }
             }
         } catch (IOException e) {

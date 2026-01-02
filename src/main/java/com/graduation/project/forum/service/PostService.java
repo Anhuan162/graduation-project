@@ -9,6 +9,7 @@ import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.constant.TargetType;
+import com.graduation.project.forum.constant.TimeRange;
 import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.forum.constant.TopicVisibility;
 import com.graduation.project.forum.dto.*;
@@ -28,13 +29,16 @@ import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -55,8 +59,24 @@ public class PostService {
 
   private final Slugify slugify = Slugify.builder().build();
 
+  /**
+   * Custom Safelist that allows video tags and their attributes for rich content
+   * editing
+   */
+  private Safelist getCustomSafelist() {
+    return Safelist.relaxed()
+        .addTags("video", "source")
+        .addAttributes("video", "src", "controls", "autoplay", "loop", "muted", "poster", "class", "width",
+            "height")
+        .addAttributes("source", "src", "type");
+  }
+
   private String generateUniqueSlug(String title) {
-    String baseSlug = slugify.slugify(title);
+    String trimmedTitle = title.trim();
+    String baseSlug = slugify.slugify(trimmedTitle);
+    if (baseSlug == null || baseSlug.isEmpty()) {
+      baseSlug = "post-" + UUID.randomUUID().toString().substring(0, 6);
+    }
     String finalSlug = baseSlug;
     int count = 1;
 
@@ -78,10 +98,10 @@ public class PostService {
 
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canCreatePost(topic, user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
     String slug = generateUniqueSlug(request.getTitle());
-    String cleanContent = Jsoup.clean(request.getContent(), Safelist.relaxed());
+    String cleanContent = Jsoup.clean(request.getContent(), getCustomSafelist());
     PostStatus status = (request.getStatus() == PostStatus.DRAFT) ? PostStatus.DRAFT : PostStatus.PENDING;
 
     Post post = Post.builder()
@@ -95,12 +115,13 @@ public class PostService {
         .lastModifiedDateTime(Instant.now())
         .deleted(false)
         .reactionCount(0L)
+        .viewCount(0L)
         .build();
 
     Post saved = postRepository.save(post);
 
     List<FileMetadata> files = fileService.updateFileMetadataList(
-        request.getFileMetadataIds(), saved.getId(), ResourceType.POST, user.getId());
+        request.getFileMetadataIds(), saved.getId(), ResourceType.POST);
 
     if (status != PostStatus.DRAFT) {
       publisher.publishEvent(CreatedPostEvent.from(saved));
@@ -118,7 +139,7 @@ public class PostService {
 
     if (!authorizationService.canViewTopic(post.getTopic(), user)
         && !authorizationService.isPostCreator(post, user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
 
     List<FileMetadata> files = fileMetadataRepository.findByResourceTypeAndResourceIdIn(
@@ -143,24 +164,24 @@ public class PostService {
     Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.isPostCreator(post, user))
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
 
     post.setTitle(request.getTitle());
     if (StringUtils.hasText(request.getContent()))
-      post.setContent(Jsoup.clean(request.getContent(), Safelist.relaxed()));
+      post.setContent(Jsoup.clean(request.getContent(), getCustomSafelist()));
 
     if (request.getStatus() != null && request.getStatus() != post.getPostStatus()) {
       if (!post.getPostStatus().canTransitionTo(request.getStatus()))
         throw new AppException(ErrorCode.INVALID_POST_STATUS_TRANSITION);
       if (request.getStatus() == PostStatus.APPROVED && !authorizationService.canManageTopic(user, post.getTopic())) {
-        throw new AppException(ErrorCode.UNAUTHORIZED);
+        throw new AppException(ErrorCode.FORBIDDEN);
       }
       post.setPostStatus(request.getStatus());
     }
     post.setLastModifiedDateTime(Instant.now());
     Post saved = postRepository.save(post);
     List<FileMetadata> files = fileService.updateFileMetadataList(request.getFileMetadataIds(), saved.getId(),
-        ResourceType.POST, user.getId());
+        ResourceType.POST);
     boolean isLiked = reactionRepository.existsByUserIdAndTargetIdAndTargetType(user.getId(), saved.getId(),
         TargetType.POST);
     boolean canManage = authorizationService.canManageTopic(user, saved.getTopic());
@@ -169,24 +190,39 @@ public class PostService {
 
   @Transactional
   public void delete(UUID id) {
-    Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post = postRepository.findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+
     User user = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.isAdmin(user))
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    post.setDeleted(true);
-    postRepository.save(post);
+    if (!authorizationService.isAdmin(user)) {
+      throw new AppException(ErrorCode.FORBIDDEN);
+    }
+
+    postRepository.delete(post);
+    postRepository.flush();
   }
 
   @Transactional
   public PostResponse softDelete(UUID id) {
-    Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post = postRepository.findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+
     User user = currentUserService.getCurrentUserEntity();
-    if (!authorizationService.canSoftDeletePost(post, user))
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+
+    if (!authorizationService.canSoftDeletePost(post, user)) {
+      throw new AppException(ErrorCode.FORBIDDEN);
+    }
+
     post.setDeleted(true);
     Post saved = postRepository.save(post);
-    return buildPostResponse(saved, Collections.emptyList(), user, false,
-        authorizationService.canManageTopic(user, saved.getTopic()), authorizationService.isPostCreator(saved, user));
+
+    return buildPostResponse(
+        saved,
+        Collections.emptyList(),
+        user,
+        false,
+        authorizationService.canManageTopic(user, saved.getTopic()),
+        authorizationService.isPostCreator(saved, user));
   }
 
   @Transactional
@@ -296,7 +332,7 @@ public class PostService {
     Topic topic = topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canViewTopic(topic, user))
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
 
     Page<Post> postPage = postRepository.findByTopicIdAndPostStatusAndDeletedFalse(topicId, PostStatus.APPROVED,
         pageable);
@@ -317,7 +353,7 @@ public class PostService {
     Topic topic = topicRepository.findById(topicId).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canManageTopic(user, topic))
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
 
     Page<Post> postPage = postRepository.findByTopicIdAndPostStatusAndDeletedFalse(topicId, postStatus, pageable);
     return processPostPageInternal(postPage, user, true);
@@ -330,6 +366,83 @@ public class PostService {
     return processPostPage(postPage, user);
   }
 
+  /**
+   * Retrieves featured posts based on the specified time range and optional
+   * topic.
+   * If no sort is provided in the pageable, defaults to sorting by reaction count
+   * descending, then by creation date descending.
+   *
+   * @param range    the time range for filtering posts (e.g., DAY, WEEK, MONTH,
+   *                 ALL)
+   * @param topicId  optional topic ID to filter posts by
+   * @param pageable pagination and sorting information
+   * @return a page of post responses
+   */
+  @Transactional(readOnly = true)
+  public Page<PostResponse> getFeaturedPosts(TimeRange range, UUID topicId, Pageable pageable) {
+    if (range == null)
+      range = TimeRange.WEEK;
+
+    User user = currentUserService.getCurrentUserEntity();
+    boolean isAdmin = authorizationService.isAdmin(user);
+
+    Instant now = Instant.now();
+    Instant fromDate = switch (range) {
+      case DAY -> now.minus(1, ChronoUnit.DAYS);
+      case WEEK -> now.minus(7, ChronoUnit.DAYS);
+      case MONTH -> now.minus(30, ChronoUnit.DAYS);
+      case ALL -> null;
+    };
+
+    Sort effectiveSort = pageable.getSort();
+    if (effectiveSort == null || effectiveSort.isUnsorted()) {
+      effectiveSort = Sort.by(Sort.Order.desc("reactionCount"), Sort.Order.desc("createdDateTime"));
+    }
+    Pageable effectivePageable = PageRequest.of(
+        pageable.getPageNumber(),
+        pageable.getPageSize(),
+        effectiveSort);
+
+    Specification<Post> spec = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
+      Join<Post, Topic> topicJoin = root.join("topic", JoinType.INNER);
+
+      // 1) base: approved + not deleted
+      predicates.add(cb.equal(root.get("postStatus"), PostStatus.APPROVED));
+      predicates.add(cb.equal(root.get("deleted"), false));
+
+      // 2) range filter
+      if (fromDate != null) {
+        predicates.add(cb.greaterThanOrEqualTo(root.get("createdDateTime"), fromDate));
+      }
+
+      // 3) topic filter (optional)
+      if (topicId != null) {
+        predicates.add(cb.equal(topicJoin.get("id"), topicId));
+      }
+
+      // 4) permission filter (non-admin)
+      if (!isAdmin) {
+        Predicate isPublic = cb.equal(topicJoin.get("topicVisibility"), TopicVisibility.PUBLIC);
+
+        Subquery<Long> memberSubquery = query.subquery(Long.class);
+        Root<TopicMember> memberRoot = memberSubquery.from(TopicMember.class);
+        memberSubquery.select(cb.literal(1L));
+        memberSubquery.where(
+            cb.equal(memberRoot.get("topic"), topicJoin),
+            cb.equal(memberRoot.get("user").get("id"), user.getId()),
+            cb.isTrue(memberRoot.get("approved")));
+
+        predicates.add(cb.or(isPublic, cb.exists(memberSubquery)));
+      }
+
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
+
+    Page<Post> postPage = postRepository.findAll(spec, effectivePageable);
+    return processPostPage(postPage, user); // reuse mapper + userState + permissions + attachments
+  }
+
   private PostResponse changePostStatus(UUID postId, PostStatus newStatus) {
     Post post = postRepository.findById(postId)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
@@ -338,7 +451,7 @@ public class PostService {
     }
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canManageTopic(user, post.getTopic())) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
     post.setPostStatus(newStatus);
     if (newStatus == PostStatus.APPROVED) {
@@ -400,6 +513,7 @@ public class PostService {
       boolean canManageTopic,
       boolean isPostCreator) {
 
+    // 1. Build Author Info
     PostAuthorResponse author = null;
     if (post.getAuthor() != null) {
       author = PostAuthorResponse.builder()
@@ -409,14 +523,18 @@ public class PostService {
           .build();
     }
 
+    // 2. Build Stats
     PostStatsResponse stats = PostStatsResponse.builder()
-        .reactionCount(post.getReactionCount() == null ? 0L : post.getReactionCount())
-        .commentCount(null)
-        .viewCount(null)
+        .reactionCount(post.getReactionCount() != null ? post.getReactionCount() : 0L)
+        .commentCount(post.getCommentCount())
+        .viewCount(post.getViewCount() != null ? post.getViewCount() : 0L)
         .build();
 
-    PostUserStateResponse userState = PostUserStateResponse.builder().liked(Boolean.TRUE.equals(isLiked)).build();
+    PostUserStateResponse userState = PostUserStateResponse.builder()
+        .liked(Boolean.TRUE.equals(isLiked))
+        .build();
 
+    // 4. Build Permissions
     boolean canEdit = isPostCreator || canManageTopic || authorizationService.isAdmin(currentUser);
     boolean canDelete = canEdit;
 
@@ -426,13 +544,15 @@ public class PostService {
         .canReport(!isPostCreator)
         .build();
 
+    // 5. Build Attachments & Excerpt
     List<String> urls = files == null ? List.of() : files.stream().map(FileMetadata::getUrl).toList();
     List<AttachmentResponse> attachments = toAttachments(files);
 
     String excerpt = Jsoup.parse(post.getContent()).text();
     excerpt = excerpt.length() > 150 ? excerpt.substring(0, 150) + "..." : excerpt;
 
-    return postMapper.toPostResponse(
+    // 6. Map base fields qua Mapper
+    PostResponse response = postMapper.toPostResponse(
         post,
         urls,
         excerpt,
@@ -441,6 +561,20 @@ public class PostService {
         userState,
         permissions,
         attachments);
+
+    if (post.getTopic() != null) {
+      var topicInfo = TopicInfoResponse.builder()
+          .id(post.getTopic().getId())
+          .name(post.getTopic().getTitle())
+          .slug(post.getTopic().getSlug())
+          .build();
+
+      response.setTopic(topicInfo);
+
+      response.setTopicId(post.getTopic().getId());
+    }
+
+    return response;
   }
 
   private Map<UUID, List<FileMetadata>> mapFiles(List<Post> posts) {
@@ -476,7 +610,59 @@ public class PostService {
     if (files == null || files.isEmpty())
       return List.of();
     return files.stream()
-        .map(f -> AttachmentResponse.builder().id(f.getId().toString()).url(f.getUrl()).build())
+        .map(f -> {
+          // Extract original filename from Firebase object name
+          // (folder/UUID_originalname)
+          String originalName = f.getFileName();
+          if (originalName != null) {
+            // Get the part after the last "/"
+            int lastSlashIndex = originalName.lastIndexOf("/");
+            if (lastSlashIndex >= 0 && lastSlashIndex < originalName.length() - 1) {
+              originalName = originalName.substring(lastSlashIndex + 1);
+            }
+            // Extract original filename from UUID_originalname
+            if (originalName.contains("_")) {
+              int underscoreIndex = originalName.indexOf("_");
+              if (underscoreIndex > 0 && underscoreIndex < originalName.length() - 1) {
+                String prefix = originalName.substring(0, underscoreIndex);
+                if (isValidUUID(prefix)) {
+                  originalName = originalName.substring(underscoreIndex + 1);
+                }
+              }
+            }
+          }
+          return AttachmentResponse.builder()
+              .id(f.getId().toString())
+              .url(f.getUrl())
+              .name(originalName)
+              .type(f.getContentType())
+              .size((long) f.getSize())
+              .build();
+        })
         .toList();
+  }
+
+  /**
+   * Checks if the given string is a valid UUID format.
+   *
+   * @param str the string to check
+   * @return true if the string matches UUID regex, false otherwise
+   */
+  private boolean isValidUUID(String str) {
+    if (str == null)
+      return false;
+    return str.matches("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+  }
+
+  /**
+   * Fix existing attachment URLs that have malformed encoding for a batch of
+   * files
+   *
+   * @param page the page number to process (0-based)
+   * @param size the number of files to process per batch
+   * @return the number of files processed
+   */
+  public int fixExistingAttachmentUrls(int page, int size) {
+    return fileService.fixExistingAttachmentUrls(page, size);
   }
 }

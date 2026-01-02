@@ -17,6 +17,7 @@ import com.graduation.project.forum.repository.ReportRepository;
 import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -62,6 +63,10 @@ public class ReportService {
         .findById(postId)
         .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
+    if (post.getAuthor() != null && post.getAuthor().getId().equals(reporter.getId())) {
+      throw new AppException(ErrorCode.FORBIDDEN);
+    }
+
     if (reportRepository.existsByPostIdAndReporterId(postId, reporter.getId())) {
       throw new AppException(ErrorCode.REPORT_ALREADY_EXISTED);
     }
@@ -74,6 +79,10 @@ public class ReportService {
     Comment comment = commentRepository
         .findById(commentId)
         .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+    if (comment.getAuthor() != null && comment.getAuthor().getId().equals(reporter.getId())) {
+      throw new AppException(ErrorCode.FORBIDDEN);
+    }
 
     if (reportRepository.existsByCommentIdAndReporterId(commentId, reporter.getId())) {
       throw new AppException(ErrorCode.REPORT_ALREADY_EXISTED);
@@ -98,7 +107,7 @@ public class ReportService {
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     if (!authorizationService.canManageTopic(reporter, topic)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
     Page<Report> reports = reportRepository.findAllReportsByTopic(topicId, pageable);
     return reports.map(this::mapToResponse);
@@ -118,11 +127,15 @@ public class ReportService {
         .findById(reportId)
         .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
 
-    report.setStatus(request.getStatus());
-
     if (request.isDeleteTarget() && request.getStatus() == ReportStatus.RESOLVED) {
       handleContentDeletion(report);
     }
+
+    User admin = currentUserService.getCurrentUserEntity();
+
+    report.setStatus(request.getStatus());
+    report.setProcessedBy(admin);
+    report.setProcessedAt(Instant.now());
 
     reportRepository.save(report);
     return mapToResponse(report);
@@ -169,6 +182,8 @@ public class ReportService {
         .commentId(report.getTargetType() == TargetType.COMMENT ? targetId : null)
         .targetPreview(targetPreview)
         .createdAt(report.getCreatedAt())
+        .processedById(report.getProcessedBy() != null ? report.getProcessedBy().getId() : null)
+        .processedAt(report.getProcessedAt())
         .build();
   }
 }

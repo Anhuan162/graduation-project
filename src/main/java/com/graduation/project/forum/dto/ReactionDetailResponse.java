@@ -10,6 +10,6 @@ import lombok.Data;
 public class ReactionDetailResponse {
   private UUID userId;
   private String username;
-  private String avatarUrl; // Nếu User entity có avatar
+  private String avatarUrl;
   private ReactionType type;
 }

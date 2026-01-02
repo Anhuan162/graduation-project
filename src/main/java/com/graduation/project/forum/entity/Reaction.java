@@ -4,15 +4,15 @@ import com.graduation.project.forum.constant.ReactionType;
 import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+
+import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(
-    name = "reactions",
-    uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "target_id", "target_type"})})
+@Table(name = "reactions", uniqueConstraints = {
+    @UniqueConstraint(columnNames = { "user_id", "target_id", "target_type" }) })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,12 +24,10 @@ public class Reaction {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  // Map quan hệ với User (Người thả tim)
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
-  // ID của bài viết hoặc comment (Không map @ManyToOne để linh hoạt)
   @Column(name = "target_id", nullable = false)
   private UUID targetId;
 
@@ -43,5 +41,5 @@ public class Reaction {
 
   @CreationTimestamp
   @Column(name = "created_at")
-  private LocalDateTime createdAt;
+  private Instant createdAt;
 }

@@ -35,6 +35,8 @@ public class User {
 
   private String avatarUrl;
 
+  private String avatarStoragePath;
+
   private String phone;
 
   @Enumerated(EnumType.STRING)

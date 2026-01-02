@@ -28,14 +28,22 @@ public class TopicController {
         .build();
   }
 
-  @GetMapping("/{topicId}")
+  @GetMapping("/postable")
+  public ApiResponse<Page<TopicResponse>> getPostableTopics(Pageable pageable) {
+    return ApiResponse.<Page<TopicResponse>>builder()
+        .result(topicService.getPostableTopics(pageable))
+        .build();
+  }
+
+  @GetMapping("/{topicId:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
+
   public ApiResponse<DetailTopicResponse> getOneTopic(@PathVariable UUID topicId) {
     return ApiResponse.<DetailTopicResponse>builder()
         .result(topicService.getOneTopic(topicId))
         .build();
   }
 
-  @PutMapping("/{topicId}")
+  @PutMapping("/{topicId:[0-9a-fA-F\\-]{36}}")
   public ApiResponse<TopicResponse> update(
       @PathVariable UUID topicId, @RequestBody TopicRequest request) {
     return ApiResponse.<TopicResponse>builder()
@@ -44,7 +52,7 @@ public class TopicController {
   }
 
   @PreAuthorize("hasRole('ADMIN')")
-  @DeleteMapping("/{topicId}")
+  @DeleteMapping("/{topicId:[0-9a-fA-F\\-]{36}}")
   public ApiResponse<String> delete(@PathVariable UUID topicId) {
     topicService.delete(topicId);
     return ApiResponse.<String>builder().result("Deleted successfully").build();

@@ -11,25 +11,23 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class FileMetadataResponse {
-  private UUID id;
+  UUID id;
 
-  private String fileName;
+  String fileName;
+  String folder;
+  String url;
+  String contentType;
 
-  private String folder;
+  long size;
 
-  private String url;
+  String storagePath;
 
-  private String contentType;
+  String accessType;
+  String resourceType;
+  UUID resourceId;
 
-  private int size;
+  @Builder.Default
+  LocalDateTime createdAt = LocalDateTime.now();
 
-  private String accessType;
-
-  private String resourceType;
-
-  private UUID resourceId;
-
-  private LocalDateTime createdAt = LocalDateTime.now();
-
-  private String userId;
+  String userId;
 }

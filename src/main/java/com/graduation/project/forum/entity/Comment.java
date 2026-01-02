@@ -38,7 +38,7 @@ public class Comment {
   @JoinColumn(name = "parent_id")
   private Comment parent;
 
-  @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+  @OneToMany(mappedBy = "parent")
   private List<Comment> replies = new ArrayList<>();
 
   @Column(columnDefinition = "TEXT")

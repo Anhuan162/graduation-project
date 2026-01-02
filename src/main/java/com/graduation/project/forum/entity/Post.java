@@ -68,6 +68,10 @@ public class Post {
   private long commentCount = 0L;
 
   @Builder.Default
+  @Column(name = "view_count", nullable = false)
+  private Long viewCount = 0L;
+
+  @Builder.Default
   private boolean deleted = false;
 
   @PreUpdate

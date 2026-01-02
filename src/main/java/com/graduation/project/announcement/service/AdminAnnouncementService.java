@@ -52,8 +52,7 @@ public class AdminAnnouncementService {
     List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
         request.getFileMetadataIds(),
         announcement.getId(),
-        ResourceType.ANNOUNCEMENT,
-        user.getId());
+        ResourceType.ANNOUNCEMENT);
 
     List<String> urls = fileMetadataList.stream().map(FileMetadata::getUrl).toList();
     return CreatedAnnonucementResponse.from(announcement, urls);

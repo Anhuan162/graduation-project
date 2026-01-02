@@ -24,4 +24,17 @@ public interface TopicRepository extends JpaRepository<Topic, UUID> {
       +
       "EXISTS (SELECT 1 FROM User u JOIN u.roles r WHERE u.id = :userId AND r.name = 'ADMIN'))")
   Set<UUID> findAccessibleTopicIdsByUserId(@Param("userId") UUID userId);
+
+  @Query("""
+        SELECT DISTINCT t FROM Topic t
+        JOIN TopicMember tm ON tm.topic.id = t.id
+        WHERE t.deleted = false
+          AND tm.user.id = :userId
+          AND tm.approved = true
+        ORDER BY t.createdAt DESC
+      """)
+  Page<Topic> findPostableTopicsByUser(@Param("userId") UUID userId, Pageable pageable);
+
+  Page<Topic> findAllByDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
+
 }

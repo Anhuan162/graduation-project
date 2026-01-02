@@ -32,6 +32,8 @@ public class PostResponse {
   private UUID createdById;
   private UUID approvedById;
 
+  private TopicInfoResponse topic;
+
   private String excerpt;
   private PostAuthorResponse author;
   private PostStatsResponse stats;

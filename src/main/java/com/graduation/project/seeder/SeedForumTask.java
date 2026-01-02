@@ -6,6 +6,7 @@ import com.graduation.project.forum.constant.*;
 import com.graduation.project.forum.entity.*;
 import com.graduation.project.forum.repository.*;
 import java.text.Normalizer;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -120,22 +121,29 @@ public class SeedForumTask {
                     User author = pick(users);
                     User approver = pick(users);
 
+                    String postTitle = faker.lorem().sentence(6);
+
+                    Instant createdInstant = Instant.now()
+                            .minusSeconds(faker.number().numberBetween(0, 60 * 60 * 24 * 60));
+                    long approvalOffset = faker.number().numberBetween(0,
+                            Math.min(60 * 60 * 24 * 14, Duration.between(createdInstant, Instant.now()).getSeconds()));
+                    Instant approvedAt = createdInstant.plusSeconds(approvalOffset);
+
                     Post post = Post.builder()
                             .topic(topic)
                             .author(author)
-                            .title(faker.lorem().sentence(6))
+                            .title(postTitle)
                             .content(faker.lorem().paragraph(4))
                             .postStatus(PostStatus.APPROVED)
                             .approvedBy(approver)
-                            .approvedAt(Instant.now().minusSeconds(
-                                    faker.number().numberBetween(0, 60 * 60 * 24 * 14)))
-                            .createdDateTime(Instant.now().minusSeconds(
-                                    faker.number().numberBetween(0, 60 * 60 * 24 * 60)))
+                            .approvedAt(approvedAt)
+                            .createdDateTime(createdInstant)
                             .lastModifiedDateTime(Instant.now())
                             .deleted(false)
                             .reactionCount(0L)
                             .commentCount(0L)
-                            .slug(slugify(topic.getTitle() + "-" + faker.lorem().word() + "-" + UUID.randomUUID()))
+                            .viewCount(0L)
+                            .slug(slugify(postTitle + "-" + faker.lorem().word() + "-" + UUID.randomUUID()))
                             .build();
 
                     post = postRepository.save(post);

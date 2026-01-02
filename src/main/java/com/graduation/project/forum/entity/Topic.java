@@ -50,4 +50,8 @@ public class Topic {
 
   @OneToMany(mappedBy = "topic", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<Post> posts = new ArrayList<>();
+
+  @Column(unique = true)
+  private String slug;
+
 }

@@ -5,228 +5,370 @@ import com.graduation.project.auth.service.CurrentUserService;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;
-import com.graduation.project.common.entity.*;
+import com.graduation.project.common.entity.FileMetadata;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.common.mapper.FileMetadataMapper;
-import com.graduation.project.common.permission_handler.FileMetadataPermissionHandler;
-import com.graduation.project.forum.service.AuthorizationService;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class FileService {
 
-  private static final Logger log = LoggerFactory.getLogger(FileService.class);
-
   private final FirebaseService firebaseService;
-  private final FileMetadataRepository fileMetadataRepository;
+  private final FileMetadataRepository fileRepository;
   private final CurrentUserService currentUserService;
-  private final FileMetadataMapper fileMetadataMapper;
-  private final FileMetadataPermissionHandler fileMetadataPermissionHandler;
-  private final AuthorizationService authorizationService;
+  private final FileMetadataMapper fileMapper;
 
-  public FileService(
-      FirebaseService firebaseService,
-      FileMetadataRepository fileMetadataRepository,
-      CurrentUserService currentUserService,
-      FileMetadataMapper fileMetadataMapper,
-      FileMetadataPermissionHandler fileMetadataPermissionHandler,
-      AuthorizationService authorizationService) {
-    this.firebaseService = firebaseService;
-    this.fileMetadataRepository = fileMetadataRepository;
-    this.currentUserService = currentUserService;
-    this.fileMetadataMapper = fileMetadataMapper;
-    this.fileMetadataPermissionHandler = fileMetadataPermissionHandler;
-    this.authorizationService = authorizationService;
-  }
-
-  public FileMetadataResponse uploadAndSaveFile(
-      MultipartFile file,
-      String folderName,
-      AccessType accessType,
-      String resourceType,
-      String resourceId)
-      throws IOException {
-    // Upload file lên Firebase Storage
-    String fileName = firebaseService.uploadFile(file, folderName);
+  @Transactional
+  public FileMetadataResponse uploadAndSaveFile(MultipartFile file, String folderName, AccessType accessType,
+      String resourceTypeStr, String resourceIdStr) throws IOException {
+    if (file == null) {
+      throw new AppException(ErrorCode.INVALID_REQUEST);
+    }
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    String url = AccessType.PUBLIC.equals(accessType)
-        ? firebaseService.getPublicUrl(folderName + fileName)
-        : null;
+    FirebaseService.FileUploadResult result = firebaseService.uploadFile(file, folderName);
 
-    // Lưu metadata vào DB
+    // 2. Build Entity
     FileMetadata metadata = FileMetadata.builder()
-        .user(currentUser)
-        .fileName(fileName)
+        .fileName(file.getOriginalFilename())
         .folder(folderName)
-        .url(url)
+        .url(result.url()) // Lưu URL vĩnh viễn vào DB
+        .storagePath(result.storagePath()) // Lưu storage path để xóa sau này
         .contentType(file.getContentType())
+        .size(file.getSize()) // Không cần ép kiểu
         .accessType(accessType)
-        .resourceType(Objects.isNull(resourceType) ? null : ResourceType.valueOf(resourceType))
-        .resourceId(Objects.isNull(resourceId) ? null : UUID.fromString(resourceId))
-        .createdAt(LocalDateTime.now())
+        .user(currentUser)
         .build();
-    fileMetadataRepository.save(metadata);
-    return fileMetadataMapper.toFileMetadataResponse(metadata);
-  }
 
-  // Lấy signed URL từ metadata
-  public String getSignedUrl(FileMetadata metadata, long durationMinutes) {
-    return null;
-  }
-
-  public FileMetadataResponse replaceFile(UUID fileId, MultipartFile newFile) throws IOException {
-    FileMetadata oldMetadata = fileMetadataRepository
-        .findById(fileId)
-        .orElseThrow(() -> new RuntimeException("File not found"));
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (!fileMetadataPermissionHandler.hasPermission(auth, oldMetadata, "UPDATE")) {
-      throw new AccessDeniedException("No permission to update this file");
+    // 3. Map Resource (Post, Comment, etc.)
+    if (resourceTypeStr != null && resourceIdStr != null) {
+      try {
+        metadata.setResourceType(ResourceType.valueOf(resourceTypeStr.toUpperCase()));
+        metadata.setResourceId(UUID.fromString(resourceIdStr));
+      } catch (IllegalArgumentException e) {
+        throw new AppException(ErrorCode.INVALID_REQUEST);
+      }
     }
 
-    User current = currentUserService.getCurrentUserEntity();
+    // 4. Save DB
+    FileMetadata saved = fileRepository.save(metadata);
 
-    if (!oldMetadata.getUser().getId().equals(current.getId())) {
-      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    return fileMapper.toFileMetadataResponse(saved);
+  }
+
+  public List<FileMetadataResponse> uploadMultipleFiles(List<MultipartFile> files, String folderName) {
+    if (files == null || files.isEmpty()) {
+      return new ArrayList<>();
     }
 
-    firebaseService.deleteFile(oldMetadata.getFileName());
-    String newFileName = firebaseService.uploadFile(newFile, oldMetadata.getFolder());
+    List<FirebaseService.FileUploadResult> uploadResults = new ArrayList<>();
+    List<String> storagePathsToDelete = new ArrayList<>();
 
-    String newUrl = oldMetadata.getAccessType() == AccessType.PUBLIC
-        ? firebaseService.getPublicUrl(oldMetadata.getFolder() + newFileName)
-        : null;
+    try {
+      for (MultipartFile file : files) {
+        FirebaseService.FileUploadResult result = firebaseService.uploadFile(file, folderName);
+        uploadResults.add(result);
+        storagePathsToDelete.add(result.storagePath());
+      }
+      // All uploads succeeded, now save to DB
+      return saveMultipleFiles(uploadResults, files, folderName);
+    } catch (Exception e) {
+      // Compensation logic: delete all successfully uploaded files to prevent
+      // orphaned files
+      for (String path : storagePathsToDelete) {
+        try {
+          firebaseService.deleteFile(path);
+        } catch (Exception deleteEx) {
+          log.error("Failed to delete file during compensation: {}", path, deleteEx);
+        }
+      }
+      throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+    }
+  }
 
-    oldMetadata.setFileName(newFileName);
-    oldMetadata.setUrl(newUrl);
-    oldMetadata.setContentType(newFile.getContentType());
-    oldMetadata.setCreatedAt(LocalDateTime.now());
-    fileMetadataRepository.save(oldMetadata);
-    return fileMetadataMapper.toFileMetadataResponse(oldMetadata);
+  @Transactional
+  private List<FileMetadataResponse> saveMultipleFiles(List<FirebaseService.FileUploadResult> results,
+      List<MultipartFile> files, String folderName) {
+    User currentUser = currentUserService.getCurrentUserEntity();
+    List<FileMetadata> metadatas = new ArrayList<>();
+    for (int i = 0; i < files.size(); i++) {
+      MultipartFile file = files.get(i);
+      FirebaseService.FileUploadResult result = results.get(i);
+      FileMetadata metadata = FileMetadata.builder()
+          .fileName(file.getOriginalFilename())
+          .folder(folderName)
+          .url(result.url())
+          .storagePath(result.storagePath())
+          .contentType(file.getContentType())
+          .size(file.getSize())
+          .accessType(AccessType.PUBLIC)
+          .user(currentUser)
+          .build();
+      metadatas.add(metadata);
+    }
+    List<FileMetadata> saved = fileRepository.saveAll(metadatas);
+    return saved.stream().map(fileMapper::toFileMetadataResponse).toList();
   }
 
   public List<FileMetadataResponse> findAllByUserId(UUID userId) {
-    List<FileMetadata> files = fileMetadataRepository.findAllByUserId(userId);
-
-    return files.stream().map(fileMetadataMapper::toFileMetadataResponse).toList();
+    List<FileMetadata> files = fileRepository.findAllByUserId(userId);
+    return files.stream().map(fileMapper::toFileMetadataResponse).toList();
   }
 
-  public List<FileMetadataResponse> uploadMultipleFiles(
-      List<MultipartFile> files, String folderName) throws IOException {
-    List<FileMetadataResponse> responses = new ArrayList<>();
-    for (MultipartFile file : files) {
-      FileMetadataResponse res = uploadAndSaveFile(file, folderName, AccessType.PUBLIC, null, null);
-      responses.add(res);
+  @Transactional
+  public FileMetadataResponse replaceFile(UUID fileId, MultipartFile newFile) throws IOException {
+    FileMetadata oldFile = fileRepository.findById(fileId)
+        .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+
+    User currentUser = currentUserService.getCurrentUserEntity();
+    if (!oldFile.getUser().getId().equals(currentUser.getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    return responses;
-  }
 
-  public List<String> getFileMetadataIds(UUID resourceId, ResourceType resourceType) {
-    return fileMetadataRepository
-        .findAllByResourceIdAndResourceType(resourceId, resourceType)
-        .stream()
-        .map(FileMetadata::getUrl)
-        .toList();
-  }
+    // Lưu lại path cũ để xóa sau
+    String oldStoragePath = oldFile.getStoragePath();
 
-  public List<FileMetadata> updateFileMetadataList(
-      List<UUID> fileMetadataIds, UUID resourceId, ResourceType resourceType, UUID userId) {
-    List<FileMetadata> fileMetadataList = fileMetadataRepository.findAllByIdIn(fileMetadataIds);
+    // 1. Upload file MỚI trước (Nếu lỗi ở đây -> DB chưa sửa -> File cũ vẫn sống)
+    FirebaseService.FileUploadResult newResult = firebaseService.uploadFile(newFile, oldFile.getFolder());
 
-    fileMetadataList.forEach(
-        fileMetadata -> {
-          updateResourceTarget(resourceId, resourceType, userId, fileMetadata);
-        });
-    return fileMetadataRepository.saveAll(fileMetadataList);
-  }
+    // 2. Update DB
+    oldFile.setUrl(newResult.url());
+    oldFile.setStoragePath(newResult.storagePath());
+    oldFile.setSize(newFile.getSize());
+    oldFile.setContentType(newFile.getContentType());
+    oldFile.setFileName(newFile.getOriginalFilename());
 
-  public void updateResourceTarget(
-      UUID resourceId, ResourceType resourceType, UUID userId, FileMetadata fileMetadata) {
-    if (!fileMetadata.getUser().getId().equals(userId)) {
-      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    FileMetadata saved = fileRepository.save(oldFile);
+
+    // 3. Xóa file CŨ sau cùng (Cleanup)
+    // Nếu bước này lỗi -> Chỉ tốn chút dung lượng rác trên Cloud, nhưng dữ liệu
+    // User AN TOÀN.
+    try {
+      if (oldStoragePath != null) {
+        firebaseService.deleteFile(oldStoragePath);
+      }
+    } catch (Exception e) {
+      log.warn("Failed to clean up old file: {}", oldStoragePath, e);
+      // Không throw exception ở đây để tránh rollback transaction đã thành công
     }
-    fileMetadata.setResourceType(resourceType);
-    fileMetadata.setResourceId(resourceId);
+
+    return fileMapper.toFileMetadataResponse(saved);
   }
 
+  @Transactional
   public void deleteFile(UUID fileId) {
-    FileMetadata metadata = fileMetadataRepository
-        .findById(fileId)
-        .orElseThrow(() -> new RuntimeException("File not found"));
-    User user = currentUserService.getCurrentUserEntity();
-    if (!user.getId().equals(metadata.getUser().getId())) {
-      throw new AccessDeniedException("No permission to delete this file");
-    }
-    User current = currentUserService.getCurrentUserEntity();
+    FileMetadata file = fileRepository.findById(fileId)
+        .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
 
-    deleteFileFromDbAndStorage(metadata, current);
-  }
-
-  private void deleteFileFromDbAndStorage(FileMetadata metadata, User current) {
-    if (!metadata.getUser().getId().equals(current.getId())) {
-      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    // Check permission - ensure current user owns the file
+    User currentUser = currentUserService.getCurrentUserEntity();
+    if (!file.getUser().getId().equals(currentUser.getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    firebaseService.deleteFile(metadata.getFolder() + metadata.getFileName());
+    // Delete from Firebase first
+    try {
+      firebaseService.deleteFile(file.getStoragePath());
+    } catch (Exception e) {
+      log.error("Failed to delete file from Firebase: {}", file.getStoragePath(), e);
+      // Continue with DB deletion even if Firebase deletion fails
+      // This prevents orphaned database records
+    }
 
-    fileMetadataRepository.delete(metadata);
+    // Delete from database
+    fileRepository.delete(file);
   }
 
-  public void deleteAllFiles(List<String> fileIds) {
-    List<UUID> fileMetadataIds = fileIds.stream().map(UUID::fromString).toList();
-    List<FileMetadata> fileMetadataList = fileMetadataRepository.findAllByIdIn(fileMetadataIds);
-    User user = currentUserService.getCurrentUserEntity();
+  @Transactional
+  public void deleteAllFiles(List<String> ids) {
+    if (ids == null || ids.isEmpty()) {
+      throw new AppException(ErrorCode.INVALID_REQUEST);
+    }
+    List<UUID> uuidList = new ArrayList<>();
+    for (String id : ids) {
+      try {
+        uuidList.add(UUID.fromString(id));
+      } catch (IllegalArgumentException e) {
+        throw new AppException(ErrorCode.INVALID_REQUEST);
+      }
+    }
+    List<FileMetadata> files = fileRepository.findAllById(uuidList);
 
-    fileMetadataList.forEach(
-        fileMetadata -> {
-          if (!user.getId().equals(fileMetadata.getUser().getId())) {
-            throw new AccessDeniedException("No permission to delete this file");
-          }
-          deleteFileFromDbAndStorage(fileMetadata, currentUserService.getCurrentUserEntity());
-        });
+    // Check permissions - ensure current user owns all files
+    User currentUser = currentUserService.getCurrentUserEntity();
+    for (FileMetadata file : files) {
+      if (!file.getUser().getId().equals(currentUser.getId())) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+    }
+
+    // Delete from Firebase first (batch operation)
+    for (FileMetadata file : files) {
+      try {
+        firebaseService.deleteFile(file.getStoragePath());
+      } catch (Exception e) {
+        log.error("Failed to delete file from Firebase: {}", file.getStoragePath(), e);
+        // Continue with other deletions even if one fails
+        // This prevents one failed deletion from blocking the entire batch
+      }
+    }
+
+    // Delete from database
+    fileRepository.deleteAll(files);
   }
 
-  public List<FileMetadata> findFileMetadataByResourceTarget(
-      UUID resourceId, ResourceType resourceType) {
-    return fileMetadataRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
-  }
-
+  @Transactional
   public void deleteFileByResourceId(UUID resourceId, ResourceType resourceType) {
-    List<FileMetadata> files = fileMetadataRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
+    List<FileMetadata> files = fileRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
 
+    // Check permissions - ensure current user owns all files
+    User currentUser = currentUserService.getCurrentUserEntity();
+    for (FileMetadata file : files) {
+      if (!file.getUser().getId().equals(currentUser.getId())) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+    }
+
+    // Delete from Firebase
+    for (FileMetadata file : files) {
+      try {
+        firebaseService.deleteFile(file.getStoragePath());
+      } catch (Exception e) {
+        log.error("Failed to delete file from Firebase: {}", file.getStoragePath(), e);
+      }
+    }
+
+    // Delete from database
+    fileRepository.deleteAll(files);
+  }
+
+  @Transactional
+  public List<FileMetadata> updateFileMetadataList(List<UUID> fileMetadataIds, UUID resourceId,
+      ResourceType resourceType) {
+    User currentUser = currentUserService.getCurrentUserEntity();
+
+    // Find existing attachments for this resource
+    List<FileMetadata> existingFiles = fileRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
+
+    if (fileMetadataIds == null || fileMetadataIds.isEmpty()) {
+      // If no files provided, delete all existing attachments
+      deleteAttachments(existingFiles);
+      return new ArrayList<>();
+    }
+
+    List<FileMetadata> newFiles = fileRepository.findAllById(fileMetadataIds);
+
+    // Check permissions - ensure current user owns all new files
+    for (FileMetadata file : newFiles) {
+      if (!file.getUser().getId().equals(currentUser.getId())) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+    }
+
+    // Find files to remove (existing files not in the new list)
+    List<FileMetadata> filesToRemove = existingFiles.stream()
+        .filter(existing -> !fileMetadataIds.contains(existing.getId()))
+        .toList();
+
+    // Check permissions for files to remove
+    for (FileMetadata file : filesToRemove) {
+      if (!file.getUser().getId().equals(currentUser.getId())) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+    }
+
+    // Delete removed attachments
+    deleteAttachments(filesToRemove);
+
+    // Update resource information for new/remaining files
+    for (FileMetadata file : newFiles) {
+      file.setResourceId(resourceId);
+      file.setResourceType(resourceType);
+    }
+
+    return fileRepository.saveAll(newFiles);
+  }
+
+  private void deleteAttachments(List<FileMetadata> files) {
     if (files.isEmpty()) {
       return;
     }
 
-    User currentUser = currentUserService.getCurrentUserEntity();
-
+    // Delete from Firebase first
     for (FileMetadata file : files) {
-      if (!currentUser.getId().equals(file.getUser().getId()) && !authorizationService.isAdmin(currentUser)) {
-        throw new AccessDeniedException("No permission to delete this file");
-      }
-
       try {
-        firebaseService.deleteFile(file.getFolder() + file.getFileName());
-        fileMetadataRepository.delete(file);
+        firebaseService.deleteFile(file.getStoragePath());
       } catch (Exception e) {
-        log.error("Failed to delete file from Firebase and database: path={}, error={}",
-            file.getFolder() + file.getFileName(), e.getMessage(), e);
-        throw e; // Rethrow to abort the loop/transaction
+        log.error("Failed to delete file from Firebase: {}", file.getStoragePath(), e);
+        // Continue with other deletions even if one fails
       }
     }
+
+    // Delete from database
+    fileRepository.deleteAll(files);
+  }
+
+  @Transactional
+  public void updateResourceTarget(UUID resourceId, ResourceType resourceType, FileMetadata fileMetadata) {
+    // Check permission - ensure current user owns the file
+    User currentUser = currentUserService.getCurrentUserEntity();
+    if (!fileMetadata.getUser().getId().equals(currentUser.getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    fileMetadata.setResourceId(resourceId);
+    fileMetadata.setResourceType(resourceType);
+    fileRepository.save(fileMetadata);
+  }
+
+  @Transactional
+  public int fixExistingAttachmentUrls(int page, int size) {
+    List<FileMetadata> files = fileRepository.findAll(PageRequest.of(page, size)).getContent();
+    String bucketName = firebaseService.getBucketName();
+    int processedCount = 0;
+
+    for (FileMetadata file : files) {
+      if (file.getStoragePath() != null && !file.getStoragePath().isEmpty()) {
+        // Extract token from current URL
+        String currentUrl = file.getUrl();
+        String token = extractTokenFromUrl(currentUrl);
+
+        if (token != null) {
+          // Re-generate URL with proper encoding
+          String fixedUrl = firebaseService.generateFirebaseUrl(bucketName, file.getStoragePath(), token);
+          if (!fixedUrl.equals(currentUrl)) {
+            file.setUrl(fixedUrl);
+            log.info("Fixed URL for file {}: {} -> {}", file.getId(), currentUrl, fixedUrl);
+          }
+        }
+      }
+      processedCount++;
+    }
+
+    fileRepository.saveAll(files);
+    return processedCount;
+  }
+
+  private String extractTokenFromUrl(String url) {
+    if (url == null || !url.contains("token=")) {
+      return null;
+    }
+    int tokenIndex = url.indexOf("token=");
+    return url.substring(tokenIndex + 6); // 6 is length of "token="
   }
 
 }
