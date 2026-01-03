@@ -5,8 +5,6 @@ import com.graduation.project.announcement.dto.AnnouncementResponse;
 import com.graduation.project.announcement.dto.FullAnnouncementResponse;
 import com.graduation.project.announcement.service.AnnouncementService;
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -32,10 +30,9 @@ public class AnnouncementController {
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Boolean status,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-      @RequestParam(required = false) String classroomCode) {
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
     return ApiResponse.ok(
-        announcementService.searchAnnouncements(pageable, type, keyword, status, fromDate, toDate, classroomCode));
+        announcementService.searchAnnouncements(pageable, type, keyword, status, fromDate, toDate));
   }
 
   @GetMapping("/{announcementId}")

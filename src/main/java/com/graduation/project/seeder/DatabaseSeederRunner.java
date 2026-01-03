@@ -53,9 +53,7 @@ public class DatabaseSeederRunner implements CommandLineRunner {
             fn.run();
         } catch (Exception ex) {
             log.error("Seeding {} failed", name, ex);
-            if (!props.isContinueOnFailure()) {
-                throw ex;
-            }
+            throw new RuntimeException("Seeding " + name + " failed", ex);
         }
     }
 }

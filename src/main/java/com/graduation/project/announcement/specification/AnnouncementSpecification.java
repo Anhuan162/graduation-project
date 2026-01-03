@@ -46,13 +46,23 @@ public class AnnouncementSpecification {
 
     public static Specification<Announcement> withClassroomCode(String classroomCode) {
         return (root, query, cb) -> {
-            if (classroomCode == null || classroomCode.trim().isEmpty())
-                return null;
-
+            // Global announcements have NO targets (empty list)
+            // Specific announcements have targets that match classroomCode
             query.distinct(true);
 
             Join<Announcement, AnnouncementTarget> targetJoin = root.join("targets", JoinType.LEFT);
-            return cb.equal(cb.upper(targetJoin.get("classroomCode")), classroomCode.trim().toUpperCase());
+
+            // Condition 1: Global announcement (targetJoin.id is null)
+            // Condition 2: Matches classroomCode (if classroomCode is present)
+
+            if (classroomCode == null || classroomCode.trim().isEmpty()) {
+                // If user has no class code, they can ONLY see global announcements
+                return cb.isNull(targetJoin.get("id"));
+            }
+
+            return cb.or(
+                    cb.isNull(targetJoin.get("id")),
+                    cb.equal(cb.upper(targetJoin.get("classroomCode")), classroomCode.trim().toUpperCase()));
         };
     }
 }

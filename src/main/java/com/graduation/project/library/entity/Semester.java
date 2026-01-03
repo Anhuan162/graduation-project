@@ -15,7 +15,8 @@ import java.util.List;
 @Entity
 @Table(name = "semesters")
 public class Semester {
-  @Id private Integer id;
+  @Id
+  private Integer id;
 
   @Enumerated(EnumType.STRING)
   private SemesterType semesterType;
@@ -25,13 +26,13 @@ public class Semester {
   @OneToMany(mappedBy = "semester", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<SubjectReference> subjectReferences;
 
-//  ThieuNN
+  // ThieuNN
   public SemesterResponse toResponse() {
     return SemesterResponse.builder()
-            .id(this.id)
-            .schoolYear(this.schoolYear)
-            .semesterType(this.semesterType.toString())
-            .build();
+        .id(this.id)
+        .schoolYear(this.schoolYear)
+        .semesterType(this.semesterType.toString())
+        .build();
 
   }
 }
