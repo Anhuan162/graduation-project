@@ -44,6 +44,7 @@ public enum ErrorCode {
   INVALID_STUDENT_CODE(1034, "Student code is invalid", HttpStatus.BAD_REQUEST),
   INVALID_REQUEST(1035, "Invalid request", HttpStatus.BAD_REQUEST),
   INVALID_PASSWORD(1036, "Invalid password", HttpStatus.BAD_REQUEST),
+  FILE_UPLOAD_FAILED(1037, "File upload failed", HttpStatus.BAD_REQUEST),
   ;
 
   private final int code;
