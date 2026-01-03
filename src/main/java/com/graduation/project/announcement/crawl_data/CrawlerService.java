@@ -202,7 +202,7 @@ public class CrawlerService {
 
     Elements fileLinks =
         contentEl.select(
-            "a[href$=.pdf], a[href$=.doc], a[href$=.docx], a[href$=.xls], a[href$=.xlsx]");
+            "a[href$=.pdf], a[href$=.doc], a[href$=.docx]");
 
     for (Element fileLink : fileLinks) {
       String fileUrl = fileLink.attr("abs:href");
