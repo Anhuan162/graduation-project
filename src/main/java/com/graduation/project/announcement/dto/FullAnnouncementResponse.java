@@ -1,14 +1,19 @@
 package com.graduation.project.announcement.dto;
 
 import com.graduation.project.announcement.constant.AnnouncementType;
+import com.graduation.project.common.dto.FileMetadataResponse;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Value
+@Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class FullAnnouncementResponse {
   UUID id;
   String title;
@@ -23,4 +28,5 @@ public class FullAnnouncementResponse {
   AnnouncementType announcementType;
 
   List<AnnouncementTargetResponse> announcementTargetResponses;
+  List<FileMetadataResponse> attachments;
 }

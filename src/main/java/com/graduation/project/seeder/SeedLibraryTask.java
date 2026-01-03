@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.datafaker.Faker;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,7 +60,7 @@ public class SeedLibraryTask {
     }
 
     private User pickAnyUserOrNull() {
-        return userRepository.findAll(org.springframework.data.domain.PageRequest.of(0, 1))
+        return userRepository.findAll(PageRequest.of(0, 1))
                 .stream().findFirst().orElse(null);
     }
 

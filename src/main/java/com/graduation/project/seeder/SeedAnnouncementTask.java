@@ -1,14 +1,15 @@
 package com.graduation.project.seeder;
 
 import com.graduation.project.announcement.entity.Announcement;
+import com.graduation.project.announcement.entity.AnnouncementTarget;
 import com.graduation.project.announcement.entity.Classroom;
 import com.graduation.project.announcement.repository.AnnouncementRepository;
 import com.graduation.project.announcement.repository.ClassroomRepository;
+import com.graduation.project.announcement.constant.AnnouncementType;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.auth.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.data.domain.Sort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,7 @@ public class SeedAnnouncementTask {
     }
 
     private void seedClassrooms() {
-        List<String> codes = List.of("K66-01", "K66-02", "K67-01", "K67-02");
+        List<String> codes = List.of("K66-01", "K66-02", "D21CQCN01-B", "K67-02");
 
         for (String code : codes) {
             if (classroomRepository.existsByClassCode(code))
@@ -51,31 +52,56 @@ public class SeedAnnouncementTask {
     }
 
     private void seedAnnouncements() {
-        if (announcementRepository.count() >= 15) {
-            log.info(" - Announcements already seeded");
-            return;
-        }
+        log.info(" - Forcing Announcement Seeding...");
 
         User creator = userRepository.findAll(Sort.by(Sort.Direction.ASC, "registrationDate")).stream().findFirst()
                 .orElseGet(() -> userRepository.findAll().stream().findFirst().orElse(null));
 
         if (creator == null) {
-            log.warn("No users found in database, skipping announcement seeding");
-            return;
+            throw new RuntimeException(
+                    "Seeding Failed: No users found in database to assign as creator for announcements.");
         }
 
-        for (int i = 0; i < 15; i++) {
-            Announcement a = Announcement.builder()
-                    .id(UUID.randomUUID())
-                    .title("Thông báo: " + faker.university().name())
-                    .content(faker.lorem().paragraph(3))
-                    .createdBy(creator)
-                    .createdDate(LocalDate.now().minusDays(faker.number().numberBetween(0, 30)))
+        // 1. Seed Global Announcements (Visible to everyone)
+        for (int i = 0; i < 5; i++) {
+            createAnnouncement(creator, null, "Thông báo Chung: ");
+        }
+
+        // 2. Seed Class Specific (Visible to D21CQCN01-B only)
+        for (int i = 0; i < 5; i++) {
+            createAnnouncement(creator, "D21CQCN01-B", "Thông báo lớp D21: ");
+        }
+
+        // 3. Seed Class Specific (Visible to K66-01 only)
+        for (int i = 0; i < 5; i++) {
+            createAnnouncement(creator, "K66-01", "Thông báo lớp K66: ");
+        }
+
+        log.info(" - Seeded announcements (Global, D21, K66)");
+    }
+
+    private void createAnnouncement(User creator, String classroomCode, String prefix) {
+        Announcement a = Announcement.builder()
+                .title(prefix + faker.job().title())
+                .content(faker.lorem().paragraph(3))
+                .createdBy(creator)
+                .createdDate(LocalDate.now().minusDays(faker.number().numberBetween(0, 30)))
+                .announcementStatus(true)
+                .announcementType(AnnouncementType.GENERAL)
+                .build();
+
+        if (classroomCode != null) {
+            AnnouncementTarget target = AnnouncementTarget
+                    .builder()
+                    .classroomCode(classroomCode)
+                    .announcement(a)
                     .build();
-
-            announcementRepository.save(a);
+            if (a.getTargets() == null) {
+                a.setTargets(new java.util.ArrayList<>());
+            }
+            a.getTargets().add(target);
         }
 
-        log.info(" - Seeded announcements");
+        announcementRepository.save(a);
     }
 }

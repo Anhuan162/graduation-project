@@ -129,6 +129,14 @@ public class FileService {
     return files.stream().map(fileMapper::toFileMetadataResponse).toList();
   }
 
+  public List<FileMetadataResponse> getFilesByResource(UUID resourceId, ResourceType resourceType) {
+    if (resourceId == null || resourceType == null) {
+      return new ArrayList<>();
+    }
+    List<FileMetadata> files = fileRepository.findAllByResourceIdAndResourceType(resourceId, resourceType);
+    return files.stream().map(fileMapper::toFileMetadataResponse).toList();
+  }
+
   @Transactional
   public FileMetadataResponse replaceFile(UUID fileId, MultipartFile newFile) throws IOException {
     FileMetadata oldFile = fileRepository.findById(fileId)

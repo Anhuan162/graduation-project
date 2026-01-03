@@ -3,7 +3,9 @@ package com.graduation.project.seeder;
 import com.graduation.project.announcement.entity.Faculty;
 import com.graduation.project.announcement.repository.FacultyRepository;
 import com.graduation.project.auth.repository.UserRepository;
+import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.User;
+import com.graduation.project.cpa.constant.CohortCode;
 import com.graduation.project.cpa.constant.Grade;
 import com.graduation.project.cpa.entity.CpaProfile;
 import com.graduation.project.cpa.entity.GpaProfile;
@@ -76,12 +78,20 @@ public class SeedCpaTask {
             cpa.setUser(u);
 
             List<GpaProfile> gpas = new ArrayList<>();
+
+            String cohortCode = toCohortCodeFromStudentCode(u.getStudentCode());
+            try {
+                CohortCode.valueOf(cohortCode);
+            } catch (IllegalArgumentException e) {
+                log.debug("Skipping CPA/GPA for user {} - Invalid CohortCode: {}", u.getEmail(), cohortCode);
+                continue;
+            }
+
             for (Semester s : semesters) {
                 GpaProfile gpa = new GpaProfile();
                 gpa.setGpaProfileCode("GPA-" + s.getId() + "-" + u.getId().toString().substring(0, 6));
                 gpa.setCpaProfile(cpa);
 
-                String cohortCode = toCohortCodeFromStudentCode(u.getStudentCode());
                 List<GradeSubjectAverageProfile> grades = gradeSubjectAverageProfileService
                         .addGradeSubjectAverageProfileList(
                                 s.getId(), faculty.getFacultyCode(), cohortCode, gpa);
@@ -150,6 +160,7 @@ public class SeedCpaTask {
             u.setAvatarUrl(faker.avatar().image());
             u.setStudentCode(studentCode);
             u.setClassCode("D20CQCN" + String.format("%02d", (idx % 10) + 1));
+            u.setProvider(Provider.LOCAL);
 
             // tuỳ entity em, đoạn reflection giữ như cũ nếu cần
             // ...
