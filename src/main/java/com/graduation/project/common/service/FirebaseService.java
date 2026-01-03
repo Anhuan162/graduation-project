@@ -17,31 +17,40 @@ public class FirebaseService {
   /**
    * Upload a file to Firebase Cloud Storage
    *
-   * @param file MultipartFile from client
+   * @param file       MultipartFile from client
    * @param folderName folder in storage (optional, e.g., "images/")
-   * @return uploaded file name
+   * @return public URL of the uploaded file
    * @throws IOException
    */
   public String uploadFile(MultipartFile file, String folderName) throws IOException {
-    String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+    String originalFilename = file.getOriginalFilename();
+    String fileName = UUID.randomUUID() + "_" + (originalFilename != null ? originalFilename : "file");
     Bucket bucket = StorageClient.getInstance().bucket();
 
+    String objectName;
+    if (folderName == null || folderName.isEmpty()) {
+      objectName = fileName;
+    } else {
+      String normalizedFolder = folderName.endsWith("/") ? folderName.substring(0, folderName.length() - 1)
+          : folderName;
+      objectName = normalizedFolder + "/" + fileName;
+    }
     try (InputStream inputStream = file.getInputStream()) {
-      bucket.create(folderName + fileName, inputStream, file.getContentType());
+      bucket.create(objectName, inputStream, file.getContentType());
     }
 
-    return fileName;
+    return getPublicUrl(objectName);
   }
 
   public String getPublicUrl(String fileName) {
     Bucket bucket = StorageClient.getInstance().bucket();
     Blob blob = bucket.get(fileName);
 
-    if (blob == null) return null;
+    if (blob == null)
+      return null;
 
     // Lấy metadata token hiện tại
-    String token =
-        blob.getMetadata() != null ? blob.getMetadata().get("firebaseStorageDownloadTokens") : null;
+    String token = blob.getMetadata() != null ? blob.getMetadata().get("firebaseStorageDownloadTokens") : null;
 
     // Nếu chưa có token, tạo mới
     if (token == null || token.isEmpty()) {
@@ -66,7 +75,8 @@ public class FirebaseService {
   public String getSignedFileUrl(String fileName, long durationMinutes) {
     Bucket bucket = StorageClient.getInstance().bucket();
     Blob blob = bucket.get(fileName);
-    if (blob == null) return null;
+    if (blob == null)
+      return null;
 
     URL signedUrl = blob.signUrl(durationMinutes, TimeUnit.MINUTES);
     return signedUrl.toString();

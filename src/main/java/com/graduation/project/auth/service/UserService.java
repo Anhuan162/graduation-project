@@ -41,6 +41,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Transactional
 @RequiredArgsConstructor
@@ -58,6 +59,84 @@ public class UserService {
   private final Validator validator;
 
   private String AVATAR_FOLDER = "avatars";
+
+  public UserProfileResponse updateProfileInfo(UserProfileUpdateRequest request) {
+    Set<ConstraintViolation<UserProfileUpdateRequest>> violations = validator.validate(request);
+    if (!violations.isEmpty()) {
+      StringBuilder message = new StringBuilder();
+      for (ConstraintViolation<UserProfileUpdateRequest> violation : violations) {
+        message.append(violation.getMessage()).append("; ");
+      }
+      throw new AppException(ErrorCode.INVALID_REQUEST, message.toString());
+    }
+
+    User user = getCurrentUser();
+    if (user == null) {
+      throw new AppException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    String facultiesName = "";
+
+    if (request.getClassCode() != null && !request.getClassCode().isBlank()
+        && request.getStudentCode() != null && !request.getStudentCode().isBlank()) {
+
+      facultiesName = getAndValidateFacultiesCode(request.getStudentCode(), request.getClassCode());
+
+      user.setStudentCode(request.getStudentCode());
+      user.setClassCode(request.getClassCode());
+    }
+
+    if (request.getFullName() != null && !request.getFullName().isBlank()) {
+      user.setFullName(request.getFullName().trim());
+    }
+
+    if (request.getPhone() != null && !request.getPhone().isBlank()) {
+      user.setPhone(request.getPhone().trim());
+    }
+
+    userRepository.save(user);
+
+    UserProfileResponse response = user.toUserProfileResponse();
+    if (!facultiesName.isBlank()) {
+      response.setFacultyName(facultiesName);
+    } else if (user.getStudentCode() != null && user.getClassCode() != null) {
+      response.setFacultyName(getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
+    }
+    return response;
+  }
+
+  public UserProfileResponse updateAvatar(MultipartFile image) {
+    if (image == null || image.isEmpty()) {
+      throw new AppException(ErrorCode.INVALID_REQUEST, "Avatar image is required");
+    }
+
+    User user = getCurrentUser();
+    if (user == null) {
+      throw new RuntimeException("User not authenticated or not found");
+    }
+
+    try {
+      String oldAvatarUrl = user.getAvatarUrl();
+      String newAvatarUrl = firebaseService.uploadFile(image, AVATAR_FOLDER);
+      user.setAvatarUrl(newAvatarUrl);
+      userRepository.save(user);
+      if (oldAvatarUrl != null && !oldAvatarUrl.isEmpty()) {
+        try {
+          firebaseService.deleteFile(oldAvatarUrl);
+        } catch (Exception e) {
+          log.warn("Failed to delete old avatar: {}", oldAvatarUrl, e);
+        }
+      }
+    } catch (IOException e) {
+      throw new AppException(ErrorCode.FILE_UPLOAD_FAILED);
+    }
+
+    UserProfileResponse response = user.toUserProfileResponse();
+    if (user.getStudentCode() != null && user.getClassCode() != null) {
+      response.setFacultyName(getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
+    }
+    return response;
+  }
 
   public SignupResponse register(SignupRequest request) {
     String email = request.getEmail();
@@ -364,13 +443,21 @@ public class UserService {
 
   public UserAuthResponse getAuthInfo() {
     UserPrincipal userPrincipal = getCurrentUserPrincipal();
-
+    User user = getCurrentUser();
+    String facultyName = null;
+    if (user != null && user.getStudentCode() != null && user.getClassCode() != null) {
+      facultyName = getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode());
+    }
     return UserAuthResponse.builder()
         .id(userPrincipal.getId().toString())
         .email(userPrincipal.getEmail())
         .fullName(userPrincipal.getFullName())
-        .avatar(userPrincipal.getAvatar())
+        .avatar(user != null ? user.getAvatarUrl() : userPrincipal.getAvatar())
         .permissions(getUserPermissionsFromPrincipal(userPrincipal))
+        .phone(user != null ? user.getPhone() : null)
+        .studentCode(user != null ? user.getStudentCode() : null)
+        .classCode(user != null ? user.getClassCode() : null)
+        .facultyName(facultyName)
         .build();
   }
 
@@ -401,55 +488,5 @@ public class UserService {
     if (faculty.isEmpty())
       throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
     return faculty.get().getFacultyName();
-  }
-
-  public UserProfileResponse updateUserProfile(UserProfileUpdateRequest userProfileRequest) {
-    // Validate the request
-    Set<ConstraintViolation<UserProfileUpdateRequest>> violations = validator.validate(userProfileRequest);
-    if (!violations.isEmpty()) {
-      StringBuilder message = new StringBuilder();
-      for (ConstraintViolation<UserProfileUpdateRequest> violation : violations) {
-        message.append(violation.getMessage()).append("; ");
-      }
-      throw new AppException(ErrorCode.INVALID_REQUEST, message.toString());
-    }
-
-    User user = getCurrentUser();
-    if (user == null) {
-      throw new RuntimeException("User not authenticated or not found");
-    }
-
-    if (userProfileRequest.getAvatarFile() != null && !userProfileRequest.getAvatarFile().isEmpty()) {
-      try {
-        String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER);
-        user.setAvatarUrl(newAvatarUrl);
-      } catch (IOException e) {
-        throw new RuntimeException("can not upload avatar", e);
-      }
-    }
-
-    String facultiesName = "";
-    if (userProfileRequest.getClassCode() != null
-        && !userProfileRequest.getClassCode().isEmpty()
-        && userProfileRequest.getStudentCode() != null
-        && !userProfileRequest.getStudentCode().isEmpty()) {
-      facultiesName = getAndValidateFacultiesCode(
-          userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
-      user.setStudentCode(userProfileRequest.getStudentCode());
-      user.setClassCode(userProfileRequest.getClassCode());
-    }
-
-    if (userProfileRequest.getFullName() != null && !userProfileRequest.getFullName().isEmpty()) {
-      user.setFullName(userProfileRequest.getFullName());
-    }
-    if (userProfileRequest.getPhone() != null && !userProfileRequest.getPhone().isEmpty()) {
-      user.setPhone(userProfileRequest.getPhone());
-    }
-
-    userRepository.save(user);
-
-    UserProfileResponse userProfileResponse = user.toUserProfileResponse();
-    userProfileResponse.setFacultyName(facultiesName);
-    return userProfileResponse;
   }
 }

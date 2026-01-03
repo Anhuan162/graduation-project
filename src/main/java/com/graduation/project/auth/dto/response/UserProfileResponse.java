@@ -27,7 +27,4 @@ public class UserProfileResponse {
     String phone;
     String facultyName;
 
-    LocalDate dob;
-
-    LocalDateTime createdAt;
 }

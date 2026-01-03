@@ -1,45 +1,52 @@
 package com.graduation.project.announcement.dto;
 
+import com.graduation.project.announcement.constant.AnnouncementType;
 import com.graduation.project.announcement.entity.Announcement;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import lombok.*;
 
-@AllArgsConstructor
-@NoArgsConstructor
+import java.time.LocalDate;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AnnouncementResponse {
-  UUID id;
-  String title;
-  String content;
-  String announcementType;
-  Boolean announcementStatus;
-  String createdBy;
-  LocalDate createdDate;
-  String modifiedBy;
-  LocalDate modifiedDate;
 
-  public static AnnouncementResponse from(Announcement announcement) {
+  private UUID id;
+
+  private String title;
+
+  private String content;
+
+  private AnnouncementType announcementType;
+
+  private Boolean announcementStatus;
+
+  private String createdBy;
+
+  private LocalDate createdDate;
+
+  private String modifiedBy;
+
+  private LocalDate modifiedDate;
+
+  public static AnnouncementResponse from(Announcement a) {
+    if (a == null)
+      return null;
     return AnnouncementResponse.builder()
-        .id(announcement.getId())
-        .title(announcement.getTitle())
-        .content(announcement.getContent())
-        .announcementStatus(announcement.getAnnouncementStatus())
-        .announcementType(String.valueOf(announcement.getAnnouncementType()))
-        .createdBy(announcement.getCreatedBy().getEmail())
-        .createdDate(announcement.getCreatedDate())
-        .modifiedBy(
-            Objects.nonNull(announcement.getModifiedBy())
-                ? announcement.getModifiedBy().getFullName()
-                : "")
-        .modifiedDate(announcement.getModifiedDate())
+        .id(a.getId())
+        .title(a.getTitle())
+        .content(a.getContent())
+        .announcementType(a.getAnnouncementType())
+        .announcementStatus(a.getAnnouncementStatus())
+        .createdDate(a.getCreatedDate())
+        .modifiedDate(a.getModifiedDate())
+        .createdBy(a.getCreatedBy() != null ? a.getCreatedBy().getEmail() : null)
+        .modifiedBy(a.getModifiedBy() != null ? a.getModifiedBy().getEmail() : null)
         .build();
-  }
-
-  public static List<AnnouncementResponse> from(List<Announcement> announcements) {
-    return announcements.stream().map(AnnouncementResponse::from).toList();
   }
 }

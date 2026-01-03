@@ -20,7 +20,8 @@ public class AnnouncementTarget {
     @Column(name = "classroom_code")
     private String classroomCode;
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "announcement_id")
     private Announcement announcement;
+
 }
