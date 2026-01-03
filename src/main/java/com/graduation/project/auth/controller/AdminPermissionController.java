@@ -14,31 +14,29 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("api/admin/permissions")
+@RequestMapping("/api/admin/permissions")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class AdminPermissionController {
+
   PermissionService permissionService;
 
   @PostMapping
-  ApiResponse<PermissionResponse> create(@RequestBody @Valid PermissionRequest request) {
-    return ApiResponse.<PermissionResponse>builder()
-        .result(permissionService.create(request))
-        .build();
+  public ApiResponse<PermissionResponse> create(@RequestBody @Valid PermissionRequest request) {
+    return ApiResponse.ok(permissionService.create(request));
   }
 
   @GetMapping
-  ApiResponse<Page<PermissionResponse>> getAll(
-      @RequestParam(required = false) String name, Pageable pageable) {
-    return ApiResponse.<Page<PermissionResponse>>builder()
-        .result(permissionService.getAll(name, pageable))
-        .build();
+  public ApiResponse<Page<PermissionResponse>> getAll(
+      @RequestParam(required = false) String name,
+      Pageable pageable) {
+    return ApiResponse.ok(permissionService.getAll(name, pageable));
   }
 
   @DeleteMapping("/{permission}")
-  ApiResponse<Void> delete(@PathVariable String permission) {
+  public ApiResponse<String> delete(@PathVariable String permission) {
     permissionService.delete(permission);
-    return ApiResponse.<Void>builder().build();
+    return ApiResponse.ok("Deleted successfully");
   }
 }

@@ -6,11 +6,16 @@ import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.dto.ReactionDetailResponse;
 import com.graduation.project.forum.dto.ReactionRequest;
 import com.graduation.project.forum.dto.ReactionSummary;
+import com.graduation.project.forum.dto.ReactionToggleResponse;
 import com.graduation.project.forum.service.ReactionService;
+
+import jakarta.validation.Valid;
+
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,10 +25,12 @@ public class ReactionController {
 
   private final ReactionService reactionService;
 
-  @PostMapping
-  public ApiResponse<String> react(@RequestBody ReactionRequest request) {
-    reactionService.toggleReaction(request);
-    return ApiResponse.<String>builder().result("Success").build();
+  @PostMapping("/toggle")
+  @PreAuthorize("isAuthenticated()")
+  public ApiResponse<ReactionToggleResponse> toggle(@Valid @RequestBody ReactionRequest req) {
+    return ApiResponse.<ReactionToggleResponse>builder()
+        .result(reactionService.toggleReaction(req))
+        .build();
   }
 
   @GetMapping("/summary")

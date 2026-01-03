@@ -17,6 +17,7 @@ import com.graduation.project.forum.repository.ReportRepository;
 import com.graduation.project.forum.repository.TopicRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -39,13 +40,12 @@ public class ReportService {
   public void createReport(ReportRequest request) {
     User reporter = currentUserService.getCurrentUserEntity();
 
-    Report.ReportBuilder reportBuilder =
-        Report.builder()
-            .reporter(reporter)
-            .reason(request.getReason())
-            .description(request.getDescription())
-            //                .ipAddress(RequestUtils.getClientIpAddress())
-            .status(ReportStatus.PENDING);
+    Report.ReportBuilder reportBuilder = Report.builder()
+        .reporter(reporter)
+        .reason(request.getReason())
+        .description(request.getDescription())
+        // .ipAddress(RequestUtils.getClientIpAddress())
+        .status(ReportStatus.PENDING);
 
     if (request.getTargetType() == TargetType.POST) {
       handlePostReport(request.getTargetId(), reporter, reportBuilder);
@@ -59,10 +59,13 @@ public class ReportService {
   }
 
   private void handlePostReport(UUID postId, User reporter, Report.ReportBuilder builder) {
-    Post post =
-        postRepository
-            .findById(postId)
-            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post = postRepository
+        .findById(postId)
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+
+    if (post.getAuthor() != null && post.getAuthor().getId().equals(reporter.getId())) {
+      throw new AppException(ErrorCode.FORBIDDEN);
+    }
 
     if (reportRepository.existsByPostIdAndReporterId(postId, reporter.getId())) {
       throw new AppException(ErrorCode.REPORT_ALREADY_EXISTED);
@@ -73,10 +76,13 @@ public class ReportService {
   }
 
   private void handleCommentReport(UUID commentId, User reporter, Report.ReportBuilder builder) {
-    Comment comment =
-        commentRepository
-            .findById(commentId)
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment comment = commentRepository
+        .findById(commentId)
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+
+    if (comment.getAuthor() != null && comment.getAuthor().getId().equals(reporter.getId())) {
+      throw new AppException(ErrorCode.FORBIDDEN);
+    }
 
     if (reportRepository.existsByCommentIdAndReporterId(commentId, reporter.getId())) {
       throw new AppException(ErrorCode.REPORT_ALREADY_EXISTED);
@@ -96,13 +102,12 @@ public class ReportService {
   @Transactional
   public Page<ReportResponse> searchReportsByTopic(UUID topicId, Pageable pageable) {
     User reporter = currentUserService.getCurrentUserEntity();
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     if (!authorizationService.canManageTopic(reporter, topic)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+      throw new AppException(ErrorCode.FORBIDDEN);
     }
     Page<Report> reports = reportRepository.findAllReportsByTopic(topicId, pageable);
     return reports.map(this::mapToResponse);
@@ -110,54 +115,52 @@ public class ReportService {
 
   @Transactional(readOnly = true)
   public ReportResponse getReportDetail(UUID id) {
-    Report report =
-        reportRepository
-            .findById(id)
-            .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+    Report report = reportRepository
+        .findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
     return mapToResponse(report);
   }
 
   @Transactional
   public ReportResponse processReport(UUID reportId, ProcessReportRequest request) {
-    Report report =
-        reportRepository
-            .findById(reportId)
-            .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+    Report report = reportRepository
+        .findById(reportId)
+        .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
 
-    report.setStatus(request.getStatus());
-
-    // 2. Logic xử lý nội dung vi phạm (Nếu Admin chọn xóa)
     if (request.isDeleteTarget() && request.getStatus() == ReportStatus.RESOLVED) {
       handleContentDeletion(report);
     }
+
+    User admin = currentUserService.getCurrentUserEntity();
+
+    report.setStatus(request.getStatus());
+    report.setProcessedBy(admin);
+    report.setProcessedAt(Instant.now());
 
     reportRepository.save(report);
     return mapToResponse(report);
   }
 
-  // Helper method: Xử lý xóa nội dung dựa trên TargetType
   private void handleContentDeletion(Report report) {
     if (report.getTargetType() == TargetType.POST && report.getPost() != null) {
       Post post = report.getPost();
-      if (!post.getDeleted()) { // Chỉ xóa nếu chưa xóa
+      if (!post.isDeleted()) {
         post.setDeleted(true);
         postRepository.save(post);
       }
     } else if (report.getTargetType() == TargetType.COMMENT && report.getComment() != null) {
       Comment comment = report.getComment();
-      if (!comment.getDeleted()) {
+      if (!comment.isDeleted()) {
         comment.setDeleted(true);
         commentRepository.save(comment);
       }
     }
   }
 
-  // Helper method: Mapper từ Entity sang DTO
   private ReportResponse mapToResponse(Report report) {
     String targetPreview = "Content deleted or unavailable";
     UUID targetId = null;
 
-    // Lấy trích dẫn nội dung để hiển thị
     if (report.getTargetType() == TargetType.POST && report.getPost() != null) {
       targetId = report.getPost().getId();
       String content = report.getPost().getContent();
@@ -170,7 +173,7 @@ public class ReportService {
 
     return ReportResponse.builder()
         .id(report.getId())
-        .reporterId(report.getReporter().getId()) // Hoặc getFullName
+        .reporterId(report.getReporter().getId())
         .reason(report.getReason())
         .description(report.getDescription())
         .status(report.getStatus())
@@ -179,6 +182,8 @@ public class ReportService {
         .commentId(report.getTargetType() == TargetType.COMMENT ? targetId : null)
         .targetPreview(targetPreview)
         .createdAt(report.getCreatedAt())
+        .processedById(report.getProcessedBy() != null ? report.getProcessedBy().getId() : null)
+        .processedAt(report.getProcessedAt())
         .build();
   }
 }

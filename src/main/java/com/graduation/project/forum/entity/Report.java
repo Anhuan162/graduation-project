@@ -6,17 +6,15 @@ import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.AssertTrue;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
 @Entity
-@Table(
-    name = "reports",
-    indexes = {
-      @Index(name = "idx_report_status", columnList = "status"),
-      @Index(name = "idx_report_created_at", columnList = "createdAt")
-    })
+@Table(name = "reports", indexes = {
+    @Index(name = "idx_report_status", columnList = "status"),
+    @Index(name = "idx_report_created_at", columnList = "createdAt")
+})
 @Getter
 @Setter
 @Builder
@@ -42,34 +40,34 @@ public class Report {
   @Builder.Default
   private ReportStatus status = ReportStatus.PENDING;
 
-  // --- PHẦN QUAN TRỌNG: POLYMORPHISM ---
-
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private TargetType targetType;
 
-  // Liên kết Post (Nullable)
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "post_id")
   private Post post;
 
-  // Liên kết Comment (Nullable)
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "comment_id")
   private Comment comment;
 
-  // --- END POLYMORPHISM ---
-
   private String ipAddress;
-  private LocalDateTime createdAt;
+  private Instant createdAt;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "processed_by_id")
+  private User processedBy;
+
+  private Instant processedAt;
 
   @PrePersist
   protected void onCreate() {
-    this.createdAt = LocalDateTime.now();
-    if (this.status == null) this.status = ReportStatus.PENDING;
+    this.createdAt = Instant.now();
+    if (this.status == null)
+      this.status = ReportStatus.PENDING;
   }
 
-  // Validate logic: 1 Report chỉ được thuộc về Post HOẶC Comment, không cả hai
   @AssertTrue(message = "Report must target either a Post or a Comment")
   public boolean isValidTarget() {
     if (targetType == TargetType.POST) {

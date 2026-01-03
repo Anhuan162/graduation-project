@@ -19,6 +19,8 @@ import io.swagger.v3.oas.annotations.responses.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+
 import java.text.ParseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -49,8 +51,8 @@ public class AuthController {
           """)
   }))
   @PostMapping("/login")
-  public ApiResponse<AuthenticationResponse> login(@RequestBody AuthenticationRequest request) {
-    return ApiResponse.<AuthenticationResponse>builder().result(authService.login(request)).build();
+  public ApiResponse<AuthenticationResponse> login(@Valid @RequestBody AuthenticationRequest request) {
+    return ApiResponse.ok(authService.login(request));
   }
 
   @Operation(summary = "Làm mới access token", description = """
@@ -103,18 +105,23 @@ public class AuthController {
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Thiếu hoặc token không hợp lệ")
   })
   @PostMapping("/logout")
-  public ApiResponse<Void> logout(HttpServletRequest request) throws ParseException {
-
+  public ApiResponse<String> logout(HttpServletRequest request) throws ParseException {
     String refreshToken = null;
     if (request.getCookies() != null) {
       for (Cookie cookie : request.getCookies()) {
         if ("refreshToken".equals(cookie.getName())) {
           refreshToken = cookie.getValue();
+          break;
         }
       }
     }
+
+    if (refreshToken == null) {
+      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
+
     authService.logout(refreshToken);
-    return ApiResponse.<Void>builder().result(null).build();
+    return ApiResponse.ok("Logout successfully");
   }
 
   @Operation(summary = "Kiểm tra tính hợp lệ của token (Introspect)", description = """

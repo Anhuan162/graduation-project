@@ -14,6 +14,7 @@ public class PublicUserProfileResponse {
     UUID id;
     String fullName;
     String avatarUrl;
+    String facultyName;
 
     public static PublicUserProfileResponse from(User user) {
         return PublicUserProfileResponse.builder()

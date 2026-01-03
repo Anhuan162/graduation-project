@@ -1,0 +1,3 @@
+ALTER TABLE users
+ADD COLUMN follower_count BIGINT DEFAULT 0,
+ADD COLUMN following_count BIGINT DEFAULT 0;

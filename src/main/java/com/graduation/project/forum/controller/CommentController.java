@@ -1,88 +1,80 @@
 package com.graduation.project.forum.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.forum.dto.*;
+import com.graduation.project.forum.dto.CommentRequest;
+import com.graduation.project.forum.dto.CommentResponse;
 import com.graduation.project.forum.service.CommentService;
-import java.util.UUID;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.UUID;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/comments")
 @RequiredArgsConstructor
+@Validated
 public class CommentController {
 
   private final CommentService commentService;
 
   @PostMapping("/post/{postId}")
-  public ApiResponse<CommentResponse> createRootComment(
-      @PathVariable String postId, @RequestBody CommentRequest request) {
+  @PreAuthorize("@authorizationService.canCreateComment(#postId)")
+  public ApiResponse<CommentResponse> createComment(
+      @PathVariable UUID postId,
+      @Valid @RequestBody CommentRequest request) {
     return ApiResponse.<CommentResponse>builder()
-        .result(commentService.createRootComment(postId, request))
-        .build();
-  }
-
-  @PostMapping("/{parentId}/replies")
-  public ApiResponse<CommentResponse> replyToComment(
-      @PathVariable String parentId, @RequestBody CommentRequest request) {
-    return ApiResponse.<CommentResponse>builder()
-        .result(commentService.replyToComment(parentId, request))
+        .result(commentService.createComment(postId, request))
         .build();
   }
 
   @GetMapping("/post/{postId}")
-  public ApiResponse<Page<CommentWithReplyCountResponse>> getRootComments(
-      @PathVariable String postId, @PageableDefault(page = 0, size = 10) Pageable pageable) {
-    return ApiResponse.<Page<CommentWithReplyCountResponse>>builder()
+  @PreAuthorize("@authorizationService.canViewPost(#postId)")
+  public ApiResponse<Page<CommentResponse>> getRootComments(
+      @PathVariable UUID postId,
+      Pageable pageable) {
+    return ApiResponse.<Page<CommentResponse>>builder()
         .result(commentService.getRootComments(postId, pageable))
         .build();
   }
 
-  @GetMapping("/{commentId}/replies")
-  public ApiResponse<Page<DetailCommentResponse>> getReplies(
-      @PathVariable String commentId, Pageable pageable) {
-    return ApiResponse.<Page<DetailCommentResponse>>builder()
-        .result(commentService.getReplies(commentId, pageable))
+  @GetMapping("/replies/{rootCommentId}")
+  @PreAuthorize("@authorizationService.canViewComment(#rootCommentId)")
+  public ApiResponse<Page<CommentResponse>> getReplies(
+      @PathVariable UUID rootCommentId,
+      @PageableDefault(page = 0, size = 10, sort = "createdDateTime", direction = Sort.Direction.ASC) Pageable pageable) {
+    return ApiResponse.<Page<CommentResponse>>builder()
+        .result(commentService.getReplies(rootCommentId, pageable))
         .build();
   }
 
   @PutMapping("/{commentId}")
-  public CommentResponse updateComment(
-      @PathVariable String commentId, @RequestBody CommentRequest request) {
-    return commentService.updateComment(commentId, request);
-  }
-
-  @DeleteMapping("/soft-delete/{commentId}")
-  public ApiResponse<CommentResponse> softDeleteComment(@PathVariable String commentId) {
-
+  @PreAuthorize("@authorizationService.isCommentCreator(#commentId)")
+  public ApiResponse<CommentResponse> updateComment(
+      @PathVariable UUID commentId,
+      @Valid @RequestBody CommentRequest request) {
     return ApiResponse.<CommentResponse>builder()
-        .result(commentService.softDeleteComment(commentId))
+        .result(commentService.updateComment(commentId, request))
         .build();
   }
 
-  @GetMapping
-  @PreAuthorize("hasRole('ADMIN')")
-  public ApiResponse<Page<CommentResponse>> searchComments(
-      @ModelAttribute SearchCommentRequest request, Pageable pageable) {
-    return ApiResponse.<Page<CommentResponse>>builder()
-        .result(commentService.searchComments(request, pageable))
-        .build();
-  }
-
-  @GetMapping("/{commentId}")
-  public ApiResponse<DetailCommentResponse> getComment(@PathVariable UUID commentId) {
-    return ApiResponse.<DetailCommentResponse>builder()
-        .result(commentService.getComment(commentId))
-        .build();
+  @DeleteMapping("/{commentId}")
+  @PreAuthorize("@authorizationService.canSoftDeleteComment(#commentId)")
+  public ApiResponse<String> delete(@PathVariable UUID commentId) {
+    commentService.delete(commentId);
+    return ApiResponse.ok("Deleted successfully");
   }
 
   @GetMapping("/my-comments")
-  public ApiResponse<Page<CommentResponse>> getMyComments(
-      @PageableDefault(page = 0, size = 10) Pageable pageable) {
+  public ApiResponse<Page<CommentResponse>> getMyComments(Pageable pageable) {
     return ApiResponse.<Page<CommentResponse>>builder()
         .result(commentService.getMyComments(pageable))
         .build();

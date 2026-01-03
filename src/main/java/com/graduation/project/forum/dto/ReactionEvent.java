@@ -11,9 +11,9 @@ import lombok.Data;
 @Data
 @Builder
 public class ReactionEvent {
-  private UUID targetId; // ID bài viết/comment
-  private TargetType targetType; // POST hoặc COMMENT
-  private ReactionType type; // LIKE, LOVE...
+  private UUID targetId;
+  private TargetType targetType;
+  private ReactionType type;
   private UUID referenceId;
   private UUID senderId;
   private String senderName;

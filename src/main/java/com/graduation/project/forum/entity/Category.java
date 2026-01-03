@@ -4,7 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.graduation.project.forum.constant.CategoryType;
 import com.graduation.project.common.entity.User;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+
+import java.time.Instant;
 import java.util.*;
 import lombok.*;
 
@@ -24,7 +25,8 @@ public class Category {
   private String name;
   private String description;
 
-  @Builder.Default private LocalDateTime createdAt = LocalDateTime.now();
+  @Builder.Default
+  private Instant createdAt = Instant.now();
 
   @Enumerated(EnumType.STRING)
   private CategoryType categoryType;
@@ -36,10 +38,7 @@ public class Category {
 
   @JsonIgnore
   @ManyToMany
-  @JoinTable(
-      name = "category_managers",
-      joinColumns = @JoinColumn(name = "category_id"),
-      inverseJoinColumns = @JoinColumn(name = "user_id"))
+  @JoinTable(name = "category_managers", joinColumns = @JoinColumn(name = "category_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
   @Builder.Default
   private Set<User> managers = new HashSet<>();
 

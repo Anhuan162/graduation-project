@@ -9,6 +9,8 @@ import lombok.experimental.FieldDefaults;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -26,5 +28,13 @@ public class UserProfileResponse {
     String classCode;
     String phone;
     String facultyName;
+    String bio;
+    UserStatsProjection stats;
+
+    @JsonProperty("isOwnProfile")
+    boolean isOwnProfile;
+
+    @JsonProperty("isFollowing")
+    boolean isFollowing;
 
 }

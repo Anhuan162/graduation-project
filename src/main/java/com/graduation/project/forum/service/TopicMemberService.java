@@ -1,28 +1,27 @@
 package com.graduation.project.forum.service;
 
-import com.graduation.project.common.constant.ResourceType;
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.service.CurrentUserService;
+import com.graduation.project.common.constant.ResourceType;
+import com.graduation.project.common.entity.User;
 import com.graduation.project.event.constant.EventType;
+import com.graduation.project.event.dto.EventEnvelope;
+import com.graduation.project.event.dto.NotificationEventDTO;
+import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.forum.constant.TopicVisibility;
+import com.graduation.project.forum.dto.TopicMemberResponse;
 import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.entity.TopicMember;
 import com.graduation.project.forum.repository.TopicMemberRepository;
 import com.graduation.project.forum.repository.TopicRepository;
-import com.graduation.project.event.dto.EventEnvelope;
-import com.graduation.project.event.dto.NotificationEventDTO;
-import com.graduation.project.event.producer.StreamProducer;
-import com.graduation.project.forum.dto.TopicMemberResponse;
-import java.time.LocalDateTime;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
-import com.graduation.project.common.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,6 +37,7 @@ public class TopicMemberService {
   private final CurrentUserService currentUserService;
   private final UserRepository userRepository;
   private final StreamProducer streamProducer;
+  private final AuthorizationService authorizationService;
 
   public List<TopicMemberResponse> getMembers(UUID topicId) {
     return topicMemberRepository.findByTopicId(topicId).stream()
@@ -47,10 +47,9 @@ public class TopicMemberService {
 
   @Transactional
   public TopicMemberResponse joinTopic(UUID topicId) {
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
 
@@ -59,194 +58,171 @@ public class TopicMemberService {
       throw new AppException(ErrorCode.TOPIC_MEMBER_EXISTED);
     }
 
-    if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
+    TopicMember topicMember = TopicMember.builder()
+        .topic(topic)
+        .user(user)
+        .topicRole(TopicRole.MEMBER)
+        .joinedAt(Instant.now())
+        .build();
 
-    TopicMember topicMember =
-        TopicMember.builder()
-            .topic(topic)
-            .user(user)
-            .topicRole(TopicRole.MEMBER)
-            .joinedAt(LocalDateTime.now())
-            .build();
-
-    // PUBLIC → join ngay
     if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) {
       topicMember.setApproved(true);
-      return TopicMemberResponse.toTopicMemberResponse(topicMemberRepository.save(topicMember));
+      TopicMember saved = topicMemberRepository.save(topicMember);
+      return TopicMemberResponse.toTopicMemberResponse(saved);
     }
-    Set<UUID> managerIds =
-        topic.getTopicMembers().stream()
-            .filter(t -> t.getTopicRole().equals(TopicRole.MANAGER))
-            .map(TopicMember::getId)
-            .collect(Collectors.toSet());
-    // PRIVATE → pending approval
+
     topicMember.setApproved(false);
-    topicMemberRepository.save(topicMember);
-    NotificationEventDTO dto =
-        NotificationEventDTO.builder()
-            .relatedId(topicMember.getId())
-            .type(ResourceType.TOPIC_MEMBER)
-            .title("Join Topic")
-            .content(user.getFullName() + "want to join your topic")
-            .senderId(user.getId())
-            .senderName(user.getEmail())
-            .receiverIds(managerIds) // build list of UUID receivers
-            .createdAt(LocalDateTime.now())
-            .build();
+    TopicMember saved = topicMemberRepository.save(topicMember);
+
+    Set<UUID> managerUserIds = topicMemberRepository.findUserIdsByTopicIdAndRole(topicId, TopicRole.MANAGER);
+
+    NotificationEventDTO dto = NotificationEventDTO.builder()
+        .relatedId(saved.getId())
+        .type(ResourceType.TOPIC_MEMBER)
+        .title("Join Topic Request")
+        .content(user.getFullName() + " wants to join topic: " + topic.getTitle())
+        .senderId(user.getId())
+        .senderName(user.getEmail())
+        .receiverIds(managerUserIds)
+        .createdAt(Instant.now())
+        .build();
+
     EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
     streamProducer.publish(eventEnvelope);
-    return TopicMemberResponse.toTopicMemberResponse(topicMember);
+
+    return TopicMemberResponse.toTopicMemberResponse(saved);
   }
 
   @Transactional
   public TopicMemberResponse approveJoin(UUID topicMemberId) {
-    TopicMember tm =
-        topicMemberRepository
-            .findById(topicMemberId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
+    TopicMember tm = topicMemberRepository
+        .findById(topicMemberId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
     User current = currentUserService.getCurrentUserEntity();
 
-    if (!canManageTopic(current, tm.getTopic())) {
+    if (!authorizationService.canManageTopic(current, tm.getTopic())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
     tm.setApproved(true);
-    TopicMember save = topicMemberRepository.save(tm);
-    NotificationEventDTO dto =
-        NotificationEventDTO.builder()
-            .relatedId(topicMemberId)
-            .type(ResourceType.TOPIC_MEMBER)
-            .title("Approve Member")
-            .content("Bạn đã được chấp thuận là thành viên của Topic")
-            .senderId(current.getId())
-            .senderName(current.getEmail())
-            .receiverIds(Set.of(tm.getUser().getId())) // build list of UUID receivers
-            .createdAt(LocalDateTime.now())
-            .build();
+    TopicMember saved = topicMemberRepository.save(tm);
+
+    NotificationEventDTO dto = NotificationEventDTO.builder()
+        .relatedId(topicMemberId)
+        .type(ResourceType.TOPIC_MEMBER)
+        .title("Request Approved")
+        .content("Yêu cầu tham gia Topic " + tm.getTopic().getTitle() + " của bạn đã được chấp thuận.")
+        .senderId(current.getId())
+        .senderName(current.getEmail())
+        .receiverIds(Set.of(tm.getUser().getId()))
+        .createdAt(Instant.now())
+        .build();
+
     EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
     streamProducer.publish(eventEnvelope);
-    return TopicMemberResponse.toTopicMemberResponse(save);
+
+    return TopicMemberResponse.toTopicMemberResponse(saved);
   }
 
   @Transactional
   public void kickMember(UUID topicId, UUID userId) {
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     User current = currentUserService.getCurrentUserEntity();
 
-    if (!canManageTopic(current, topic)) {
+    if (!authorizationService.canManageTopic(current, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    TopicMember tm =
-        topicMemberRepository
-            .findByUserIdAndTopicId(userId, topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
+    TopicMember tm = topicMemberRepository
+        .findByUserIdAndTopicId(userId, topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
     topicMemberRepository.delete(tm);
   }
 
   public Page<TopicMemberResponse> findUnapprovedMember(Pageable pageable) {
-    Page<TopicMember> page = topicMemberRepository.findAllByApprovedIsFalse(pageable);
-    return page.map(TopicMemberResponse::toTopicMemberResponse);
+    return topicMemberRepository.findAllByApprovedIsFalse(pageable)
+        .map(TopicMemberResponse::toTopicMemberResponse);
   }
 
   public Page<TopicMemberResponse> findApprovedMember(Pageable pageable) {
-    Page<TopicMember> page = topicMemberRepository.findAllByApprovedIsTrue(pageable);
-    return page.map(TopicMemberResponse::toTopicMemberResponse);
+    return topicMemberRepository.findAllByApprovedIsTrue(pageable)
+        .map(TopicMemberResponse::toTopicMemberResponse);
   }
 
   @Transactional
-  public void addTopicMember(UUID topicId, UUID userId, String topicRole) {
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+  public void addTopicMember(UUID topicId, UUID userId, TopicRole topicRole) {
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
-    User userToAdd =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    User userToAdd = userRepository
+        .findById(userId)
+        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    // --- chỉ creator hoặc admin mới được add ---
-    boolean canEditTopic = canManageTopic(currentUser, topic);
-
-    if (!canEditTopic) {
+    if (!authorizationService.canManageTopic(currentUser, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    TopicMember topicMember = new TopicMember();
-    topicMember.setTopic(topic);
-    topicMember.setUser(userToAdd);
-    topicMember.setTopicRole(TopicRole.valueOf(topicRole));
-    topicMember.setApproved(true);
-    topicMember.setJoinedAt(LocalDateTime.now());
+
+    // Check if member already exists
+    boolean existed = topicMemberRepository.existsByUserIdAndTopicId(userId, topicId);
+    if (existed) {
+      throw new AppException(ErrorCode.TOPIC_MEMBER_EXISTED);
+    }
+
+    TopicMember topicMember = TopicMember.builder()
+        .topic(topic)
+        .user(userToAdd)
+        .topicRole(topicRole)
+        .approved(true)
+        .joinedAt(Instant.now())
+        .build();
 
     topicMemberRepository.save(topicMember);
   }
 
-  private static boolean canChangeManagerForTopic(User currentUser, Topic topic) {
-    return currentUser.getRoles().stream().anyMatch(role -> role.getName().equals("ADMIN"))
-        || topic.getCreatedBy().getId().equals(currentUser.getId());
-  }
-
   @Transactional
   public void removeTopicMember(UUID topicMemberId) {
-    TopicMember topicMember =
-        topicMemberRepository
-            .findById(topicMemberId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
+    TopicMember topicMember = topicMemberRepository
+        .findById(topicMemberId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    boolean canManage = canChangeManagerForTopic(currentUser, topicMember.getTopic());
-    if (!canManage) {
+    if (!authorizationService.canManageTopic(currentUser, topicMember.getTopic())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
     topicMemberRepository.deleteById(topicMemberId);
   }
 
-  private boolean canManageTopic(User currentUser, Topic topic) {
-    boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().equals("ADMIN"));
-    boolean isCreator = topic.getCreatedBy().getId().equals(currentUser.getId());
-    boolean isManager =
-        topic.getTopicMembers().stream()
-            .anyMatch(
-                m ->
-                    m.getUser().getId().equals(currentUser.getId())
-                        && m.getTopicRole() == TopicRole.MANAGER);
-
-    return isAdmin || isCreator || isManager;
-  }
-
+  @Transactional
   public void updateTopicMember(UUID topicMemberId, TopicRole topicRole) {
-    TopicMember topicMember =
-        topicMemberRepository
-            .findById(topicMemberId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    TopicMember topicMember = topicMemberRepository
+        .findById(topicMemberId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
+
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    if (!canManageTopic(currentUser, topicMember.getTopic())) {
+    if (!authorizationService.canManageTopic(currentUser, topicMember.getTopic())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
+
     topicMember.setTopicRole(topicRole);
     topicMemberRepository.save(topicMember);
   }
 
   public boolean isTopicMember(UUID topicId, UUID userId) {
-    return topicMemberRepository.existsByUserIdAndTopicIdAndApprovedIsTrue(userId, topicId);
+    return topicMemberRepository.existsByUserIdAndTopicIdAndApprovedTrue(userId, topicId);
   }
 
   public boolean canViewTopic(Topic topic, User user) {
-    if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) return true;
-    return isTopicMember(topic.getId(), user.getId());
+    return authorizationService.canViewTopic(topic, user);
   }
 }

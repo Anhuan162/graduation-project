@@ -1,28 +1,43 @@
 package com.graduation.project.forum.dto;
 
 import com.graduation.project.forum.constant.PostStatus;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import java.util.UUID;
+import lombok.*;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class PostResponse {
-  private String id;
+  private UUID id;
   private String title;
   private String content;
-  private String topicId;
-  private String createdById;
-  private String approvedById;
-  private LocalDateTime createdDateTime;
-  private LocalDateTime approvedAt;
+
+  private Instant createdDateTime;
+  private Instant lastModifiedDateTime;
+  private Instant approvedAt;
+
   private PostStatus postStatus;
+
   private Long reactionCount;
-  private Boolean deleted;
+
+  private boolean deleted;
+
   private List<String> urls;
+  private String slug;
+
+  private UUID topicId;
+  private UUID createdById;
+  private UUID approvedById;
+
+  private TopicInfoResponse topic;
+
+  private String excerpt;
+  private PostAuthorResponse author;
+  private PostStatsResponse stats;
+  private PostUserStateResponse userState;
+  private PostPermissionsResponse permissions;
+  private List<AttachmentResponse> attachments;
 }

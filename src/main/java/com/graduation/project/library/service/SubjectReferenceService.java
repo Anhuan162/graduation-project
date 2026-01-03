@@ -40,48 +40,42 @@ public class SubjectReferenceService {
   private final FacultyRepository facultyRepository;
   private final SemesterRepository semesterRepository;
 
-  public SubjectReferenceResponse createSubjectReference(
-      SubjectReferenceRequest subjectReferenceRequest) throws BadRequestException {
+  public SubjectReferenceResponse createSubjectReference(SubjectReferenceRequest req) {
 
-    boolean exists =
-        subjectReferenceRepository.existsBySubjectIdAndFacultyIdAndSemesterIdAndCohortCode(
-            subjectReferenceRequest.getSubjectId(),
-            subjectReferenceRequest.getFacultyId(),
-            subjectReferenceRequest.getSemesterId(),
-            subjectReferenceRequest.getCohortCode());
+    boolean exists = subjectReferenceRepository
+        .existsBySubjectIdAndFacultyIdAndSemesterIdAndCohortCode(
+            req.getSubjectId(),
+            req.getFacultyId(),
+            req.getSemesterId(),
+            req.getCohortCode());
 
     if (exists) {
-      throw new BadRequestException("SubjectReference đã tồn tại.");
+      throw new AppException(ErrorCode.CONFLICT);
     }
-    Subject subject =
-        subjectRepository
-            .findById(subjectReferenceRequest.getSubjectId())
-            .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_NOT_FOUND));
 
-    Faculty faculty =
-        facultyRepository
-            .findById(subjectReferenceRequest.getFacultyId())
-            .orElseThrow(() -> new AppException(ErrorCode.FACULTY_NOT_FOUND));
+    Subject subject = subjectRepository.findById(req.getSubjectId())
+        .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_NOT_FOUND));
 
-    Semester semester =
-        semesterRepository
-            .findById(subjectReferenceRequest.getSemesterId())
-            .orElseThrow(() -> new AppException(ErrorCode.SEMESTER_NOT_FOUND));
+    Faculty faculty = facultyRepository.findById(req.getFacultyId())
+        .orElseThrow(() -> new AppException(ErrorCode.FACULTY_NOT_FOUND));
+
+    Semester semester = semesterRepository.findById(req.getSemesterId())
+        .orElseThrow(() -> new AppException(ErrorCode.SEMESTER_NOT_FOUND));
 
     SubjectReference subjectReference = new SubjectReference();
     subjectReference.setSubject(subject);
     subjectReference.setFaculty(faculty);
     subjectReference.setSemester(semester);
-    subjectReference.setCohortCode(subjectReferenceRequest.getCohortCode());
+    subjectReference.setCohortCode(req.getCohortCode());
+
     subjectReferenceRepository.save(subjectReference);
     return SubjectReferenceResponse.toSubjectReferenceResponse(subjectReference);
   }
 
   public SubjectReferenceResponse getSubjectReference(UUID subjectReferenceId) {
-    SubjectReference subjectReference =
-        subjectReferenceRepository
-            .findById(subjectReferenceId)
-            .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_REFERENCE_NOT_FOUND));
+    SubjectReference subjectReference = subjectReferenceRepository
+        .findById(subjectReferenceId)
+        .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_REFERENCE_NOT_FOUND));
     return SubjectReferenceResponse.toSubjectReferenceResponse(subjectReference);
   }
 
@@ -92,46 +86,43 @@ public class SubjectReferenceService {
       UUID subjectId,
       Pageable pageable) {
 
-    Specification<SubjectReference> specification =
-        (root, query, cb) -> {
+    Specification<SubjectReference> specification = (root, query, cb) -> {
 
-          // JOIN
-          Join<Object, Object> facultyJoin = root.join("faculty", JoinType.LEFT);
-          Join<Object, Object> subjectJoin = root.join("subject", JoinType.LEFT);
-          Join<Object, Object> semesterJoin = root.join("semester", JoinType.LEFT);
+      // JOIN
+      Join<Object, Object> facultyJoin = root.join("faculty", JoinType.LEFT);
+      Join<Object, Object> subjectJoin = root.join("subject", JoinType.LEFT);
+      Join<Object, Object> semesterJoin = root.join("semester", JoinType.LEFT);
 
-          List<Predicate> predicates = new ArrayList<>();
+      List<Predicate> predicates = new ArrayList<>();
 
-          if (Objects.nonNull(facultyId)) {
-            predicates.add(cb.equal(facultyJoin.get("id"), facultyId));
-          }
+      if (Objects.nonNull(facultyId)) {
+        predicates.add(cb.equal(facultyJoin.get("id"), facultyId));
+      }
 
-          if (Objects.nonNull(semesterId)) {
-            predicates.add(cb.equal(semesterJoin.get("id"), semesterId));
-          }
+      if (Objects.nonNull(semesterId)) {
+        predicates.add(cb.equal(semesterJoin.get("id"), semesterId));
+      }
 
-          if (Objects.nonNull(cohortCode)) {
-            predicates.add(cb.equal(root.get("cohortCode"), cohortCode));
-          }
+      if (Objects.nonNull(cohortCode)) {
+        predicates.add(cb.equal(root.get("cohortCode"), cohortCode));
+      }
 
-          if (Objects.nonNull(subjectId)) {
-            predicates.add(cb.equal(subjectJoin.get("id"), subjectId));
-          }
+      if (Objects.nonNull(subjectId)) {
+        predicates.add(cb.equal(subjectJoin.get("id"), subjectId));
+      }
 
-          return cb.and(predicates.toArray(new Predicate[0]));
-        };
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
 
-    Page<SubjectReference> subjectReferences =
-        subjectReferenceRepository.findAll(specification, pageable);
+    Page<SubjectReference> subjectReferences = subjectReferenceRepository.findAll(specification, pageable);
 
     return subjectReferences.map(SubjectReferenceResponse::toSubjectReferenceResponse);
   }
 
   public void deleteSubjectReference(UUID subjectReferenceId) {
-    SubjectReference subjectReference =
-        subjectReferenceRepository
-            .findById(subjectReferenceId)
-            .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_REFERENCE_NOT_FOUND));
+    SubjectReference subjectReference = subjectReferenceRepository
+        .findById(subjectReferenceId)
+        .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_REFERENCE_NOT_FOUND));
     subjectReferenceRepository.delete(subjectReference);
   }
 }

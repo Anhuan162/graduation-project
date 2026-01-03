@@ -18,8 +18,9 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
+
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -51,18 +52,18 @@ public class AdminAnnouncementService {
     List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
         request.getFileMetadataIds(),
         announcement.getId(),
-        ResourceType.ANNOUNCEMENT,
-        user.getId());
+        ResourceType.ANNOUNCEMENT);
 
     List<String> urls = fileMetadataList.stream().map(FileMetadata::getUrl).toList();
     return CreatedAnnonucementResponse.from(announcement, urls);
   }
 
   public void releaseAnnouncement(UUID announcementId, ReleaseAnnouncementRequest request) {
-    Announcement announcement = announcementRepository.findById(announcementId).orElseThrow();
+    Announcement announcement = announcementRepository.findById(announcementId).orElseThrow(
+        () -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND, "Announcement not found for id: " + announcementId));
 
     if (Boolean.TRUE.equals(announcement.getAnnouncementStatus())) {
-      throw new AppException(ErrorCode.INVALID_REQUEST, "Thông báo đã được gửi");
+      throw new AppException(ErrorCode.CONFLICT, "Thông báo đã được gửi");
     }
 
     Set<String> allClassroomCodes = getAllClassroomCodes(
@@ -83,7 +84,7 @@ public class AdminAnnouncementService {
         .content(announcement.getContent())
         .senderId(user.getId())
         .senderName(user.getEmail())
-        .createdAt(LocalDateTime.now())
+        .createdAt(Instant.now())
         .receiverIds(receiverUserIds)
         .build();
 

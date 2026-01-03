@@ -4,7 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.forum.constant.TopicRole;
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+
+import java.time.Instant;
 import java.util.UUID;
 import lombok.*;
 
@@ -24,7 +25,7 @@ public class TopicMember {
   private TopicRole topicRole;
 
   private boolean approved;
-  private LocalDateTime joinedAt;
+  private Instant joinedAt;
 
   @JsonIgnore
   @ManyToOne

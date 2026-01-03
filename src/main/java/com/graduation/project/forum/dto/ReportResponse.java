@@ -3,7 +3,7 @@ package com.graduation.project.forum.dto;
 import com.graduation.project.forum.constant.ReportReason;
 import com.graduation.project.forum.constant.ReportStatus;
 import com.graduation.project.forum.constant.TargetType;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,6 +27,8 @@ public class ReportResponse {
   private UUID commentId;
 
   private String ipAddress;
-  private LocalDateTime createdAt;
+  private Instant createdAt;
   private String targetPreview;
+  private UUID processedById;
+  private Instant processedAt;
 }

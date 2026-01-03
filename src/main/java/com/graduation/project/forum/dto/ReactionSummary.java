@@ -10,7 +10,7 @@ import lombok.Data;
 @Builder
 public class ReactionSummary {
   private UUID targetId;
-  private Map<ReactionType, Long> counts; // VD: LIKE: 10, LOVE: 5
-  private Long totalReactions; // Tổng: 15
-  private ReactionType userReaction; // User hiện tại đang thả gì (null nếu chưa thả)
+  private Map<ReactionType, Long> counts;
+  private Long totalReactions;
+  private ReactionType userReaction;
 }

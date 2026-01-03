@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 public class ReactionRequest {
-  private UUID targetId; // ID bài viết/comment
-  private TargetType targetType; // POST hoặc COMMENT
-  private ReactionType reactionType; // LIKE, LOVE...
+  private UUID targetId;
+  private TargetType targetType;
+  private ReactionType reactionType;
 }

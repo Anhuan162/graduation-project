@@ -2,50 +2,83 @@ package com.graduation.project.forum.dto;
 
 import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.entity.Post;
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.time.Instant;
+import java.util.*;
 import java.util.UUID;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class DetailPostResponse {
-  private String id;
+  private UUID id;
   private String title;
+  private String excerpt;
   private String content;
   private UUID topicId;
-  private LocalDateTime createdDateTime;
-  private LocalDateTime lastModifiedDateTime;
   private PostStatus postStatus;
+
+  private Instant createdDateTime;
+  private Instant lastModifiedDateTime;
+  private Instant approvedAt;
+
   private UUID createdById;
-  private LocalDateTime approvedAt;
   private Long reactionCount;
-  private Boolean isDeleted;
+  private boolean deleted;
   private List<String> urls;
+
   private boolean isPostCreator;
   private boolean canManageTopic;
+
+  private PostAuthorResponse author;
+  private PostStatsResponse stats;
+  private PostUserStateResponse userState;
+  private PostPermissionsResponse permissions;
+  private List<AttachmentResponse> attachments;
 
   public static DetailPostResponse from(
       Post post,
       Map<UUID, List<String>> urlsByPostId,
       boolean canManageTopic,
       boolean isPostCreator) {
+    List<String> urls = urlsByPostId.getOrDefault(post.getId(), Collections.emptyList());
+
     return DetailPostResponse.builder()
-        .id(post.getId().toString())
+        .id(post.getId())
         .title(post.getTitle())
         .content(post.getContent())
+        .excerpt(buildExcerpt(post.getContent(), 150))
         .topicId(post.getTopic().getId())
+        .postStatus(post.getPostStatus())
+
+        .createdDateTime(post.getCreatedDateTime())
+        .lastModifiedDateTime(post.getLastModifiedDateTime())
+        .approvedAt(post.getApprovedAt())
+
         .createdById(post.getAuthor() != null ? post.getAuthor().getId() : null)
-        .urls(urlsByPostId.getOrDefault(post.getId(), Collections.emptyList()))
+        .reactionCount(post.getReactionCount())
+        .deleted(Boolean.TRUE.equals(post.isDeleted()))
+        .urls(urls)
         .canManageTopic(canManageTopic)
         .isPostCreator(isPostCreator)
+
+        .author(null)
+        .stats(PostStatsResponse.builder()
+            .reactionCount(post.getReactionCount() != null ? post.getReactionCount() : 0L)
+            .build())
+        .userState(null)
+        .permissions(null)
+        .attachments(null)
         .build();
+  }
+
+  private static String buildExcerpt(String content, int maxLen) {
+    if (content == null || content.isEmpty())
+      return "";
+    String plain = content.replaceAll("\\s+", " ").trim();
+    if (plain.length() <= maxLen)
+      return plain;
+    return plain.substring(0, maxLen).trim() + "...";
   }
 }

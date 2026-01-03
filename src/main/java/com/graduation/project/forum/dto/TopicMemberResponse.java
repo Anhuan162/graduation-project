@@ -2,7 +2,7 @@ package com.graduation.project.forum.dto;
 
 import com.graduation.project.forum.entity.TopicMember;
 import com.graduation.project.forum.constant.TopicRole;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,7 +17,7 @@ public class TopicMemberResponse {
   private UUID id;
   private TopicRole topicRole;
   private boolean approved;
-  private LocalDateTime joinedAt;
+  private Instant joinedAt;
   private UUID userId;
   private UUID topicId;
 

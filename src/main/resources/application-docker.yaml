@@ -55,14 +55,23 @@ logging:
         orm:
           jdbc:
             bind: TRACE
-
 app:
+  seed:
+    enabled: true
+    continueOnFailure: true
+    users: 20
+    categories: 5
+    topicsPerCategory: 3
+    postsPerTopic: 5
+    commentsPerPost: 2
+    admin-password: ${ADMIN_PASSWORD}
+
   jwt:
     secret: ${JWT_SECRET}
     accessTokenExpirationMs: 900000 # 15 minutes
     refreshTokenExpirationMs: 604800000 # 7 days
   oauth2:
-    authorizedRedirectUri: http://localhost:3000/oauth2/redirect
+    authorizedRedirectUri: http://localhost:3000/forum
 
 redis:
   stream:

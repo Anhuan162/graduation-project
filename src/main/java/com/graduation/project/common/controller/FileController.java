@@ -22,7 +22,7 @@ public class FileController {
     this.fileService = fileService;
   }
 
-  @PreAuthorize("hasAuthority('CREATE_ANY_FILES') or hasAuthority('CREATE_ALL_FILES')")
+  @PreAuthorize("hasAuthority('CREATE_OWN_FILE') or hasAuthority('MANAGE_ALL_FILE')")
   @PostMapping("/upload")
   public ApiResponse<FileMetadataResponse> uploadFile(
       @RequestParam("file") MultipartFile file,
@@ -31,8 +31,8 @@ public class FileController {
       @RequestParam(required = false) String resourceType,
       @RequestParam(required = false) String resourceId)
       throws IOException {
-    FileMetadataResponse metadata =
-        fileService.uploadAndSaveFile(file, folderName, accessType, resourceType, resourceId);
+    FileMetadataResponse metadata = fileService.uploadAndSaveFile(file, folderName, accessType, resourceType,
+        resourceId);
 
     return ApiResponse.<FileMetadataResponse>builder().result(metadata).build();
   }
@@ -62,16 +62,20 @@ public class FileController {
     return ApiResponse.<List<FileMetadataResponse>>builder().result(result).build();
   }
 
-  @DeleteMapping("/{fileId}")
-  public ApiResponse<?> deleteFile(@PathVariable UUID fileId) {
-    fileService.deleteFile(fileId);
-    return ApiResponse.builder().result(null).build();
+  public record DeleteFilesRequest(List<UUID> fileIds) {
   }
 
+  @PreAuthorize("hasAuthority('DELETE_FILES') or hasAuthority('DELETE_OWN_FILES')")
+  @DeleteMapping("/{fileId}")
+  public ApiResponse<String> deleteFile(@PathVariable UUID fileId) {
+    fileService.deleteFile(fileId);
+    return ApiResponse.ok("Deleted successfully");
+  }
+
+  @PreAuthorize("hasAuthority('DELETE_FILES') or hasAuthority('DELETE_ALL_FILES')")
   @PostMapping("/delete-all-files")
-  public ApiResponse<?> deleteAllFiles(@RequestBody Map<String, List<String>> request) {
-    // Lấy value theo key "fileIds"
-    fileService.deleteAllFiles(request.get("fileIds"));
-    return ApiResponse.builder().result(null).build();
+  public ApiResponse<String> deleteAllFiles(@RequestBody DeleteFilesRequest request) {
+    fileService.deleteAllFiles(request.fileIds().stream().map(UUID::toString).toList());
+    return ApiResponse.ok("Deleted successfully");
   }
 }

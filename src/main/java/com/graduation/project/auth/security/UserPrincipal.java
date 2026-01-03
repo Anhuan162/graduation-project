@@ -21,6 +21,22 @@ public class UserPrincipal implements UserDetails {
 
   private Collection<? extends GrantedAuthority> authorities;
 
+  public UUID getId() {
+    return id;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public String getFullName() {
+    return fullName;
+  }
+
+  public String getAvatarUrl() {
+    return avatar;
+  }
+
   public UserPrincipal(
       UUID id,
       String email,

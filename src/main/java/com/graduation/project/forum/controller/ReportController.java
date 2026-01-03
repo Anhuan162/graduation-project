@@ -30,16 +30,15 @@ public class ReportController {
   public ApiResponse<String> createReport(@Valid @RequestBody ReportRequest request) {
     reportService.createReport(request);
     return ApiResponse.<String>builder()
-        .result("Create report for " + request.getTargetType() + "and" + request.getTargetId())
+        .result("Create report for " + request.getTargetType() + " and " + request.getTargetId())
         .build();
   }
 
   @GetMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
   public ApiResponse<Page<ReportResponse>> getReports(
-      @RequestParam(required = false)
-          ReportStatus status, // Lọc theo trạng thái (PENDING/APPROVED...)
-      @RequestParam(required = false) TargetType type, // Lọc theo loại (POST/COMMENT)
+      @RequestParam(required = false) ReportStatus status,
+      @RequestParam(required = false) TargetType type,
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<ReportResponse>>builder()
         .result(reportService.searchReportsForAdmin(status, type, pageable))
@@ -47,6 +46,7 @@ public class ReportController {
   }
 
   @GetMapping("topic/{topicId}")
+  @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
   public ApiResponse<Page<ReportResponse>> searchReportsByTopic(
       @PathVariable UUID topicId,
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -55,21 +55,16 @@ public class ReportController {
         .build();
   }
 
-  // 2. Xem chi tiết báo cáo
   @GetMapping("/{id}")
-  // @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
   public ApiResponse<ReportResponse> getReportDetail(@PathVariable UUID id) {
     return ApiResponse.<ReportResponse>builder().result(reportService.getReportDetail(id)).build();
   }
 
-  // 3. Xử lý báo cáo (Duyệt/Từ chối + Xóa nội dung vi phạm)
+  @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
   @PatchMapping("/{id}/process")
-  @ResponseStatus(HttpStatus.NO_CONTENT) // 204 No Content
-  // @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
   public ApiResponse<ReportResponse> processReport(
       @PathVariable UUID id, @Valid @RequestBody ProcessReportRequest request) {
-    return ApiResponse.<ReportResponse>builder()
-        .result(reportService.processReport(id, request))
-        .build();
+    return ApiResponse.ok(reportService.processReport(id, request));
   }
 }

@@ -9,7 +9,7 @@ public class ProcessReportRequest {
   @NotNull(message = "Status is required")
   private ReportStatus status;
 
-  private String adminNote; // Ghi chú của admin về quyết định này (optional)
+  private String adminNote;
 
-  private boolean deleteTarget; // True = Xóa luôn bài viết/comment bị report
+  private boolean deleteTarget;
 }

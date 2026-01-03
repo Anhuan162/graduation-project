@@ -29,7 +29,10 @@ public class FileMetadata {
 
   private String contentType;
 
-  private int size;
+  private long size;
+
+  @Column(name = "storage_path")
+  private String storagePath;
 
   @Enumerated(EnumType.STRING)
   private AccessType accessType;

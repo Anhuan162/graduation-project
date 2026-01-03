@@ -19,4 +19,5 @@ public class ActivityLogResponse {
     private String metadata; // Trả về dạng JSON String hoặc Map<String, Object>
     private String ipAddress;
     private LocalDateTime createdAt;
+
 }
