@@ -84,7 +84,7 @@ public class FileController {
   @GetMapping
   public ApiResponse<Page<FileMetadataResponse>> searchFiles(
           @ModelAttribute SearchFileRequest searchFileRequest,
-          @PageableDefault(page = 0, size = 10, sort = "CreatedAt")Pageable pageable) {
+          @PageableDefault(page = 0, size = 10, sort = "createdAt")Pageable pageable) {
     return ApiResponse.<Page<FileMetadataResponse>>builder()
         .result(fileService.searchFiles(searchFileRequest, pageable))
         .build();

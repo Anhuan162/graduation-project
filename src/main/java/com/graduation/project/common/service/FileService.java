@@ -17,10 +17,8 @@ import com.graduation.project.security.exception.ErrorCode;
 import java.io.IOException;
 import java.net.URLConnection;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -222,6 +220,15 @@ public class FileService {
   public FileResponse uploadToDrive(FileMetadataSelected fileMetadataSelected) throws IOException {
 
 
+    UUID fileId = UUID.fromString(fileMetadataSelected.getFileId());
+
+    Optional<FileMetadata> fileMetadata =  fileMetadataRepository.findById(fileId);
+    if (fileMetadata.isEmpty()){
+      throw new AppException(ErrorCode.FILE_NOT_FOUND);
+    }
+    fileMetadata.get().setIsOnDrive(true);
+    fileMetadataRepository.save(fileMetadata.get());
+
     String fileUrl = fileMetadataSelected.getUrl();
     // 1. Download file từ Firebase Storage URL
     RestTemplate rest = new RestTemplate();
@@ -234,6 +241,7 @@ public class FileService {
     byte[] fileBytes = response.getBody();
     String fileName = extractFileName(fileUrl);
     String contentType = URLConnection.guessContentTypeFromName(fileName);
+
 
     return driveService.uploadFile(fileBytes, fileName, contentType);
   }
