@@ -12,7 +12,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileMetadataSelected {
-    private String url;
-    private String contentType;
+//    private String url;
     private String fileId;
 }

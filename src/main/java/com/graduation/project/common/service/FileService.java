@@ -226,10 +226,16 @@ public class FileService {
     if (fileMetadata.isEmpty()){
       throw new AppException(ErrorCode.FILE_NOT_FOUND);
     }
-    fileMetadata.get().setIsOnDrive(true);
-    fileMetadataRepository.save(fileMetadata.get());
+//    if (!fileMetadata.get().getUrl().equals(fileMetadataSelected.getUrl())){
+//      throw new AppException(ErrorCode.URL_NOT_MATCH);
+//    }
+//    if (fileMetadata.get().getFolder() == null ) {
+//      throw new AppException(ErrorCode.FILE_MUST_UPLOAD_TO_FIRE_BASE_FIRST);
+//    }
 
-    String fileUrl = fileMetadataSelected.getUrl();
+    fileMetadata.get().setOnDrive(true);
+    String fileUrlFromDb = fileMetadata.get().getUrl();
+    String fileUrl = fileMetadata.get().getUrl();
     // 1. Download file từ Firebase Storage URL
     RestTemplate rest = new RestTemplate();
     ResponseEntity<byte[]> response = rest.getForEntity(fileUrl, byte[].class);
@@ -242,8 +248,9 @@ public class FileService {
     String fileName = extractFileName(fileUrl);
     String contentType = URLConnection.guessContentTypeFromName(fileName);
 
-
-    return driveService.uploadFile(fileBytes, fileName, contentType);
+    FileResponse fileResponse = driveService.uploadFile(fileBytes, fileName, contentType);
+//    fileMetadataRepository.save(fileMetadata.get());
+    return fileResponse;
   }
 
   private String extractFileName(String url) {

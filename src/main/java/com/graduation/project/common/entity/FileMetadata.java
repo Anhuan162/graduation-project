@@ -42,7 +42,7 @@ public class FileMetadata {
   private LocalDateTime createdAt = LocalDateTime.now();
 
   @Column(name = "is_on_drive")
-  private Boolean isOnDrive;
+  private Boolean onDrive;
 
   @JsonIgnore
   @ManyToOne
