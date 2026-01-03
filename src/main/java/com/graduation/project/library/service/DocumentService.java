@@ -1,6 +1,10 @@
 package com.graduation.project.library.service;
 
-import com.graduation.project.common.service.FirebaseService;
+import com.graduation.project.library.repository.DocumentSpecification;
+import org.springframework.data.jpa.domain.Specification;
+import com.graduation.project.common.entity.User;
+import com.graduation.project.common.service.LocalFileStorageService;
+import com.graduation.project.library.constant.DocumentStatus;
 import com.graduation.project.library.constant.DocumentType;
 import com.graduation.project.library.dto.DocumentRequest;
 import com.graduation.project.library.dto.DocumentResponse;
@@ -9,77 +13,80 @@ import com.graduation.project.library.entity.Subject;
 import com.graduation.project.library.repository.DocumentRepository;
 import com.graduation.project.library.repository.SubjectRepository;
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class DocumentService {
-  private final FirebaseService firebaseService;
+
   private final DocumentRepository documentRepository;
   private final SubjectRepository subjectRepository;
+  private final LocalFileStorageService localFileStorageService;
+  private final DocumentAsyncService documentAsyncService;
 
-  private final String FOLDER_DOCUMENT = "documents";
-  private final String FOLDER_IMAGE = "images";
+  @Transactional
+  public DocumentResponse uploadDocument(MultipartFile file, User user, DocumentRequest request) {
+    // 1. Validate Subject
+    Subject subject = subjectRepository.findById(request.getSubjectId())
+        .orElseThrow(() -> new RuntimeException("Subject not found"));
 
-  public DocumentResponse uploadDocument(
-      MultipartFile document, MultipartFile image, DocumentRequest documentRequest)
-      throws IOException {
+    // 2. Store File Locally (Rename to UUID)
+    String filePath = localFileStorageService.store(file, "documents");
 
-    Optional<Subject> subject = subjectRepository.findById(documentRequest.getSubjectId());
-    if (subject.isEmpty()) {
-      throw new RuntimeException("subject not found!!!");
-    }
-
-    List<Document> checkOldDocument = documentRepository.findByTitle(documentRequest.getTitle());
-    if (checkOldDocument.size() > 0) {
-      throw new RuntimeException("document name already exist!!!");
-    }
-
-    FirebaseService.FileUploadResult documentResult = null;
-    FirebaseService.FileUploadResult imageResult = null;
-    try {
-      documentResult = firebaseService.uploadFile(document, FOLDER_DOCUMENT);
-      imageResult = firebaseService.uploadFile(image, FOLDER_IMAGE);
-    } catch (IOException e) {
-      if (documentResult != null) {
-        try {
-          firebaseService.deleteFile(documentResult.storagePath());
-          log.info("Cleaned up uploaded document file due to image upload failure");
-        } catch (Exception deleteEx) {
-          log.error("Failed to delete document file after upload failure: {}", deleteEx.getMessage(), deleteEx);
-        }
-      }
-      log.error("Upload failed: {}", e.getMessage(), e);
-      throw e;
-    }
-
-    String filePath = documentResult.url();
-    String imageUrl = imageResult.url();
-    Document documentEntity = Document.builder()
-        .title(documentRequest.getTitle())
-        .description(documentRequest.getDescription())
-        .documentType(documentRequest.getDocumentType())
+    // 3. Create Entity (Status: PROCESSING)
+    Document document = Document.builder()
+        .title(request.getTitle())
+        .description(request.getDescription())
+        .documentType(request.getDocumentType())
+        .subject(subject)
+        .uploadedBy(user)
+        .documentStatus(DocumentStatus.PROCESSING) // Async processing will start
         .filePath(filePath)
-        .imageUrl(imageUrl)
-        .subject(subject.get())
+        .originalFilename(file.getOriginalFilename())
+        .mimeType(file.getContentType())
         .build();
-    documentRepository.save(documentEntity);
-    return documentEntity.toDocumentResponse();
+
+    // 4. Save & Flush (Critical: Ensure DB commit before Async reads it)
+    Document savedDoc = documentRepository.saveAndFlush(document);
+
+    // 5. Trigger Async Job
+    documentAsyncService.processDocumentBackground(savedDoc.getId(), filePath);
+
+    // 6. Return Response immediately
+    return savedDoc.toDocumentResponse();
   }
 
-  public Page<DocumentResponse> searchDocuments(
+  public Page<DocumentResponse> searchPublicDocuments(
       UUID subjectId, String title, DocumentType documentType, Pageable pageable) {
-    Page<Document> documentOptionals = documentRepository.findByTitleAndDocumentTypeAndSubjectId(
-        title, documentType, subjectId, pageable);
-    return documentOptionals.map(Document::toDocumentResponse);
+
+    // Strict Filter: Only PUBLISHED documents are visible to public
+    Specification<Document> spec = Specification.where(DocumentSpecification.hasStatus(DocumentStatus.PUBLISHED))
+        .and(DocumentSpecification.containsTitle(title))
+        .and(DocumentSpecification.hasType(documentType))
+        .and(DocumentSpecification.hasSubjectId(subjectId));
+
+    Page<Document> documents = documentRepository.findAll(spec, pageable);
+    return documents.map(Document::toDocumentResponse);
+  }
+
+  public Page<DocumentResponse> searchMyDocuments(
+      User user, String title, DocumentType documentType, DocumentStatus status, Pageable pageable) {
+
+    // Filter: Created by Current User AND dynamic filters
+    Specification<Document> spec = Specification.where(DocumentSpecification.createdBy(user.getId()))
+        .and(DocumentSpecification.containsTitle(title))
+        .and(DocumentSpecification.hasType(documentType))
+        .and(DocumentSpecification.hasStatus(status)); // User can search their own docs by status (e.g. show REJECTED)
+
+    Page<Document> documents = documentRepository.findAll(spec, pageable);
+    return documents.map(Document::toDocumentResponse);
   }
 }

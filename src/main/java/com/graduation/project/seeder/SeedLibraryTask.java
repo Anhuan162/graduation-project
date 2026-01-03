@@ -197,7 +197,7 @@ public class SeedLibraryTask {
                         .subject(subject)
                         .uploadedBy(uploader)
                         .approvedBy(uploader)
-                        .documentStatus(DocumentStatus.APPROVED)
+                        .documentStatus(DocumentStatus.PUBLISHED)
                         .documentType(type)
                         .size(200_000 + rnd.nextInt(2_000_000))
                         .originalFilename(subject.getSubjectCode() + "-" + type.name().toLowerCase() + ".pdf")

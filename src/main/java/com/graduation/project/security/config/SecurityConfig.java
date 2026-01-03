@@ -90,7 +90,10 @@ public class SecurityConfig {
                     "/login/**",
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
-                    "/swagger-ui.html")
+                    "/swagger-ui.html",
+                    "/uploads/**") // Allow public access to uploads
+                .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/documents/**") // Allow public search & details
                 .permitAll()
                 .requestMatchers("/ws/notification/**")
                 .permitAll()
