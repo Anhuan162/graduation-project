@@ -20,6 +20,7 @@ import lombok.*;
 @Entity
 @Table(name = "users")
 public class User {
+
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
@@ -43,16 +44,19 @@ public class User {
   private String studentCode;
 
   private String classCode;
+
   private LocalDateTime registrationDate;
 
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<FileMetadata> fileMetadata;
+  @Builder.Default
+  private List<FileMetadata> fileMetadata = new ArrayList<>();
 
-  @ManyToMany(fetch = FetchType.EAGER)
+  @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
+  @Builder.Default
   private Set<Role> roles = new HashSet<>();
 
-  @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+  @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
   private CpaProfile cpaProfile;
 
   @OneToMany(mappedBy = "creator", cascade = CascadeType.ALL, orphanRemoval = true)

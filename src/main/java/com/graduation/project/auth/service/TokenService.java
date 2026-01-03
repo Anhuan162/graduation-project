@@ -51,10 +51,9 @@ public class TokenService {
     }
     JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
-    JWTClaimsSet jwtClaimsSet =
-        isRefreshToken
-            ? buildJwtClaimSetForRefreshToken(user)
-            : buildJwtClaimSetForAccessToken(user);
+    JWTClaimsSet jwtClaimsSet = isRefreshToken
+        ? buildJwtClaimSetForRefreshToken(user)
+        : buildJwtClaimSetForAccessToken(user);
 
     Payload payload = new Payload(jwtClaimsSet.toJSONObject());
 
@@ -75,21 +74,34 @@ public class TokenService {
         .issuer("graduation_project.com")
         .issueTime(new Date())
         .expirationTime(
-            new Date(Instant.now().plus(refreshTokenValidityMs, ChronoUnit.SECONDS).toEpochMilli()))
+            new Date(Instant.now().plus(refreshTokenValidityMs, ChronoUnit.MILLIS).toEpochMilli()))
         .jwtID(UUID.randomUUID().toString())
         .build();
   }
 
   private JWTClaimsSet buildJwtClaimSetForAccessToken(User user) {
-    return new JWTClaimsSet.Builder()
+    JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder()
         .subject(user.getEmail())
         .issuer("graduation_project.com")
         .issueTime(new Date())
         .expirationTime(
-            new Date(Instant.now().plus(accessTokenValidityMs, ChronoUnit.SECONDS).toEpochMilli()))
+            new Date(Instant.now().plus(accessTokenValidityMs, ChronoUnit.MILLIS).toEpochMilli()))
         .jwtID(UUID.randomUUID().toString())
-        .claim("scope", buildScope(user))
-        .build();
+        .claim("scope", buildScope(user));
+
+    if (user.getId() != null) {
+      builder.claim("userId", user.getId().toString());
+    }
+
+    if (user.getFullName() != null && !user.getFullName().isEmpty()) {
+      builder.claim("fullName", user.getFullName());
+    }
+
+    if (user.getAvatarUrl() != null && !user.getAvatarUrl().isEmpty()) {
+      builder.claim("avatar", user.getAvatarUrl());
+    }
+
+    return builder.build();
   }
 
   public SignedJWT verifyToken(String token, boolean isRefresh) {
@@ -102,16 +114,15 @@ public class TokenService {
 
       SignedJWT signedJWT = SignedJWT.parse(token);
 
-      Date expiryTime =
-          (isRefresh)
-              ? new Date(
-                  signedJWT
-                      .getJWTClaimsSet()
-                      .getIssueTime()
-                      .toInstant()
-                      .plus(refreshTokenValidityMs, ChronoUnit.SECONDS)
-                      .toEpochMilli())
-              : signedJWT.getJWTClaimsSet().getExpirationTime();
+      Date expiryTime = (isRefresh)
+          ? new Date(
+              signedJWT
+                  .getJWTClaimsSet()
+                  .getIssueTime()
+                  .toInstant()
+                  .plus(refreshTokenValidityMs, ChronoUnit.MILLIS)
+                  .toEpochMilli())
+          : signedJWT.getJWTClaimsSet().getExpirationTime();
 
       var verified = signedJWT.verify(verifier);
 

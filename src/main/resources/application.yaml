@@ -77,7 +77,7 @@ logging:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    accessTokenExpirationMs: 150000 # 15 minutes
+    accessTokenExpirationMs: 900000 # 15 minutes
     refreshTokenExpirationMs: 604800000 # 7 days
   oauth2:
     authorizedRedirectUri: http://localhost:3000/oauth2/redirect

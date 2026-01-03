@@ -27,7 +27,6 @@ public class UserProfileResponse {
     String phone;
     String facultyName;
 
-    @JsonFormat(pattern = "yyyy-MM-dd")
     LocalDate dob;
 
     LocalDateTime createdAt;

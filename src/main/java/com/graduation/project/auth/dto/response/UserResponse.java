@@ -16,10 +16,9 @@ import lombok.experimental.FieldDefaults;
 public class UserResponse {
   UUID id;
   String email;
-  String password;
   String fullName;
   Boolean enabled;
-  String avatar_url;
+  String avatarUrl;
   String phone;
   Provider provider;
   String studentCode;
@@ -30,10 +29,9 @@ public class UserResponse {
     return UserResponse.builder()
         .id(user.getId())
         .email(user.getEmail())
-        .password(user.getPassword())
         .fullName(user.getFullName())
         .enabled(user.getEnabled())
-        .avatar_url(user.getAvatarUrl())
+        .avatarUrl(user.getAvatarUrl())
         .phone(user.getPhone())
         .studentCode(user.getStudentCode())
         .roles(RoleResponse.from(user.getRoles()))
