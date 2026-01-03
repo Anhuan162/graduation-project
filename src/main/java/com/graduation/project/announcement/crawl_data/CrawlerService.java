@@ -71,8 +71,8 @@ public class CrawlerService {
   }
 
   // 2. Hàm chạy tự động (Scheduled)
-//  @Scheduled(cron = "${app.crawler.schedule.cron}", zone = "Asia/Ho_Chi_Minh")
-    @Scheduled(fixedRate = 3600000)
+  @Scheduled(cron = "${app.crawler.schedule.cron}", zone = "Asia/Ho_Chi_Minh")
+//    @Scheduled(fixedRate = 3600000)
   public void autoCrawl() {
     log.info("Bắt đầu tiến trình tự động crawl...");
     crawlAll();
@@ -202,7 +202,7 @@ public class CrawlerService {
 
     Elements fileLinks =
         contentEl.select(
-            "a[href$=.pdf], a[href$=.doc], a[href$=.docx], a[href$=.xls], a[href$=.xlsx]");
+            "a[href$=.pdf], a[href$=.doc], a[href$=.docx]");
 
     for (Element fileLink : fileLinks) {
       String fileUrl = fileLink.attr("abs:href");
