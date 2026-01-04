@@ -37,3 +37,5 @@ build/
 /.env
 /docker
 /config-firebase
+
+src/main/resources/graduated-project-firebase-adminsdk-key.json

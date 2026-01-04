@@ -1,6 +1,9 @@
 package com.graduation.project.library.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
+import com.graduation.project.auth.service.CurrentUserService;
+import com.graduation.project.common.entity.User;
+import com.graduation.project.library.constant.DocumentStatus;
 import com.graduation.project.library.constant.DocumentType;
 import com.graduation.project.library.dto.DocumentRequest;
 import com.graduation.project.library.dto.DocumentResponse;
@@ -20,24 +23,29 @@ import org.springframework.web.multipart.MultipartFile;
 public class CommonDocumentController {
 
   private final DocumentService documentService;
+  private final CurrentUserService currentUserService;
 
   @PreAuthorize("hasAuthority('CREATE_OWN_FILE') or hasAuthority('MANAGE_ALL_FILES')")
   @PostMapping("/upload")
   public ApiResponse<DocumentResponse> createDocument(
       @RequestParam("document") MultipartFile document,
-      @RequestParam("image") MultipartFile image,
       @RequestParam() UUID subjectId,
       @RequestParam() String title,
       @RequestParam(required = false, defaultValue = "") String description,
       @RequestParam(required = false) DocumentType documentType)
       throws IOException {
+
+    User currentUser = currentUserService.getCurrentUserEntity();
+
     DocumentRequest documentRequest = DocumentRequest.builder()
         .title(title)
         .documentType(documentType)
         .description(description)
         .subjectId(subjectId)
         .build();
-    DocumentResponse res = documentService.uploadDocument(document, image, documentRequest);
+
+    // Note: Image upload is removed as it's now auto-generated
+    DocumentResponse res = documentService.uploadDocument(document, currentUser, documentRequest);
     return ApiResponse.<DocumentResponse>builder().result(res).build();
   }
 
@@ -46,7 +54,26 @@ public class CommonDocumentController {
       @RequestParam(required = false) UUID subjectId,
       @RequestParam(required = false) String title,
       @RequestParam(required = false) DocumentType documentType,
+      @RequestParam(required = false) DocumentStatus documentStatus,
       Pageable pageable) {
-    return ApiResponse.ok(documentService.searchDocuments(subjectId, title, documentType, pageable));
+    return ApiResponse.ok(
+        documentService.searchPublicDocuments(subjectId, title, documentType, documentStatus, pageable));
+  }
+
+  @GetMapping("/{id}")
+  public ApiResponse<DocumentResponse> getDocumentById(@PathVariable UUID id) {
+    return ApiResponse.ok(documentService.getDocumentById(id));
+  }
+
+  @GetMapping("/me")
+  public ApiResponse<Page<DocumentResponse>> getMyDocuments(
+      @RequestParam(required = false) String title,
+      @RequestParam(required = false) DocumentType documentType,
+      @RequestParam(required = false) DocumentStatus status,
+      Pageable pageable) {
+
+    User currentUser = currentUserService.getCurrentUserEntity();
+    return ApiResponse.ok(
+        documentService.searchMyDocuments(currentUser, title, documentType, status, pageable));
   }
 }

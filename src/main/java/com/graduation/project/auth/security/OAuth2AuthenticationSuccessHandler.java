@@ -162,7 +162,7 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
 
   private void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
     Cookie cookie = new Cookie(name, value);
-    cookie.setHttpOnly(true);
+    cookie.setHttpOnly(false);
     cookie.setPath("/");
     cookie.setMaxAge(maxAge);
     // cookie.setSecure(true); // bật khi HTTPS (production)

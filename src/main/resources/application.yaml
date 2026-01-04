@@ -10,12 +10,15 @@ spring:
     password: root
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
 
   servlet:
     multipart:
@@ -84,6 +87,10 @@ app:
     postsPerTopic: 5
     commentsPerPost: 2
     admin-password: Admin@123
+
+  firebase:
+    config-path: classpath:graduated-project-firebase-adminsdk-key.json
+    bucket-name: graduated-project-17647.firebasestorage.app
 
   jwt:
     secret: ${JWT_SECRET}

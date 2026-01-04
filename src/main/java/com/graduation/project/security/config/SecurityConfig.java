@@ -61,6 +61,7 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
 
     httpSecurity
+        .cors(org.springframework.security.config.Customizer.withDefaults())
         .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
@@ -90,7 +91,14 @@ public class SecurityConfig {
                     "/login/**",
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
-                    "/swagger-ui.html")
+                    "/swagger-ui.html",
+                    "/uploads/**") // Allow public access to uploads
+                .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/documents/**") // Allow public search & details
+                .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/subjects/**")
+                .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/posts/**")
                 .permitAll()
                 .requestMatchers("/ws/notification/**")
                 .permitAll()
