@@ -22,4 +22,9 @@ public class UserAuthResponse {
     String fullName;
     String avatar;
     Set<String> permissions;
+
+    String phone;
+    String studentCode;
+    String facultyName;
+    String classCode;
 }
