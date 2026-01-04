@@ -60,6 +60,11 @@ public class CommonDocumentController {
         documentService.searchPublicDocuments(subjectId, title, documentType, documentStatus, pageable));
   }
 
+  @GetMapping("/{id}")
+  public ApiResponse<DocumentResponse> getDocumentById(@PathVariable UUID id) {
+    return ApiResponse.ok(documentService.getDocumentById(id));
+  }
+
   @GetMapping("/me")
   public ApiResponse<Page<DocumentResponse>> getMyDocuments(
       @RequestParam(required = false) String title,

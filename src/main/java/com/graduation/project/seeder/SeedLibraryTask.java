@@ -180,6 +180,17 @@ public class SeedLibraryTask {
         List<Document> docs = new ArrayList<>();
         Random rnd = new Random();
 
+        // Valid statuses for seeding (excluding PROCESSING and FAILED as they are
+        // transient states)
+        DocumentStatus[] validStatuses = {
+                DocumentStatus.PUBLISHED, // 60% of documents
+                DocumentStatus.PUBLISHED,
+                DocumentStatus.PUBLISHED,
+                DocumentStatus.PENDING, // 30% of documents
+                DocumentStatus.PENDING,
+                DocumentStatus.REJECTED // 10% of documents
+        };
+
         for (Subject subject : subjects) {
             for (int i = 0; i < perSubject; i++) {
                 DocumentType type = DocumentType.values()[rnd.nextInt(DocumentType.values().length)];
@@ -190,14 +201,17 @@ public class SeedLibraryTask {
 
                 String checksum = sha256(title + "|" + filePath);
 
+                // Select a valid status for this document
+                DocumentStatus status = validStatuses[i % validStatuses.length];
+
                 Document doc = Document.builder()
                         .title(title)
                         .description("Seeded document for " + subject.getSubjectName())
                         .filePath(filePath)
                         .subject(subject)
                         .uploadedBy(uploader)
-                        .approvedBy(uploader)
-                        .documentStatus(DocumentStatus.PUBLISHED)
+                        .approvedBy(status == DocumentStatus.PUBLISHED ? uploader : null)
+                        .documentStatus(status) // Always use a valid enum value
                         .documentType(type)
                         .size(200_000 + rnd.nextInt(2_000_000))
                         .originalFilename(subject.getSubjectCode() + "-" + type.name().toLowerCase() + ".pdf")
@@ -208,7 +222,9 @@ public class SeedLibraryTask {
                         .downloadCount(rnd.nextInt(300))
                         .createdAt(LocalDateTime.now().minusDays(rnd.nextInt(60)))
                         .updatedAt(LocalDateTime.now())
-                        .approvedAt(LocalDateTime.now().minusDays(rnd.nextInt(30)))
+                        .approvedAt(status == DocumentStatus.PUBLISHED ? LocalDateTime.now().minusDays(rnd.nextInt(30))
+                                : null)
+                        .rejectionReason(status == DocumentStatus.REJECTED ? "Seeded rejection: Quality issue" : null)
                         .imageUrl("https://picsum.photos/seed/" + checksum.substring(0, 8) + "/640/360")
                         .build();
 
@@ -217,7 +233,7 @@ public class SeedLibraryTask {
         }
 
         documentRepository.saveAll(docs);
-        log.info(" - seeded documents: {}", docs.size());
+        log.info(" - seeded documents: {} (PUBLISHED: ~60%, PENDING: ~30%, REJECTED: ~10%)", docs.size());
     }
 
     private static String sha256(String input) {

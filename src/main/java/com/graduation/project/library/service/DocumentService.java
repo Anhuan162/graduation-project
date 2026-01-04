@@ -96,4 +96,20 @@ public class DocumentService {
     Page<Document> documents = documentRepository.findAll(spec, pageable);
     return documents.map(Document::toDocumentResponse);
   }
+
+  public DocumentResponse getDocumentById(UUID id) {
+    Document document = documentRepository.findById(id)
+        .orElseThrow(() -> new RuntimeException("Document not found"));
+
+    // For public access, we might want to restrict to PUBLISHED status
+    // But since the controller is where permissions are often checked, or here.
+    // Let's check status.
+    if (document.getDocumentStatus() != DocumentStatus.PUBLISHED) {
+      // Option: Allow if current user is owner (needs user context)
+      // For now, strict public rule:
+      throw new RuntimeException("Document is not available (Status: " + document.getDocumentStatus() + ")");
+    }
+
+    return document.toDocumentResponse();
+  }
 }
