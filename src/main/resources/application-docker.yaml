@@ -5,9 +5,11 @@ spring:
   application:
     name: project
   datasource:
-    url: jdbc:postgresql://db:5432/authdb
-    username: postgres
-    password: root
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://db:5432/authdb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 5  # Reduced for cloud free tier limits
   jpa:
     hibernate:
       ddl-auto: none
@@ -63,7 +65,7 @@ app:
     accessTokenExpirationMs: 15000     # 15 minutes
     refreshTokenExpirationMs: 604800000 # 7 days
   oauth2:
-    authorizedRedirectUri: http://localhost:3000/oauth2/redirect
+    authorizedRedirectUri: http://localhost:3000/
   crawler:
     schedule:
       cron: 0 0 2 * * *

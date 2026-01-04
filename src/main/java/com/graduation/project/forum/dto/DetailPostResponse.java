@@ -1,5 +1,6 @@
 package com.graduation.project.forum.dto;
 
+import com.graduation.project.common.dto.FileMetadataResponse;
 import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.entity.Post;
 import java.time.LocalDateTime;
@@ -28,13 +29,13 @@ public class DetailPostResponse {
   private LocalDateTime approvedAt;
   private Long reactionCount;
   private Boolean isDeleted;
-  private List<String> urls;
+  private List<FileMetadataResponse> attachments;
   private boolean isPostCreator;
   private boolean canManageTopic;
 
   public static DetailPostResponse from(
       Post post,
-      Map<UUID, List<String>> urlsByPostId,
+      Map<UUID, List<FileMetadataResponse>> filesByPostId,
       boolean canManageTopic,
       boolean isPostCreator) {
     return DetailPostResponse.builder()
@@ -43,7 +44,7 @@ public class DetailPostResponse {
         .content(post.getContent())
         .topicId(post.getTopic().getId())
         .createdById(post.getAuthor() != null ? post.getAuthor().getId() : null)
-        .urls(urlsByPostId.getOrDefault(post.getId(), Collections.emptyList()))
+        .attachments(filesByPostId.getOrDefault(post.getId(), Collections.emptyList()))
         .canManageTopic(canManageTopic)
         .isPostCreator(isPostCreator)
         .build();
