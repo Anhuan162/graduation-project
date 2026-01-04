@@ -144,6 +144,9 @@ public class Document {
         .pageCount(this.pageCount)
         .isPremium(this.isPremium)
         .fileSize(this.size)
+        .viewCount(0) // Default to 0 as entity lacks viewCount
+        .downloadCount(this.downloadCount)
+        .originalFilename(this.originalFilename)
         .createdAt(this.createdAt)
         .rejectionReason(this.rejectionReason)
         .build();

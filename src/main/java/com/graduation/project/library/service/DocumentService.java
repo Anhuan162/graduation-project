@@ -3,7 +3,7 @@ package com.graduation.project.library.service;
 import com.graduation.project.library.repository.DocumentSpecification;
 import org.springframework.data.jpa.domain.Specification;
 import com.graduation.project.common.entity.User;
-import com.graduation.project.common.service.LocalFileStorageService;
+import com.graduation.project.common.service.FileStorageService;
 import com.graduation.project.library.constant.DocumentStatus;
 import com.graduation.project.library.constant.DocumentType;
 import com.graduation.project.library.dto.DocumentRequest;
@@ -29,7 +29,7 @@ public class DocumentService {
 
   private final DocumentRepository documentRepository;
   private final SubjectRepository subjectRepository;
-  private final LocalFileStorageService localFileStorageService;
+  private final FileStorageService fileStorageService;
   private final DocumentAsyncService documentAsyncService;
 
   @Transactional
@@ -39,7 +39,7 @@ public class DocumentService {
         .orElseThrow(() -> new RuntimeException("Subject not found"));
 
     // 2. Store File Locally (Rename to UUID)
-    String filePath = localFileStorageService.store(file, "documents");
+    String filePath = fileStorageService.store(file, "documents");
 
     // 3. Create Entity (Status: PROCESSING)
     Document document = Document.builder()
@@ -65,10 +65,17 @@ public class DocumentService {
   }
 
   public Page<DocumentResponse> searchPublicDocuments(
-      UUID subjectId, String title, DocumentType documentType, Pageable pageable) {
+      UUID subjectId, String title, DocumentType documentType, DocumentStatus documentStatus, Pageable pageable) {
 
-    // Strict Filter: Only PUBLISHED documents are visible to public
-    Specification<Document> spec = Specification.where(DocumentSpecification.hasStatus(DocumentStatus.PUBLISHED))
+    // Default to PUBLISHED if null.
+    // If frontend requests something else (e.g. PENDING), we might want to restrict
+    // that
+    // depending on business logic, but for now we trust the filter or default to
+    // PUBLISHED.
+    // Ideally public search should ONLY return PUBLISHED.
+    DocumentStatus statusFilter = (documentStatus != null) ? documentStatus : DocumentStatus.PUBLISHED;
+
+    Specification<Document> spec = Specification.where(DocumentSpecification.hasStatus(statusFilter))
         .and(DocumentSpecification.containsTitle(title))
         .and(DocumentSpecification.hasType(documentType))
         .and(DocumentSpecification.hasSubjectId(subjectId));

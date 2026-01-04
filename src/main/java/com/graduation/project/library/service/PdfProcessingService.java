@@ -31,8 +31,8 @@ public class PdfProcessingService {
         }
     }
 
-    public List<String> convertPagesToImages(File pdfFile, int maxPages) {
-        List<String> imagePaths = new ArrayList<>();
+    public List<File> convertPagesToImages(File pdfFile, int maxPages) {
+        List<File> imageFiles = new ArrayList<>();
         try (PDDocument document = PDDocument.load(pdfFile)) {
             PDFRenderer pdfRenderer = new PDFRenderer(document);
             int pages = Math.min(document.getNumberOfPages(), maxPages);
@@ -43,19 +43,13 @@ public class PdfProcessingService {
                 // renderImageWithDPI(page, 72) is safer for consistent size
                 BufferedImage bim = pdfRenderer.renderImageWithDPI(page, 72, ImageType.RGB);
 
-                String imageName = UUID.randomUUID().toString() + "_p" + (page + 1) + ".jpg";
-                Path imagePath = rootLocation.resolve("images").resolve(imageName);
-                File outputFile = imagePath.toFile();
-
-                // Ensure parent exists
-                outputFile.getParentFile().mkdirs();
-
-                ImageIO.write(bim, "jpg", outputFile);
-                imagePaths.add("images/" + imageName);
+                File tempFile = File.createTempFile("pdf-preview-" + UUID.randomUUID(), ".jpg");
+                ImageIO.write(bim, "jpg", tempFile);
+                imageFiles.add(tempFile);
             }
         } catch (IOException e) {
             log.error("Failed to convert PDF to images: " + pdfFile.getName(), e);
         }
-        return imagePaths;
+        return imageFiles;
     }
 }

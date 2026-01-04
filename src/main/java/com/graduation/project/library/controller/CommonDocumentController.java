@@ -54,9 +54,10 @@ public class CommonDocumentController {
       @RequestParam(required = false) UUID subjectId,
       @RequestParam(required = false) String title,
       @RequestParam(required = false) DocumentType documentType,
+      @RequestParam(required = false) DocumentStatus documentStatus,
       Pageable pageable) {
     return ApiResponse.ok(
-        documentService.searchPublicDocuments(subjectId, title, documentType, pageable));
+        documentService.searchPublicDocuments(subjectId, title, documentType, documentStatus, pageable));
   }
 
   @GetMapping("/me")

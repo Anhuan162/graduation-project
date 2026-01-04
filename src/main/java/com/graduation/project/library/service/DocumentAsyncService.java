@@ -1,9 +1,16 @@
 package com.graduation.project.library.service;
 
+import com.graduation.project.common.service.FileStorageService;
 import com.graduation.project.library.constant.DocumentStatus;
 import com.graduation.project.library.entity.Document;
 import com.graduation.project.library.repository.DocumentRepository;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -19,64 +26,88 @@ public class DocumentAsyncService {
 
     private final DocumentRepository documentRepository;
     private final PdfProcessingService pdfProcessingService;
+    private final FileStorageService fileStorageService;
 
     @Async("taskExecutor")
     @Transactional
     public void processDocumentBackground(UUID documentId, String filePath) {
         log.info("Starting background processing for document: {}", documentId);
-        try {
-            // 1. Simulate delay if needed (optional)
-            // Thread.sleep(1000);
+        File pdfFile = null;
+        List<File> tempImageFiles = new ArrayList<>();
 
-            // 2. Fetch Document (Must exist because Sync method committed)
+        try {
+            // 1. Fetch Document
             Document document = documentRepository.findById(documentId)
                     .orElseThrow(() -> new RuntimeException("Document not found in async job: " + documentId));
 
-            // 3. Process PDF
-            // Construct absolute path properly.
-            // Assuming LocalFileStorageService saves relative to project root 'uploads'
-            // But filePath stored is relative "documents/uuid.pdf".
-            File pdfFile = new File("uploads/" + filePath);
-
-            if (!pdfFile.exists()) {
-                log.error("File not found on disk: {}", pdfFile.getAbsolutePath());
-                document.setDocumentStatus(DocumentStatus.REJECTED);
-                documentRepository.save(document);
-                return;
+            // 2. Resolve PDF File (Local or Remote)
+            if (filePath.startsWith("http")) {
+                pdfFile = downloadToTemp(filePath);
+            } else {
+                pdfFile = new File("uploads/" + filePath);
+                if (!pdfFile.exists()) {
+                    throw new IOException("File not found on disk: " + pdfFile.getAbsolutePath());
+                }
             }
 
+            // 3. Process PDF -> Temp Images
             int pageCount = pdfProcessingService.getPageCount(pdfFile);
-            List<String> previewImages = pdfProcessingService.convertPagesToImages(pdfFile, 3);
+            tempImageFiles = pdfProcessingService.convertPagesToImages(pdfFile, 3);
+
+            // 4. Upload Images to Storage -> Public URLs
+            List<String> previewImageUrls = new ArrayList<>();
+            for (File imgFile : tempImageFiles) {
+                String imageUrl = fileStorageService.store(imgFile, "images");
+                previewImageUrls.add(imageUrl);
+            }
 
             String thumbnailUrl = null;
-            if (!previewImages.isEmpty()) {
-                thumbnailUrl = previewImages.get(0);
+            if (!previewImageUrls.isEmpty()) {
+                thumbnailUrl = previewImageUrls.get(0);
             }
 
-            // 4. Update Entity
+            // 5. Update Entity
             document.setPageCount(pageCount);
-            document.setPreviewImages(previewImages);
+            document.setPreviewImages(previewImageUrls);
             document.setThumbnailUrl(thumbnailUrl);
-            document.setSize(pdfFile.length());
+            document.setSize(pdfFile.length()); // Note: if remote, this is temp file size
 
-            // Update status to PENDING (Waiting for Admin approval)
             document.setDocumentStatus(DocumentStatus.PENDING);
-
             documentRepository.save(document);
+
             log.info("Successfully processed document: {}", documentId);
 
         } catch (Exception e) {
             log.error("Error processing document: {}", documentId, e);
-            // Handle failure status
             try {
                 Document document = documentRepository.findById(documentId).orElse(null);
                 if (document != null) {
-                    document.setDocumentStatus(DocumentStatus.REJECTED); // Or ERROR
+                    document.setDocumentStatus(DocumentStatus.REJECTED);
                     documentRepository.save(document);
                 }
             } catch (Exception ex) {
                 log.error("Failed to update error status", ex);
             }
+        } finally {
+            // 6. Cleanup Temp Files
+            if (filePath.startsWith("http") && pdfFile != null && pdfFile.exists()) {
+                pdfFile.delete();
+            }
+            if (tempImageFiles != null) {
+                for (File f : tempImageFiles) {
+                    if (f.exists())
+                        f.delete();
+                }
+            }
         }
+    }
+
+    private File downloadToTemp(String urlStr) throws IOException {
+        URL url = new URL(urlStr);
+        File temp = File.createTempFile("downloaded-" + UUID.randomUUID(), ".pdf");
+        try (InputStream in = url.openStream()) {
+            Files.copy(in, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        }
+        return temp;
     }
 }

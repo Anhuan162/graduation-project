@@ -88,6 +88,10 @@ app:
     commentsPerPost: 2
     admin-password: Admin@123
 
+  firebase:
+    config-path: classpath:graduated-project-firebase-adminsdk-key.json
+    bucket-name: graduated-project-17647.firebasestorage.app
+
   jwt:
     secret: ${JWT_SECRET}
     accessTokenExpirationMs: 900000 # 15 minutes

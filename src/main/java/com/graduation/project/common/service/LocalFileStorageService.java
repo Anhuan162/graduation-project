@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @Slf4j
-public class LocalFileStorageService {
+public class LocalFileStorageService implements FileStorageService {
 
     private final Path rootLocation = Paths.get("uploads");
 
@@ -67,6 +67,30 @@ public class LocalFileStorageService {
             Files.copy(file.getInputStream(), destinationFile);
 
             // Return relative path for DB
+            return subDir + "/" + newFilename;
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to store file.", e);
+        }
+    }
+
+    @Override
+    public String store(java.io.File file, String subDir) {
+        try {
+            String originalFilename = file.getName();
+            String extension = "pdf"; // Default assumption, or extract
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1);
+            }
+
+            String newFilename = UUID.randomUUID().toString() + "." + extension;
+            Path destinationFile = this.rootLocation.resolve(subDir).resolve(newFilename)
+                    .normalize().toAbsolutePath();
+
+            if (!destinationFile.getParent().equals(this.rootLocation.resolve(subDir).normalize().toAbsolutePath())) {
+                throw new RuntimeException("Cannot store file outside current directory.");
+            }
+
+            Files.copy(file.toPath(), destinationFile);
             return subDir + "/" + newFilename;
         } catch (IOException e) {
             throw new RuntimeException("Failed to store file.", e);

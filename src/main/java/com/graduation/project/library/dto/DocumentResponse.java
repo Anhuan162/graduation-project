@@ -25,6 +25,10 @@ public class DocumentResponse {
     private Boolean isPremium;
     private Long fileSize;
 
+    private Integer viewCount;
+    private Integer downloadCount;
+    private String originalFilename;
+
     private String rejectionReason;
 
     private LocalDateTime createdAt;

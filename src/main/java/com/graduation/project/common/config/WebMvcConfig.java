@@ -15,4 +15,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations("file:./uploads/");
     }
+
+    @Override
+    public void addArgumentResolvers(
+            java.util.List<org.springframework.web.method.support.HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(new org.springframework.data.web.PageableHandlerMethodArgumentResolver());
+    }
 }
