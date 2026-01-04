@@ -49,6 +49,9 @@ public enum ErrorCode {
   INVALID_FACULTY_CODE(1039, "Faculty code is invalid", HttpStatus.BAD_REQUEST),
   UPLOAD_FILE_FAILED(1040, "Can not upload this file", HttpStatus.BAD_REQUEST),
   FACULTY_EXISTED(1041, "Faculty already existed", HttpStatus.BAD_REQUEST),
+  BAD_REQUEST(1042, "Bad request", HttpStatus.BAD_REQUEST),
+  SESSION_RESET_PASSWORD_HAS_USED(
+      1043, "Reset password session has already been used", HttpStatus.BAD_REQUEST),
   ;
 
   private final int code;

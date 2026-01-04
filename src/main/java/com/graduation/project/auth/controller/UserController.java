@@ -10,8 +10,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,7 +48,12 @@ public class UserController {
   @GetMapping
   ApiResponse<Page<UserResponse>> searchUsers(
       @ModelAttribute SearchUserRequest searchUserRequest,
-      @PageableDefault(page = 0, size = 10, sort = "registrationDate", direction = Sort.Direction.DESC) Pageable pageable) {
+      @PageableDefault(
+              page = 0,
+              size = 10,
+              sort = "registrationDate",
+              direction = Sort.Direction.DESC)
+          Pageable pageable) {
     return ApiResponse.<Page<UserResponse>>builder()
         .result(userService.searchUsers(searchUserRequest, pageable))
         .build();
@@ -62,39 +67,37 @@ public class UserController {
   }
 
   @PostMapping("/password/reset")
-  public ApiResponse<String> requestResetPassword(
-      @RequestBody ResetPasswordRequest request) {
+  public ApiResponse<String> requestResetPassword(@RequestBody ResetPasswordRequest request) {
     return ApiResponse.<String>builder()
-        .result(userService.sendOtpToUserToResetPassword(request.getEmail())).build();
+        .result(userService.sendOtpToUserToResetPassword(request.getEmail()))
+        .build();
   }
 
   @PostMapping("/otp")
-  public ApiResponse<String> verifyOtp(
-      @Valid @RequestBody VerifyOtpRequest request) {
-    return ApiResponse.<String>builder().result(userService.verifyOtp(request.getOtp(), request.getEmail())).build();
+  public ApiResponse<String> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+    return ApiResponse.<String>builder()
+        .result(userService.verifyOtp(request.getOtp(), request.getEmail()))
+        .build();
   }
 
   @PutMapping("/change-password")
-  public ApiResponse<String> changePassword(
-      @Valid @RequestBody ChangePasswordRequest request) {
-    return ApiResponse.<String>builder().result(
-        userService.changePassword(request.getPasswordSessionId(), request.getNewPassword())).build();
+  public ApiResponse<String> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+    return ApiResponse.<String>builder()
+        .result(
+            userService.changePassword(request.getPasswordSessionId(), request.getNewPassword()))
+        .build();
   }
 
   @PreAuthorize("isAuthenticated()")
   @GetMapping("/me")
   public ApiResponse<UserAuthResponse> getAuthInfo() {
-    return ApiResponse.<UserAuthResponse>builder()
-        .result(userService.getAuthInfo())
-        .build();
+    return ApiResponse.<UserAuthResponse>builder().result(userService.getAuthInfo()).build();
   }
 
   @PreAuthorize("isAuthenticated()")
   @GetMapping("/profile")
   public ApiResponse<UserProfileResponse> getMyProfile() {
-    return ApiResponse.<UserProfileResponse>builder()
-        .result(userService.getUserProfile())
-        .build();
+    return ApiResponse.<UserProfileResponse>builder().result(userService.getMyProfile()).build();
   }
 
   @PreAuthorize("isAuthenticated()")
@@ -106,12 +109,25 @@ public class UserController {
       @RequestParam(value = "studentCode", required = false) String studentCode,
       @RequestParam(value = "classCode", required = false) String classCode) {
 
-    UserProfileUpdateRequest userProfileRequest = UserProfileUpdateRequest.builder()
-        .phone(phone)
-        .classCode(classCode)
-        .studentCode(studentCode)
-        .avatarFile(avatarFile)
-        .fullName(fullName).build();
-    return ApiResponse.<UserProfileResponse>builder().result(userService.updateUserProfile(userProfileRequest)).build();
+    UserProfileUpdateRequest userProfileRequest =
+        UserProfileUpdateRequest.builder()
+            .phone(phone)
+            .classCode(classCode)
+            .studentCode(studentCode)
+            .avatarFile(avatarFile)
+            .fullName(fullName)
+            .build();
+    return ApiResponse.<UserProfileResponse>builder()
+        .result(userService.updateUserProfile(userProfileRequest))
+        .build();
+  }
+
+  @PreAuthorize("isAuthenticated()")
+  @PatchMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE)
+  public ApiResponse<UserProfileResponse> updateProfileInfo(
+      @Valid @RequestBody UserProfileUpdateRequest request) {
+    return ApiResponse.<UserProfileResponse>builder()
+        .result(userService.updateProfileInfo(request))
+        .build();
   }
 }
