@@ -42,12 +42,11 @@ public class CpaProfileService {
       throw new AppException(ErrorCode.STUDENT_CODE_NULL);
     }
     String cpaProfileCode = "CPA" + studentCode;
-    CpaProfile cpaProfile =
-        CpaProfile.builder()
-            .cpaProfileCode(cpaProfileCode)
-            .cpaProfileName(studentCode)
-            .user(user)
-            .build();
+    CpaProfile cpaProfile = CpaProfile.builder()
+        .cpaProfileCode(cpaProfileCode)
+        .cpaProfileName(studentCode)
+        .user(user)
+        .build();
     GpaProfile gpaProfile = gpaProfileService.addGpaProfile(studentCode, 1, cpaProfile);
 
     cpaProfile.getGpaProfiles().add(gpaProfile);
@@ -57,15 +56,13 @@ public class CpaProfileService {
   }
 
   public CpaProfileResponse addGpaProfileForCpaProfile(String cpaProfileId) {
-    CpaProfile cpaProfile =
-        cpaProfileRepository
-            .findById(UUID.fromString(cpaProfileId))
-            .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
-    GpaProfile gpaProfile =
-        gpaProfileService.addGpaProfile(
-            cpaProfile.getUser().getStudentCode(),
-            cpaProfile.getGpaProfiles().size() + 1,
-            cpaProfile);
+    CpaProfile cpaProfile = cpaProfileRepository
+        .findById(UUID.fromString(cpaProfileId))
+        .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
+    GpaProfile gpaProfile = gpaProfileService.addGpaProfile(
+        cpaProfile.getUser().getStudentCode(),
+        cpaProfile.getGpaProfiles().size() + 1,
+        cpaProfile);
     cpaProfile.getGpaProfiles().add(gpaProfile);
     cpaProfileRepository.save(cpaProfile);
 
@@ -73,10 +70,8 @@ public class CpaProfileService {
   }
 
   public CpaProfileResponse deleteGpaProfileInCpaProfile(String cpaProfileId, String gpaProfileId) {
-    CpaProfile cpaProfile =
-        cpaProfileRepository.findById(UUID.fromString(cpaProfileId)).orElseThrow();
-    GpaProfile gpaProfile =
-        gpaProfileRepository.findById(UUID.fromString(gpaProfileId)).orElseThrow();
+    CpaProfile cpaProfile = cpaProfileRepository.findById(UUID.fromString(cpaProfileId)).orElseThrow();
+    GpaProfile gpaProfile = gpaProfileRepository.findById(UUID.fromString(gpaProfileId)).orElseThrow();
     int passedCredits = gpaProfile.getPassedCredits();
     Double totalWeightedScore = gpaProfile.getTotalWeightedScore();
     int previousAccumulatedCredits = cpaProfile.getAccumulatedCredits();
@@ -101,18 +96,17 @@ public class CpaProfileService {
     return cpaProfileMapper.toCpaProfileResponse(cpaProfile);
   }
 
-  public CpaProfileResponse calculateCpaScore(
+  public CpaProfileResponse updateCpaProfile(
       String cpaProfileId, CpaProfileRequest cpaProfileRequest) {
     int accumulatedCredits = 0;
     double totalAccumulatedScore = 0;
-    CpaProfile cpaProfile =
-        cpaProfileRepository
-            .findById(UUID.fromString(cpaProfileId))
-            .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
+    CpaProfile cpaProfile = cpaProfileRepository
+        .findById(UUID.fromString(cpaProfileId))
+        .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
 
     List<GpaProfile> gpaProfiles = new ArrayList<>();
     for (GpaProfileRequest gpaProfileRequest : cpaProfileRequest.getGpaProfileRequests()) {
-      GpaProfile gpaProfile = gpaProfileService.calculateGpaScore(gpaProfileRequest);
+      GpaProfile gpaProfile = gpaProfileService.updateGpaProfile(gpaProfileRequest);
       gpaProfile.setCpaProfile(cpaProfile);
       accumulatedCredits += gpaProfile.getPassedCredits();
       totalAccumulatedScore += gpaProfile.getTotalWeightedScore();
@@ -147,10 +141,9 @@ public class CpaProfileService {
   }
 
   public CpaProfileResponse getCpaProfile(String cpaProfileId) {
-    CpaProfile cpaProfile =
-        cpaProfileRepository
-            .findById(UUID.fromString(cpaProfileId))
-            .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
+    CpaProfile cpaProfile = cpaProfileRepository
+        .findById(UUID.fromString(cpaProfileId))
+        .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
     return cpaProfileMapper.toCpaProfileResponse(cpaProfile);
   }
 }

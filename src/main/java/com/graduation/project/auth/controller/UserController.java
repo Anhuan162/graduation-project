@@ -1,5 +1,6 @@
 package com.graduation.project.auth.controller;
 
+import com.graduation.project.auth.dto.UserProfileUpdateDto;
 import com.graduation.project.auth.dto.VerifyUserDto;
 import com.graduation.project.auth.dto.request.*;
 import com.graduation.project.auth.dto.response.*;
@@ -48,12 +49,7 @@ public class UserController {
   @GetMapping
   ApiResponse<Page<UserResponse>> searchUsers(
       @ModelAttribute SearchUserRequest searchUserRequest,
-      @PageableDefault(
-              page = 0,
-              size = 10,
-              sort = "registrationDate",
-              direction = Sort.Direction.DESC)
-          Pageable pageable) {
+      @PageableDefault(page = 0, size = 10, sort = "registrationDate", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<UserResponse>>builder()
         .result(userService.searchUsers(searchUserRequest, pageable))
         .build();
@@ -101,33 +97,19 @@ public class UserController {
   }
 
   @PreAuthorize("isAuthenticated()")
-  @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ApiResponse<UserProfileResponse> updateUserProfile(
-      @RequestParam(value = "image", required = false) MultipartFile avatarFile,
-      @RequestParam(value = "fullName", required = false) String fullName,
-      @RequestParam(value = "phone", required = false) String phone,
-      @RequestParam(value = "studentCode", required = false) String studentCode,
-      @RequestParam(value = "classCode", required = false) String classCode) {
-
-    UserProfileUpdateRequest userProfileRequest =
-        UserProfileUpdateRequest.builder()
-            .phone(phone)
-            .classCode(classCode)
-            .studentCode(studentCode)
-            .avatarFile(avatarFile)
-            .fullName(fullName)
-            .build();
-    return ApiResponse.<UserProfileResponse>builder()
-        .result(userService.updateUserProfile(userProfileRequest))
-        .build();
+  @GetMapping("/{userId}/profile")
+  public ApiResponse<UserProfileResponse> getUserProfile(@PathVariable String userId) {
+    return ApiResponse.<UserProfileResponse>builder().result(userService.getUserProfile(userId)).build();
   }
 
   @PreAuthorize("isAuthenticated()")
-  @PatchMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE)
-  public ApiResponse<UserProfileResponse> updateProfileInfo(
-      @Valid @RequestBody UserProfileUpdateRequest request) {
+  @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ApiResponse<UserProfileResponse> updateUserProfile(
+      @Valid @RequestPart("data") UserProfileUpdateDto profileData,
+      @RequestPart(value = "avatar", required = false) MultipartFile avatarFile) {
     return ApiResponse.<UserProfileResponse>builder()
-        .result(userService.updateProfileInfo(request))
+        .result(userService.updateUserProfile(profileData, avatarFile))
         .build();
   }
+
 }

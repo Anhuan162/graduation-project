@@ -55,12 +55,11 @@ public class AnnouncementService {
     Announcement announcement = CreatedAnnouncementRequest.toAnnouncement(request, user);
     announcementRepository.save(announcement);
 
-    List<FileMetadata> fileMetadataList =
-        fileService.updateFileMetadataList(
-            request.getFileMetadataIds(),
-            announcement.getId(),
-            ResourceType.ANNOUNCEMENT,
-            user.getId());
+    List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
+        request.getFileMetadataIds(),
+        announcement.getId(),
+        ResourceType.ANNOUNCEMENT,
+        user.getId());
     List<String> urls = fileMetadataList.stream().map(FileMetadata::getUrl).toList();
     return CreatedAnnonucementResponse.from(announcement, urls);
   }
@@ -72,31 +71,27 @@ public class AnnouncementService {
       throw new RuntimeException("Thông báo đã được gửi");
     }
 
-    Set<String> allClassroomCodes =
-        getAllClassroomCodes(
-            request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
+    Set<String> allClassroomCodes = getAllClassroomCodes(
+        request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
 
-    List<AnnouncementTarget> announcementTargets =
-        generateAnnouncementTargets(allClassroomCodes, announcement);
+    List<AnnouncementTarget> announcementTargets = generateAnnouncementTargets(allClassroomCodes, announcement);
     announcement.getTargets().addAll(announcementTargets);
     announcement.setAnnouncementStatus(true);
     announcementRepository.save(announcement);
 
     User user = currentUserService.getCurrentUserEntity();
-    Set<UUID> receiverUserIds =
-        new HashSet<>(userRepository.findUserIdsByClassCodes(allClassroomCodes));
+    Set<UUID> receiverUserIds = new HashSet<>(userRepository.findUserIdsByClassCodes(allClassroomCodes));
 
-    NotificationEventDTO notificationEventDTO =
-        NotificationEventDTO.builder()
-            .relatedId(announcement.getId())
-            .type(ResourceType.ANNOUNCEMENT)
-            .title("Thông báo mới " + announcement.getTitle())
-            .content(announcement.getContent())
-            .senderId(user.getId())
-            .senderName(user.getEmail())
-            .createdAt(LocalDateTime.now())
-            .receiverIds(receiverUserIds)
-            .build();
+    NotificationEventDTO notificationEventDTO = NotificationEventDTO.builder()
+        .relatedId(announcement.getId())
+        .type(ResourceType.ANNOUNCEMENT)
+        .title("Thông báo mới " + announcement.getTitle())
+        .content(announcement.getContent())
+        .senderId(user.getId())
+        .senderName(user.getEmail())
+        .createdAt(LocalDateTime.now())
+        .receiverIds(receiverUserIds)
+        .build();
 
     publisher.publishEvent(notificationEventDTO);
   }
@@ -118,18 +113,16 @@ public class AnnouncementService {
       List<CohortCode> schoolYearCodes, List<UUID> facultyIds, List<String> classCodes) {
     Set<String> allClassroomCodes = new HashSet<>();
     if (Objects.nonNull(schoolYearCodes)) {
-      List<String> classroomCodeBySchoolYearCodes =
-          classroomRepository.findBySchoolYearCodeIn(schoolYearCodes).stream()
-              .map(Classroom::getClassCode)
-              .toList();
+      List<String> classroomCodeBySchoolYearCodes = classroomRepository.findBySchoolYearCodeIn(schoolYearCodes).stream()
+          .map(Classroom::getClassCode)
+          .toList();
       allClassroomCodes.addAll(classroomCodeBySchoolYearCodes);
     }
 
     if (Objects.nonNull(facultyIds)) {
-      List<String> classroomCodeByFacultyCodes =
-          classroomRepository.findByFacultyIdIn(facultyIds).stream()
-              .map(Classroom::getClassCode)
-              .toList();
+      List<String> classroomCodeByFacultyCodes = classroomRepository.findByFacultyIdIn(facultyIds).stream()
+          .map(Classroom::getClassCode)
+          .toList();
       allClassroomCodes.addAll(classroomCodeByFacultyCodes);
     }
 
@@ -141,10 +134,9 @@ public class AnnouncementService {
 
   public AnnouncementResponse updateAnnouncement(
       String announcementId, UpdatedAnnouncementRequest request, User user) {
-    Announcement announcement =
-        announcementRepository
-            .findById(UUID.fromString(announcementId))
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+    Announcement announcement = announcementRepository
+        .findById(UUID.fromString(announcementId))
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
     announcement.setTitle(request.getTitle());
     announcement.setContent(request.getContent());
@@ -152,80 +144,86 @@ public class AnnouncementService {
     announcement.setModifiedBy(user);
     announcement.setModifiedDate(LocalDate.now());
 
-    Set<String> allClassroomCodes =
-        getAllClassroomCodes(
-            request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
+    Set<String> allClassroomCodes = getAllClassroomCodes(
+        request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
     announcement.setTargets(generateAnnouncementTargets(allClassroomCodes, announcement));
     announcementRepository.save(announcement);
     return AnnouncementResponse.from(announcement);
   }
 
   public DetailedAnnouncementResponse getAnnouncement(UUID announcementId) {
-    var announcement =
-        announcementRepository
-            .findById(announcementId)
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+    var announcement = announcementRepository
+        .findById(announcementId)
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
-    List<String> fileMetadataList =
-        fileService.getFileMetadataIds(announcementId, ResourceType.ANNOUNCEMENT);
+    List<AnnouncementFileResponse> attachments = fileService
+        .findFileMetadataByResourceTarget(announcementId, ResourceType.ANNOUNCEMENT)
+        .stream()
+        .map(
+            file -> AnnouncementFileResponse.builder()
+                .id(file.getId())
+                .fileName(file.getFileName())
+                .url(file.getUrl())
+                .fileType(file.getContentType())
+                .size(file.getSize())
+                .build())
+        .toList();
 
-    return DetailedAnnouncementResponse.from(announcement, fileMetadataList);
+    return DetailedAnnouncementResponse.from(announcement, attachments);
   }
 
   @Transactional
   public Page<AnnouncementResponse> searchAnnouncement(
       SearchAnnouncementRequest request, Pageable pageable) {
-    Specification<Announcement> specification =
-        (root, query, cb) -> {
-          List<Predicate> predicates = new ArrayList<>();
+    Specification<Announcement> specification = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
 
-          if (Objects.nonNull(request.getTitle())) {
-            predicates.add(
-                cb.like(root.get("title").as(String.class), "%" + request.getTitle() + "%"));
-          }
+      if (Objects.nonNull(request.getTitle())) {
+        predicates.add(
+            cb.like(root.get("title").as(String.class), "%" + request.getTitle() + "%"));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementType())) {
-            predicates.add(
-                cb.equal(
-                    root.get("announcementType").as(String.class), request.getAnnouncementType()));
-          }
+      if (Objects.nonNull(request.getAnnouncementType())) {
+        predicates.add(
+            cb.equal(
+                root.get("announcementType").as(String.class), request.getAnnouncementType()));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementStatus())) {
-            predicates.add(
-                cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
-          }
+      if (Objects.nonNull(request.getAnnouncementStatus())) {
+        predicates.add(
+            cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementProvider())) {
-            predicates.add(
-                cb.equal(root.get("announcementProvider"), request.getAnnouncementProvider()));
-          }
+      if (Objects.nonNull(request.getAnnouncementProvider())) {
+        predicates.add(
+            cb.equal(root.get("announcementProvider"), request.getAnnouncementProvider()));
+      }
 
-          if (Objects.nonNull(request.getFromDate())) {
-            predicates.add(
-                cb.greaterThanOrEqualTo(
-                    root.get("createdDate"), request.getFromDate().atStartOfDay()));
-          }
+      if (Objects.nonNull(request.getFromDate())) {
+        predicates.add(
+            cb.greaterThanOrEqualTo(
+                root.get("createdDate"), request.getFromDate().atStartOfDay()));
+      }
 
-          if (Objects.nonNull(request.getToDate())) {
-            predicates.add(
-                cb.lessThanOrEqualTo(
-                    root.get("createdDate"), request.getToDate().atTime(23, 59, 59)));
-          }
+      if (Objects.nonNull(request.getToDate())) {
+        predicates.add(
+            cb.lessThanOrEqualTo(
+                root.get("createdDate"), request.getToDate().atTime(23, 59, 59)));
+      }
 
-          Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDate")));
+      Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDate")));
 
-          return cb.and(predicates.toArray(new Predicate[0]));
-        };
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
 
     Page<Announcement> announcementPage = announcementRepository.findAll(specification, pageable);
     return announcementPage.map(AnnouncementResponse::from);
   }
 
   public void deleteAnnouncement(String announcementId) {
-    Announcement announcement =
-        announcementRepository
-            .findById(UUID.fromString(announcementId))
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+    Announcement announcement = announcementRepository
+        .findById(UUID.fromString(announcementId))
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
     announcementRepository.delete(announcement);
   }
@@ -233,8 +231,7 @@ public class AnnouncementService {
   @Transactional
   public Page<AnnouncementResponse> searchActiveAnnouncements(
       SearchActiveAnnouncementRequest request, Pageable pageable) {
-    Page<Announcement> announcementPage =
-        announcementRepository.findAllActiveAnnouncements(request, pageable);
+    Page<Announcement> announcementPage = announcementRepository.findAllActiveAnnouncements(request, pageable);
     return announcementPage.map(announcementMapper::toResponse);
   }
 
@@ -246,10 +243,11 @@ public class AnnouncementService {
       throw new AppException(ErrorCode.UUID_IS_INVALID);
     }
     Optional<Announcement> announcement = announcementRepository.findById(id);
-    if (announcement.isEmpty()){
+    if (announcement.isEmpty()) {
       throw new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND);
     }
-    FileResponse FileResponse = driveService.uploadTextToDrive(announcement.get().getTitle(), announcement.get().getContent());
+    FileResponse FileResponse = driveService.uploadTextToDrive(announcement.get().getTitle(),
+        announcement.get().getContent());
     return FileResponse;
   }
 }

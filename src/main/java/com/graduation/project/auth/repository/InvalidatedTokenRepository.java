@@ -10,4 +10,6 @@ public interface InvalidatedTokenRepository extends JpaRepository<InvalidatedTok
     boolean existsByJit(String jit);
 
     List<InvalidatedToken> findByUser(User user);
+
+    int deleteByExpiryTimeBefore(java.util.Date expiryTime);
 }

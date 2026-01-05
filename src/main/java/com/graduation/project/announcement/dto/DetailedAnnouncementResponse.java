@@ -21,24 +21,27 @@ public class DetailedAnnouncementResponse {
   LocalDate createdDate;
   String modifiedBy;
   LocalDate modifiedDate;
-  List<String> filePaths;
+  List<AnnouncementFileResponse> attachments;
 
   public static DetailedAnnouncementResponse from(
-      Announcement announcement, List<String> filePaths) {
+      Announcement announcement, List<AnnouncementFileResponse> attachments) {
     return DetailedAnnouncementResponse.builder()
         .id(announcement.getId())
         .title(announcement.getTitle())
         .content(announcement.getContent())
         .announcementStatus(announcement.getAnnouncementStatus())
         .announcementType(String.valueOf(announcement.getAnnouncementType()))
-        .createdBy(announcement.getCreatedBy().getEmail())
+        .createdBy(
+            Objects.nonNull(announcement.getCreatedBy())
+                ? announcement.getCreatedBy().getEmail()
+                : "")
         .createdDate(announcement.getCreatedDate())
         .modifiedBy(
             Objects.nonNull(announcement.getModifiedBy())
                 ? announcement.getModifiedBy().getFullName()
                 : "")
         .modifiedDate(announcement.getModifiedDate())
-        .filePaths(filePaths)
+        .attachments(attachments)
         .build();
   }
 }

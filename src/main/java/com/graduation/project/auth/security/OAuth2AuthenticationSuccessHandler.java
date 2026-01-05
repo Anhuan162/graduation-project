@@ -56,44 +56,41 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
     }
 
     // Lấy thông tin User từ Google/Facebook
-    String providerUserId =
-        provider.equals("GOOGLE")
-            ? (String) oauthUser.getAttribute("sub")
-            : (String) oauthUser.getAttribute("id");
+    String providerUserId = provider.equals("GOOGLE")
+        ? (String) oauthUser.getAttribute("sub")
+        : (String) oauthUser.getAttribute("id");
 
     String email = oauthUser.getAttribute("email");
-    if (email == null) email = providerUserId + "@" + provider.toLowerCase() + ".oauth";
+    if (email == null)
+      email = providerUserId + "@" + provider.toLowerCase() + ".oauth";
 
     Provider providerEnum = Provider.valueOf(provider); // Lấy Enum động
 
     // Xử lý logic tìm hoặc tạo user
-    Optional<OauthAccount> accOpt =
-        oauthRepo.findByProviderAndProviderUserId(providerEnum, providerUserId);
+    Optional<OauthAccount> accOpt = oauthRepo.findByProviderAndProviderUserId(providerEnum, providerUserId);
     User user;
 
     if (accOpt.isPresent()) {
       user = accOpt.get().getUser();
     } else {
-      Role userRole =
-          roleRepo
-              .findByName("USER")
-              .orElseThrow(() -> new RuntimeException("Role USER not found"));
+      Role userRole = roleRepo
+          .findByName("USER")
+          .orElseThrow(() -> new RuntimeException("Role USER not found"));
 
       String finalEmail = email;
-      user =
-          userRepo
-              .findByEmail(email)
-              .orElseGet(
-                  () -> {
-                    User u = new User();
-                    u.setEmail(finalEmail);
-                    u.setProvider(providerEnum);
-                    u.setEnabled(true);
-                    u.setFullName(oauthUser.getAttribute("name"));
-                    u.setRegistrationDate(LocalDateTime.now());
-                    u.getRoles().add(userRole);
-                    return userRepo.save(u);
-                  });
+      user = userRepo
+          .findByEmail(email)
+          .orElseGet(
+              () -> {
+                User u = new User();
+                u.setEmail(finalEmail);
+                u.setProvider(providerEnum);
+                u.setEnabled(true);
+                u.setFullName(oauthUser.getAttribute("name"));
+                u.setRegistrationDate(LocalDateTime.now());
+                u.getRoles().add(userRole);
+                return userRepo.save(u);
+              });
 
       OauthAccount acc = new OauthAccount();
       acc.setProvider(providerEnum);
@@ -114,11 +111,13 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
   }
 
   private void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
-    Cookie cookie = new Cookie(name, value);
-    cookie.setHttpOnly(true);
-    cookie.setPath("/");
-    cookie.setMaxAge(maxAge);
-    // cookie.setSecure(true); // Bật dòng này khi chạy HTTPS (Production)
-    response.addCookie(cookie);
+    org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from(name, value)
+        .httpOnly(true)
+        .path("/")
+        .maxAge(maxAge)
+        .sameSite("Lax")
+        .secure(false) // Set to true for production (HTTPS)
+        .build();
+    response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
   }
 }
