@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.user.*;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Log4j2
@@ -44,6 +45,7 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
   }
 
   @Override
+  @Transactional
   public void onAuthenticationSuccess(
       HttpServletRequest request, HttpServletResponse response, Authentication authentication)
       throws IOException {
@@ -54,68 +56,107 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
     if (authentication instanceof OAuth2AuthenticationToken token) {
       provider = token.getAuthorizedClientRegistrationId().toUpperCase();
     }
+    Provider providerEnum = Provider.valueOf(provider);
 
-    // Lấy thông tin User từ Google/Facebook
-    String providerUserId =
-        provider.equals("GOOGLE")
-            ? (String) oauthUser.getAttribute("sub")
-            : (String) oauthUser.getAttribute("id");
+    String providerUserId = provider.equals("GOOGLE")
+        ? (String) oauthUser.getAttribute("sub")
+        : (String) oauthUser.getAttribute("id");
 
     String email = oauthUser.getAttribute("email");
     if (email == null) email = providerUserId + "@" + provider.toLowerCase() + ".oauth";
 
-    Provider providerEnum = Provider.valueOf(provider); // Lấy Enum động
+    String fullName = extractFullName(oauthUser, email);
 
-    // Xử lý logic tìm hoặc tạo user
-    Optional<OauthAccount> accOpt =
-        oauthRepo.findByProviderAndProviderUserId(providerEnum, providerUserId);
+    String avatarUrl = (String) oauthUser.getAttribute("picture");
+    if (avatarUrl == null || avatarUrl.isBlank()) {
+      avatarUrl = "https://ui-avatars.com/api/?name=" + fullName.replace(" ", "+") + "&size=128&background=random";
+    }
+
     User user;
+    Optional<OauthAccount> accOpt = oauthRepo.findByProviderAndProviderUserId(providerEnum, providerUserId);
 
     if (accOpt.isPresent()) {
       user = accOpt.get().getUser();
+      user = syncUserData(user, fullName, avatarUrl);
     } else {
-      Role userRole =
-          roleRepo
-              .findByName("USER")
-              .orElseThrow(() -> new RuntimeException("Role USER not found"));
+      Optional<User> userByEmail = userRepo.findByEmail(email);
 
-      String finalEmail = email;
-      user =
-          userRepo
-              .findByEmail(email)
-              .orElseGet(
-                  () -> {
-                    User u = new User();
-                    u.setEmail(finalEmail);
-                    u.setProvider(providerEnum);
-                    u.setEnabled(true);
-                    u.setFullName(oauthUser.getAttribute("name"));
-                    u.setRegistrationDate(LocalDateTime.now());
-                    u.getRoles().add(userRole);
-                    return userRepo.save(u);
-                  });
+      if (userByEmail.isPresent()) {
+        user = userByEmail.get();
+        user = syncUserData(user, fullName, avatarUrl);
+      } else {
+        user = createNewUser(email, fullName, avatarUrl, providerEnum);
+      }
 
-      OauthAccount acc = new OauthAccount();
-      acc.setProvider(providerEnum);
-      acc.setProviderUserId(providerUserId);
-      acc.setUser(user);
-      oauthRepo.save(acc);
+      OauthAccount newAcc = new OauthAccount();
+      newAcc.setProvider(providerEnum);
+      newAcc.setProviderUserId(providerUserId);
+      newAcc.setUser(user);
+      oauthRepo.save(newAcc);
     }
 
-    // Tạo Token
+    // 3. Generate Token & Redirect
     String accessToken = tokenService.generateToken(user, false);
     String refreshToken = tokenService.generateToken(user, true);
 
-    // Lưu Cookie
     addCookie(response, "accessToken", accessToken, 3600);
     addCookie(response, "refreshToken", refreshToken, 86400);
 
     response.sendRedirect(redirectUri);
   }
 
+  private String extractFullName(OAuth2User oauthUser, String fallbackEmail) {
+    String name = (String) oauthUser.getAttribute("name");
+    if (name != null && !name.isBlank())
+      return name;
+
+    String givenName = (String) oauthUser.getAttribute("given_name");
+    String familyName = (String) oauthUser.getAttribute("family_name");
+
+    if (givenName != null && familyName != null)
+      return givenName + " " + familyName;
+    if (givenName != null)
+      return givenName;
+    if (familyName != null)
+      return familyName;
+
+    return fallbackEmail;
+  }
+
+  private User createNewUser(String email, String fullName, String avatarUrl, Provider provider) {
+    Role userRole = roleRepo.findByName("USER")
+        .orElseThrow(() -> new RuntimeException("Role USER not found"));
+
+    User u = new User();
+    u.setEmail(email);
+    u.setProvider(provider);
+    u.setEnabled(true);
+    u.setFullName(fullName);
+    u.setAvatarUrl(avatarUrl);
+    u.setRegistrationDate(LocalDateTime.now());
+    u.getRoles().add(userRole);
+    return userRepo.save(u);
+  }
+
+  private User syncUserData(User user, String newName, String newAvatar) {
+    boolean isModified = false;
+
+    if (newName != null && !newName.isBlank() && !newName.equals(user.getFullName())) {
+      user.setFullName(newName);
+      isModified = true;
+    }
+
+    if (newAvatar != null && !newAvatar.isBlank() && !newAvatar.equals(user.getAvatarUrl())) {
+      user.setAvatarUrl(newAvatar);
+      isModified = true;
+    }
+
+    return isModified ? userRepo.save(user) : user;
+  }
+
   private void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
     Cookie cookie = new Cookie(name, value);
-    cookie.setHttpOnly(true);
+    cookie.setHttpOnly(false);
     cookie.setPath("/");
     cookie.setMaxAge(maxAge);
     // cookie.setSecure(true); // Bật dòng này khi chạy HTTPS (Production)
