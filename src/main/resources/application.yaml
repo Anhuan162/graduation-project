@@ -77,10 +77,10 @@ logging:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    accessTokenExpirationMs: 900000     # 15 minutes
+    accessTokenExpirationMs: 15000     # 15 minutes
     refreshTokenExpirationMs: 604800000 # 7 days
   oauth2:
-    authorizedRedirectUri: http://localhost:3000/
+    authorizedRedirectUri: http://localhost:3000/forum
   crawler:
     schedule:
       cron: 0 0 2 * * *

@@ -1,9 +1,9 @@
 package com.graduation.project.security.config;
 
+import com.graduation.project.auth.security.OAuth2AuthenticationSuccessHandler;
 import com.graduation.project.common.config.CustomPermissionEvaluator;
 import com.graduation.project.security.ultilities.JwtAuthenticationEntryPoint;
 import com.graduation.project.security.ultilities.JwtToUserPrincipalConverter;
-import com.graduation.project.auth.security.OAuth2AuthenticationSuccessHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
@@ -27,8 +27,7 @@ import org.springframework.security.web.*;
 public class SecurityConfig {
 
   private final OAuth2AuthenticationSuccessHandler oauth2SuccessHandler;
-  @Autowired
-  private CustomJwtDecoder customJwtDecoder;
+  @Autowired private CustomJwtDecoder customJwtDecoder;
   private final CustomPermissionEvaluator customPermissionEvaluator;
 
   public SecurityConfig(
@@ -63,40 +62,46 @@ public class SecurityConfig {
         .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
-            auth -> auth.requestMatchers(
-                "/api/auth/**",
-                "/oauth2/**",
-                "/login/**",
-                "/api/users/**",
-                "/v3/api-docs/**",
-                "/swagger-ui/**",
-                "/swagger-ui.html")
-                .permitAll()
-                .requestMatchers("/ws/notification/**")
-                .permitAll()
-                .requestMatchers(HttpMethod.GET, "/public/**")
-                .permitAll()
-                .requestMatchers("/api/admin/**")
-                .hasRole("ADMIN")
-                .anyRequest()
-                .authenticated())
+            auth ->
+                auth.requestMatchers(
+                        "/api/auth/**",
+                        "/oauth2/**",
+                        "/login/**",
+                        "/api/users/register",
+                        "/api/users/verify",
+                        "/api/users/resend",
+                        "/v3/api-docs/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html")
+                    .permitAll()
+                    .requestMatchers("/ws/notification/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/public/**")
+                    .permitAll()
+                    .requestMatchers("/api/admin/**")
+                    .hasRole("ADMIN")
+                    .anyRequest()
+                    .authenticated())
         .oauth2Login(oauth2 -> oauth2.successHandler(oauth2SuccessHandler))
         .exceptionHandling(ex -> ex.authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
 
     httpSecurity.oauth2ResourceServer(
-        oauth2 -> oauth2
-            .jwt(
-                jwtConfigurer -> jwtConfigurer
-                    .decoder(customJwtDecoder)
-                    .jwtAuthenticationConverter(new JwtToUserPrincipalConverter()))
-            .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
+        oauth2 ->
+            oauth2
+                .jwt(
+                    jwtConfigurer ->
+                        jwtConfigurer
+                            .decoder(customJwtDecoder)
+                            .jwtAuthenticationConverter(new JwtToUserPrincipalConverter()))
+                .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
 
     return httpSecurity.build();
   }
 
   @Bean
   JwtAuthenticationConverter jwtAuthenticationConverter() {
-    JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+    JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter =
+        new JwtGrantedAuthoritiesConverter();
     jwtGrantedAuthoritiesConverter.setAuthorityPrefix("");
 
     JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
