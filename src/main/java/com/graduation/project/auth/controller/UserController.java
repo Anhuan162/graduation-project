@@ -96,12 +96,6 @@ public class UserController {
   }
 
   @PreAuthorize("isAuthenticated()")
-  @GetMapping("/{userId}/profile")
-  public ApiResponse<UserProfileResponse> getUserProfile(@PathVariable String userId) {
-    return ApiResponse.<UserProfileResponse>builder().result(userService.getUserProfile(userId)).build();
-  }
-
-  @PreAuthorize("isAuthenticated()")
   @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ApiResponse<UserProfileResponse> updateUserProfile(
       @RequestParam(value = "image", required = false) MultipartFile avatarFile,
@@ -110,13 +104,14 @@ public class UserController {
       @RequestParam(value = "studentCode", required = false) String studentCode,
       @RequestParam(value = "classCode", required = false) String classCode) {
 
-    UserProfileUpdateRequest userProfileRequest = UserProfileUpdateRequest.builder()
-        .phone(phone)
-        .classCode(classCode)
-        .studentCode(studentCode)
-        .avatarFile(avatarFile)
-        .fullName(fullName)
-        .build();
+    UserProfileUpdateRequest userProfileRequest =
+        UserProfileUpdateRequest.builder()
+            .phone(phone)
+            .classCode(classCode)
+            .studentCode(studentCode)
+            .avatarFile(avatarFile)
+            .fullName(fullName)
+            .build();
     return ApiResponse.<UserProfileResponse>builder()
         .result(userService.updateUserProfile(userProfileRequest))
         .build();

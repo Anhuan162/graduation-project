@@ -12,14 +12,12 @@ import com.graduation.project.auth.repository.PasswordResetSessionRepository;
 import com.graduation.project.auth.repository.RoleRepository;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.repository.VerificationTokenRepository;
-import com.graduation.project.auth.repository.InvalidatedTokenRepository;
 import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.common.constant.Provider;
 import com.graduation.project.common.entity.PasswordResetSession;
 import com.graduation.project.common.entity.Role;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.entity.VerificationToken;
-import com.graduation.project.common.entity.InvalidatedToken;
 import com.graduation.project.common.service.FirebaseService;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
@@ -51,7 +49,6 @@ public class UserService {
   private final VerificationTokenRepository verificationTokenRepository;
   private final RoleRepository roleRepository;
   private final PasswordResetSessionRepository passwordResetSessionRepository;
-  private final InvalidatedTokenRepository invalidatedTokenRepository;
   private final FirebaseService firebaseService;
   private final FacultyRepository facultyRepository;
   private final Validator validator;
@@ -286,10 +283,6 @@ public class UserService {
 
     passwordResetSession.get().setUsed(true);
     passwordResetSessionRepository.save(passwordResetSession.get());
-
-    // Invalidate all sessions for security
-    invalidateUserSessions(user);
-
     return "success";
   }
 
@@ -314,18 +307,6 @@ public class UserService {
     if (user == null) {
       throw new RuntimeException("User not authenticated or not found");
     }
-    UserProfileResponse userProfileResponse = user.toUserProfileResponse();
-    if (user.getStudentCode() != null && user.getClassCode() != null)
-      userProfileResponse.setFacultyName(
-          getAndValidateFacultiesCode(user.getStudentCode(), user.getClassCode()));
-    return userProfileResponse;
-  }
-
-  public UserProfileResponse getUserProfile(String userId) {
-    User user = userRepository
-        .findById(UUID.fromString(userId))
-        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-
     UserProfileResponse userProfileResponse = user.toUserProfileResponse();
     if (user.getStudentCode() != null && user.getClassCode() != null)
       userProfileResponse.setFacultyName(
@@ -358,14 +339,14 @@ public class UserService {
       throw new AppException(ErrorCode.INVALID_FACULTY_CODE);
     }
     Optional<Faculty> faculty = facultyRepository.findByFacultyCode(facultiesCodeFromClass);
-    if (faculty.isEmpty())
-      throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
+    if (faculty.isEmpty()) throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
     return faculty.get().getFacultyName();
   }
 
   public UserProfileResponse updateUserProfile(UserProfileUpdateRequest userProfileRequest) {
     // Validate the request
-    Set<ConstraintViolation<UserProfileUpdateRequest>> violations = validator.validate(userProfileRequest);
+    Set<ConstraintViolation<UserProfileUpdateRequest>> violations =
+        validator.validate(userProfileRequest);
     if (!violations.isEmpty()) {
       StringBuilder message = new StringBuilder();
       for (ConstraintViolation<UserProfileUpdateRequest> violation : violations) {
@@ -381,7 +362,8 @@ public class UserService {
     if (userProfileRequest.getAvatarFile() != null
         && !userProfileRequest.getAvatarFile().isEmpty()) {
       try {
-        String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER);
+        String newAvatarUrl =
+            firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER);
         user.setAvatarUrl(newAvatarUrl);
       } catch (IOException e) {
         throw new AppException(ErrorCode.UPLOAD_FILE_FAILED);
@@ -392,15 +374,15 @@ public class UserService {
         && !userProfileRequest.getClassCode().isEmpty()
         && userProfileRequest.getStudentCode() != null
         && !userProfileRequest.getStudentCode().isEmpty()) {
-      facultiesName = getAndValidateFacultiesCode(
-          userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
+      facultiesName =
+          getAndValidateFacultiesCode(
+              userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
       user.setStudentCode(userProfileRequest.getStudentCode());
       user.setClassCode(userProfileRequest.getClassCode());
     }
     if (userProfileRequest.getFullName() != null && !userProfileRequest.getFullName().isEmpty()) {
       user.setFullName(userProfileRequest.getFullName());
     }
-
     if (userProfileRequest.getPhone() != null && !userProfileRequest.getPhone().isEmpty()) {
       user.setPhone(userProfileRequest.getPhone());
     }
@@ -412,15 +394,5 @@ public class UserService {
 
   public UserProfileResponse updateProfileInfo(UserProfileUpdateRequest request) {
     return userProfileService.updateProfileInfo(request);
-  }
-
-  private void invalidateUserSessions(User user) {
-    // Logic to invalidate sessions would go here.
-    // Since we don't have access to all active tokens in a stateless system without
-    // a registry,
-    // we log this event. A real implementation might use a "credentialsChangedAt"
-    // timestamp on the User entity
-    // or a blacklist mechanism if we knew the tokens.
-    log.info("User {} changed password. All active sessions should be considered invalid.", user.getEmail());
   }
 }
