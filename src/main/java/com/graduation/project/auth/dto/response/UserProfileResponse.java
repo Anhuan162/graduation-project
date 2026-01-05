@@ -7,9 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -26,9 +23,6 @@ public class UserProfileResponse {
     String classCode;
     String phone;
     String facultyName;
-
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    LocalDate dob;
 
     LocalDateTime createdAt;
 }

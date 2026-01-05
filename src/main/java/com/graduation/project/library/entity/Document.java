@@ -38,6 +38,7 @@ public class Document {
   @JoinColumn(name = "approved_by")
   private User approvedBy;
 
+  @Enumerated(EnumType.STRING)
   private DocumentStatus documentStatus;
 
   @Enumerated(EnumType.STRING)

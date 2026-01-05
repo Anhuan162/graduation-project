@@ -18,6 +18,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -57,7 +58,18 @@ public class AuthService {
 
   public RefreshTokenResponse refreshToken(String refreshToken) throws ParseException {
     var signedJWT = tokenService.verifyToken(refreshToken, true);
-    User user = invalidateValidToken(signedJWT);
+    User user;
+    try {
+      user = invalidateValidToken(signedJWT);
+    } catch (DataIntegrityViolationException e) {
+      log.error("Token reuse detected for JIT: {}", signedJWT.getJWTClaimsSet().getJWTID());
+      String email = signedJWT.getJWTClaimsSet().getSubject();
+      User compromisedUser = userRepository.findByEmail(email).orElse(null);
+      if (compromisedUser != null) {
+        tokenService.revokeAllUserTokens(compromisedUser);
+      }
+      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
 
     String newRefreshToken = tokenService.generateToken(user, true);
     String newAccessToken = tokenService.generateToken(user, false);

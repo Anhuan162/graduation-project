@@ -8,6 +8,7 @@ import com.graduation.project.forum.entity.Category;
 import com.graduation.project.forum.entity.Topic;
 import com.graduation.project.forum.entity.TopicMember;
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 import java.util.*;
 import lombok.*;
@@ -74,8 +75,10 @@ public class User {
 
   public UserProfileResponse toUserProfileResponse() {
     return UserProfileResponse.builder()
+        .id(this.id != null ? this.id.toString() : null)
         .email(this.email)
         .fullName(this.fullName)
+
         .phone(this.phone)
         .avatarUrl(this.avatarUrl)
         .studentCode(this.studentCode)

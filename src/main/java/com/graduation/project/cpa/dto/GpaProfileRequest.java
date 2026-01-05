@@ -10,7 +10,7 @@ import lombok.*;
 public class GpaProfileRequest {
   String id;
   String gpaProfileCode;
-  Double letterGpaScore;
+  String letterGpaScore;
   Double numberGpaScore;
   Double previousNumberGpaScore;
   int passedCredits;

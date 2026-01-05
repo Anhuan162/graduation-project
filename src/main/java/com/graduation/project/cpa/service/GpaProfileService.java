@@ -30,43 +30,40 @@ public class GpaProfileService {
     String facultyCode = studentCode.substring(5, 7);
     GpaProfile gpaProfile = GpaProfile.builder().gpaProfileCode(gpaProfileCode).build();
 
-    List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles =
-        gradeSubjectAverageProfileService.addGradeSubjectAverageProfileList(
+    List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles = gradeSubjectAverageProfileService
+        .addGradeSubjectAverageProfileList(
             semesterId, facultyCode, cohortCode, gpaProfile);
     gpaProfile.setGradeSubjectAverageProfiles(gradeSubjectAverageProfiles);
     gpaProfile.setCpaProfile(cpaProfile);
     return gpaProfile;
   }
 
-  public GpaProfile calculateGpaScore(GpaProfileRequest gpaProfileRequest) {
+  public GpaProfile updateGpaProfile(GpaProfileRequest gpaProfileRequest) {
     int passedCredit = 0;
-    double totalWeightededScore = 0;
+    double totalWeightedScore = 0;
 
-    GpaProfile gpaProfile =
-        gpaProfileRepository
-            .findById(UUID.fromString(gpaProfileRequest.getId()))
-            .orElseThrow(() -> new AppException(ErrorCode.GPA_PROFILE_NOT_FOUND));
+    GpaProfile gpaProfile = gpaProfileRepository
+        .findById(UUID.fromString(gpaProfileRequest.getId()))
+        .orElseThrow(() -> new AppException(ErrorCode.GPA_PROFILE_NOT_FOUND));
 
     List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles = new ArrayList<>();
-    for (GradeSubjectAverageProfileRequest gradeSubjectAverageProfileRequest :
-        gpaProfileRequest.getGradeSubjectAverageProfileRequests()) {
-      GradeSubjectAverageProfile gradeSubjectAverageProfile =
-          gradeSubjectAverageProfileService.updateGradeAverageScoreProfile(
+    for (GradeSubjectAverageProfileRequest gradeSubjectAverageProfileRequest : gpaProfileRequest
+        .getGradeSubjectAverageProfileRequests()) {
+      GradeSubjectAverageProfile gradeSubjectAverageProfile = gradeSubjectAverageProfileService
+          .updateGradeAverageScoreProfile(
               gradeSubjectAverageProfileRequest);
       gradeSubjectAverageProfile.setGpaProfile(gpaProfile);
       gradeSubjectAverageProfiles.add(gradeSubjectAverageProfile);
     }
 
     for (GradeSubjectAverageProfile gradeSubjectAverageProfile : gradeSubjectAverageProfiles) {
-      Double averageSubjectScore =
-          Objects.nonNull(gradeSubjectAverageProfile.getImprovementScore())
-              ? gradeSubjectAverageProfile.getImprovementScore()
-              : gradeSubjectAverageProfile.getCurrentScore();
+      Double averageSubjectScore = Objects.nonNull(gradeSubjectAverageProfile.getImprovementScore())
+          ? gradeSubjectAverageProfile.getImprovementScore()
+          : gradeSubjectAverageProfile.getCurrentScore();
       if (Objects.nonNull(averageSubjectScore)) {
         passedCredit += gradeSubjectAverageProfile.getSubjectReference().getSubject().getCredit();
-        totalWeightededScore +=
-            gradeSubjectAverageProfile.getSubjectReference().getSubject().getCredit()
-                * averageSubjectScore;
+        totalWeightedScore += gradeSubjectAverageProfile.getSubjectReference().getSubject().getCredit()
+            * averageSubjectScore;
       }
     }
 
@@ -75,13 +72,13 @@ public class GpaProfileService {
       gpaProfile.setNumberGpaScore(null);
       gpaProfile.setLetterGpaScore(null);
     } else {
-      gpaProfile.setNumberGpaScore(totalWeightededScore / passedCredit);
-      gpaProfile.setLetterGpaScore(Grade.fromScore(totalWeightededScore / passedCredit));
+      gpaProfile.setNumberGpaScore(totalWeightedScore / passedCredit);
+      gpaProfile.setLetterGpaScore(Grade.fromScore(totalWeightedScore / passedCredit));
     }
 
     gpaProfile.setPreviousNumberGpaScore(gpaProfileRequest.getPreviousNumberGpaScore());
     gpaProfile.setPassedCredits(passedCredit);
-    gpaProfile.setTotalWeightedScore(totalWeightededScore);
+    gpaProfile.setTotalWeightedScore(totalWeightedScore);
 
     return gpaProfile;
   }

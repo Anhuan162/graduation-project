@@ -15,9 +15,11 @@ import lombok.*;
 @Entity
 @Table(name = "invalidated_tokens")
 public class InvalidatedToken {
-  @Id private UUID id;
+  @Id
+  private UUID id;
 
   private Date expiryTime;
+  @Column(unique = true, nullable = false)
   private String jit;
   private Date issuedAt;
 
