@@ -5,12 +5,12 @@ import com.graduation.project.announcement.dto.FacultyResponse;
 import com.graduation.project.announcement.dto.UpdatedFacultyRequest;
 import com.graduation.project.announcement.entity.Faculty;
 import com.graduation.project.announcement.repository.FacultyRepository;
-import java.util.List;
-import java.util.UUID;
-
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -47,8 +47,8 @@ public class AdminFacultyService {
     return mapToResponse(faculty);
   }
 
-  public List<FacultyResponse> getAllFaculties() {
-    return facultyRepository.findAll().stream().map(this::mapToResponse).toList();
+  public Page<FacultyResponse> getAllFaculties(Pageable pageable) {
+    return facultyRepository.findAll(pageable).map(this::mapToResponse);
   }
 
   public void deleteFaculty(String facultyId) {

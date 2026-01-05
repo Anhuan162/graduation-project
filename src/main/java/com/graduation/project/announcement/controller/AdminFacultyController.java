@@ -7,6 +7,8 @@ import com.graduation.project.announcement.service.AdminFacultyService;
 import com.graduation.project.auth.dto.response.ApiResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -32,9 +34,9 @@ public class AdminFacultyController {
   }
 
   @GetMapping
-  public ApiResponse<List<FacultyResponse>> getAllFaculties() {
-    return ApiResponse.<List<FacultyResponse>>builder()
-        .result(adminFacultyService.getAllFaculties())
+  public ApiResponse<Page<FacultyResponse>> getAllFaculties(Pageable pageable) {
+    return ApiResponse.<Page<FacultyResponse>>builder()
+        .result(adminFacultyService.getAllFaculties(pageable))
         .build();
   }
 
