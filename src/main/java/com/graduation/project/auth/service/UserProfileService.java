@@ -110,7 +110,7 @@ public class UserProfileService {
         return UserAuthResponse.builder()
                 .id(principal.getId().toString())
                 .email(principal.getEmail())
-                .fullName(principal.getFullName())
+                .fullName(user.getFullName())
                 .avatar(user.getAvatarUrl() != null ? user.getAvatarUrl() : principal.getAvatar())
                 .permissions(getUserPermissionsFromPrincipal(principal))
                 .phone(user.getPhone())

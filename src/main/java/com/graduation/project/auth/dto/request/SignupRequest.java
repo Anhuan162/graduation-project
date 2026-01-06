@@ -18,8 +18,12 @@ public class SignupRequest {
   @NotBlank(message = "Email is required")
   private String email;
 
-  @StrongPassword private String password;
+  @StrongPassword
+  private String password;
 
   @NotBlank(message = "Confirm password is required")
   private String confirmPassword;
+
+  @NotBlank(message = "Full name is required")
+  private String fullName;
 }

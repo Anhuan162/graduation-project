@@ -13,13 +13,15 @@ INSERT INTO users (id, avatar_url, email, enabled, full_name, password, phone, p
 VALUES 
 ('11111111-1111-1111-1111-111111111111', 'https://avatar.iran.liara.run/public/1', 'student_a@example.com', true, 'Nguyen Van Student A', '$2a$10$vSOxFQ8Qr2i7421Q8C3rvu0HkY0fQQ/tT0xM2WtJ/2V4/YECL9GRO', '0900000001', 'LOCAL', 'B19DCCN001', 'D19CQCN01', NOW()),
 ('22222222-2222-2222-2222-222222222222', 'https://avatar.iran.liara.run/public/2', 'student_b@example.com', true, 'Tran Thi Student B', '$2a$10$vSOxFQ8Qr2i7421Q8C3rvu0HkY0fQQ/tT0xM2WtJ/2V4/YECL9GRO', '0900000002', 'LOCAL', 'B19DCCN002', 'D19CQCN01', NOW()),
-('33333333-3333-3333-3333-333333333333', 'https://avatar.iran.liara.run/public/3', 'manager_c@example.com', true, 'Le Van Manager C', '$2a$10$vSOxFQ8Qr2i7421Q8C3rvu0HkY0fQQ/tT0xM2WtJ/2V4/YECL9GRO', '0900000003', 'LOCAL', 'B19DCCN003', 'D19CQCN01', NOW())
+('33333333-3333-3333-3333-333333333333', 'https://avatar.iran.liara.run/public/3', 'manager_c@example.com', true, 'Le Van Manager C', '$2a$10$vSOxFQ8Qr2i7421Q8C3rvu0HkY0fQQ/tT0xM2WtJ/2V4/YECL9GRO', '0900000003', 'LOCAL', 'B19DCCN003', 'D19CQCN01', NOW()),
+('4af76b85-6971-47b1-a4aa-0f83da58f2f5', 'https://avatar.iran.liara.run/public/4', 'admin@gmail.com', true, 'System Admin', '$2b$10$EHINiaamdhCNxI08hN0HGuLhvx8GF3guszSjXgU6kubrlqK5.JyI6', '0900000000', 'LOCAL', 'ADMIN001', 'ADMIN', NOW())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id) VALUES
 ('11111111-1111-1111-1111-111111111111', 'USER'),
 ('22222222-2222-2222-2222-222222222222', 'USER'),
-('33333333-3333-3333-3333-333333333333', 'USER') 
+('33333333-3333-3333-3333-333333333333', 'USER'),
+('4af76b85-6971-47b1-a4aa-0f83da58f2f5', 'ADMIN')
 ON CONFLICT DO NOTHING;
 
 -- ================================================================================================
