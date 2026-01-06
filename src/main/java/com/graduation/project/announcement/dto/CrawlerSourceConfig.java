@@ -20,6 +20,7 @@ public class CrawlerSourceConfig {
   private String linkSelector; // Thẻ a chứa link chi tiết
   private String titleSelector; // Class chứa tiêu đề (ở trang chi tiết)
   private String contentSelector; // Class chứa nội dung (ở trang chi tiết)
+  private String dateSelector; // Class chứa ngày đăng (ở trang chi tiết)
 
   private String subLinkSelector; // Thẻ a chứa link chi tiết
 }

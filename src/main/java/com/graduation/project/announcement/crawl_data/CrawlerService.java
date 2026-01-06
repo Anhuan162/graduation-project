@@ -12,6 +12,8 @@ import com.graduation.project.common.entity.FileMetadata;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,24 @@ public class CrawlerService {
   private static final String USER_AGENT =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36";
 
+  // ... bên trong class CrawlerService
+
+  // Định dạng ngày tháng phổ biến ở VN
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+  private LocalDate parseDateStr(String dateStr) {
+    if (dateStr == null || dateStr.isEmpty()) {
+      return LocalDate.now(); // Mặc định nếu không lấy được
+    }
+    try {
+      // Cắt bỏ khoảng trắng thừa (trim)
+      return LocalDate.parse(dateStr.trim(), DATE_FORMATTER);
+    } catch (DateTimeParseException e) {
+      log.warn("Không thể parse ngày: {}. Dùng ngày hiện tại.", dateStr);
+      return LocalDate.now();
+    }
+  }
+
   // Giả sử bạn có service upload file (S3/Local)
   // private final FileStorageService fileStorageService;
 
@@ -48,6 +68,7 @@ public class CrawlerService {
             .listUrl("https://giaovu.ptit.edu.vn/thong-bao/thong-bao-tu-phong-giao-vu/")
             .nextPageSelector("a.next.page-numbers")
             .itemSelector(".posts-gv li .content") // Cần F12 để xem class thực tế
+            .dateSelector(".post-meta .post-date .right")
             .linkSelector(".post-title a")
             .titleSelector("h1.post-title")
             .contentSelector(".post-content")
@@ -61,6 +82,7 @@ public class CrawlerService {
             .listUrl("https://ptit.edu.vn/tin-tuc-su-kien/thong-bao")
             .nextPageSelector("a.next.page-numbers")
             .itemSelector(".content")
+            .dateSelector(".post-meta .post-date .right")
             .linkSelector(".post-title a")
             .titleSelector("h1.post-title")
             .contentSelector(".post-content")
@@ -71,8 +93,8 @@ public class CrawlerService {
   }
 
   // 2. Hàm chạy tự động (Scheduled)
-  @Scheduled(cron = "${app.crawler.schedule.cron}", zone = "Asia/Ho_Chi_Minh")
-//    @Scheduled(fixedRate = 3600000)
+  //  @Scheduled(cron = "${app.crawler.schedule.cron}", zone = "Asia/Ho_Chi_Minh")
+  @Scheduled(fixedRate = 3600000)
   public void autoCrawl() {
     log.info("Bắt đầu tiến trình tự động crawl...");
     crawlAll();
@@ -122,8 +144,17 @@ public class CrawlerService {
             continue;
           }
 
-          // Nếu chưa có -> Xử lý lưu
-          processDetailPage(detailUrl, config);
+          String dateStr = "";
+          Element dateEl = item.select(config.getDateSelector()).first();
+          if (dateEl != null) {
+            dateStr = dateEl.text();
+          }
+
+          // 3. Parse sang LocalDate
+          LocalDate publishedDate = parseDateStr(dateStr);
+
+          // 4. Truyền detailUrl VÀ publishedDate vào hàm xử lý
+          processDetailPage(detailUrl, config, publishedDate);
           hasNewItemOnThisPage = true; // Đánh dấu là trang này có dữ liệu mới
         }
 
@@ -178,7 +209,8 @@ public class CrawlerService {
     return null; // Hết số lần thử mà vẫn lỗi
   }
 
-  protected void processDetailPage(String url, CrawlerSourceConfig config) throws IOException {
+  protected void processDetailPage(String url, CrawlerSourceConfig config, LocalDate publishedDate)
+      throws IOException {
     Document doc = connectWithRetry(url);
     if (doc == null) return;
 
@@ -196,13 +228,12 @@ public class CrawlerService {
     announcement.setCreatedDate(LocalDate.now());
     announcement.setAnnouncementStatus(true);
     announcement.setAnnouncementType(AnnouncementType.ACADEMIC);
+    announcement.setCreatedDate(publishedDate);
     announcement.setAnnouncementProvider(config.getName());
 
     Announcement savedAnnouncement = announcementRepository.save(announcement);
 
-    Elements fileLinks =
-        contentEl.select(
-            "a[href$=.pdf], a[href$=.doc], a[href$=.docx]");
+    Elements fileLinks = contentEl.select("a[href$=.pdf], a[href$=.doc], a[href$=.docx]");
 
     for (Element fileLink : fileLinks) {
       String fileUrl = fileLink.attr("abs:href");
@@ -218,6 +249,7 @@ public class CrawlerService {
               .accessType(AccessType.PUBLIC)
               .size(0)
               .contentType("application/octet-stream")
+              .createdAt(publishedDate.atStartOfDay())
               .build();
 
       fileMetadataRepository.save(metadata);
