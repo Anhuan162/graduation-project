@@ -103,9 +103,15 @@ public class CommentService {
         .getContent()
         .forEach(
             c -> {
-              boolean isCommentCreator = currentUser.getId().equals(c.getAuthorId());
+              boolean isCommentCreator = currentUser.getId().equals(c.getAuthor().getId());
               c.setCommentCreator(isCommentCreator);
               c.setCanSoftDeletePost(canSoftDeletePost);
+
+              CommentWithReplyCountResponse.Permissions permissions = new CommentWithReplyCountResponse.Permissions();
+              permissions.setCanEdit(isCommentCreator);
+              permissions.setCanDelete(isCommentCreator || canSoftDeletePost);
+              permissions.setCanReport(!isCommentCreator);
+              c.setPermissions(permissions);
             });
 
     if (currentUser != null) {
@@ -295,6 +301,26 @@ public class CommentService {
   }
 
   private CommentResponse toResponse(Comment c, String url, Boolean isLiked) {
+    User currentUser = null;
+    try {
+      currentUser = currentUserService.getCurrentUserEntity();
+    } catch (Exception e) {
+      // Ignored: Anonymous user
+    }
+
+    CommentResponse.Permissions permissions = new CommentResponse.Permissions();
+    if (currentUser != null) {
+      boolean isCommentCreator = authorizationService.isCommentCreator(c, currentUser);
+      boolean canSoftDeletePost = authorizationService.canSoftDeletePost(c.getPost(), currentUser);
+      permissions.setCanEdit(isCommentCreator);
+      permissions.setCanDelete(isCommentCreator || canSoftDeletePost);
+      permissions.setCanReport(!isCommentCreator);
+    } else {
+      permissions.setCanEdit(false);
+      permissions.setCanDelete(false);
+      permissions.setCanReport(false);
+    }
+
     return CommentResponse.builder()
         .id(c.getId())
         .content(c.getContent())
@@ -311,6 +337,7 @@ public class CommentService {
         .url(url)
         .reactionCount(c.getReactionCount())
         .isLiked(isLiked)
+        .permissions(permissions)
         .build();
   }
 

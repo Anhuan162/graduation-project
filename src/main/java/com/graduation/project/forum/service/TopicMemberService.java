@@ -38,6 +38,7 @@ public class TopicMemberService {
   private final CurrentUserService currentUserService;
   private final UserRepository userRepository;
   private final StreamProducer streamProducer;
+  private final AuthorizationService authorizationService;
 
   public Page<TopicMemberResponse> getMembers(UUID topicId, Boolean approved, Pageable pageable) {
     Page<TopicMember> page;
@@ -134,17 +135,51 @@ public class TopicMemberService {
         .findById(topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
-    User current = currentUserService.getCurrentUserEntity();
+    User currentUser = currentUserService.getCurrentUserEntity();
+    UUID currentUserId = currentUser.getId();
 
-    if (!canManageTopic(current, topic)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
+    // 1. Get Actor (Requester) Member Info
+    TopicMember actor = topicMemberRepository
+        .findByUserIdAndTopicId(currentUserId, topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED)); // Not even a member
 
-    TopicMember tm = topicMemberRepository
+    // 2. Get Target (Victim) Member Info
+    TopicMember target = topicMemberRepository
         .findByUserIdAndTopicId(userId, topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
-    topicMemberRepository.delete(tm);
+    // 3. Rule 1: No self-kicking
+    if (actor.getId().equals(target.getId())) {
+      throw new AppException(ErrorCode.BAD_REQUEST); // "Cannot kick yourself"
+    }
+
+    // 4. Rule 2: Protect Creator/Owner
+    if (target.getTopicRole() == TopicRole.OWNER || topic.getCreatedBy().getId().equals(target.getUser().getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED); // "Cannot kick Creator"
+    }
+
+    // 5. Rule 3: Hierarchy Check (Actor must be > Target)
+    boolean isActorAdmin = authorizationService.isAdmin(currentUser);
+    boolean isActorCreator = topic.getCreatedBy().getId().equals(currentUserId);
+    boolean isActorManager = actor.getTopicRole() == TopicRole.MANAGER;
+
+    if (isActorAdmin || isActorCreator) {
+      // Admin/Creator can kick anyone (except Creator, handled above)
+      // Valid
+    } else if (isActorManager) {
+      // Manager cannot kick other Managers
+      if (target.getTopicRole() == TopicRole.MANAGER) {
+        throw new AppException(ErrorCode.UNAUTHORIZED); // "Manager cannot kick Manager"
+      }
+      // Manager cannot kick Creator (handled above)
+      // Manager can kick Member -> OK
+    } else {
+      // Members cannot kick anyone
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    // 6. Execute Delete
+    topicMemberRepository.delete(target);
   }
 
   public Page<TopicMemberResponse> findUnapprovedMember(Pageable pageable) {
@@ -158,27 +193,52 @@ public class TopicMemberService {
   }
 
   @Transactional
-  public void addTopicMember(UUID topicId, UUID userId, String topicRole) {
+  public void addTopicMember(UUID topicId, UUID userId, String topicRoleStr) {
     Topic topic = topicRepository
         .findById(topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+
+    TopicRole roleToAdd;
+    try {
+      roleToAdd = TopicRole.valueOf(topicRoleStr);
+    } catch (IllegalArgumentException e) {
+      throw new AppException(ErrorCode.BAD_REQUEST);
+    }
+
+    User currentUser = currentUserService.getCurrentUserEntity();
+    boolean isActorAdmin = authorizationService.isAdmin(currentUser);
+    boolean isActorCreator = topic.getCreatedBy().getId().equals(currentUser.getId());
+
+    // Check if actor is manager
+    boolean isActorManager = topicMemberRepository.findByUserIdAndTopicId(currentUser.getId(), topicId)
+        .map(tm -> tm.getTopicRole() == TopicRole.MANAGER)
+        .orElse(false);
+
+    // LOGIC CHECK
+    if (isActorAdmin || isActorCreator) {
+      // Pass
+    } else if (isActorManager) {
+      // Manager CANNOT add other Managers
+      if (roleToAdd == TopicRole.MANAGER || roleToAdd == TopicRole.OWNER) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+      // Manager add Member -> OK
+    } else {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
 
     User userToAdd = userRepository
         .findById(userId)
         .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-    User currentUser = currentUserService.getCurrentUserEntity();
-
-    // --- chỉ creator hoặc admin mới được add ---
-    boolean canEditTopic = canManageTopic(currentUser, topic);
-
-    if (!canEditTopic) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+    if (topicMemberRepository.existsByUserIdAndTopicId(userId, topicId)) {
+      throw new AppException(ErrorCode.TOPIC_MEMBER_EXISTED);
     }
+
     TopicMember topicMember = new TopicMember();
     topicMember.setTopic(topic);
     topicMember.setUser(userToAdd);
-    topicMember.setTopicRole(TopicRole.valueOf(topicRole));
+    topicMember.setTopicRole(roleToAdd);
     topicMember.setApproved(true);
     topicMember.setJoinedAt(LocalDateTime.now());
 
@@ -217,17 +277,37 @@ public class TopicMemberService {
     return isAdmin || isCreator || isManager;
   }
 
-  public void updateTopicMember(UUID topicMemberId, TopicRole topicRole) {
-    TopicMember topicMember = topicMemberRepository
+  @Transactional
+  public void updateTopicMember(UUID topicMemberId, TopicRole newRole) {
+    TopicMember targetMember = topicMemberRepository
         .findById(topicMemberId)
-        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
-    User currentUser = currentUserService.getCurrentUserEntity();
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
-    if (!canManageTopic(currentUser, topicMember.getTopic())) {
+    Topic topic = targetMember.getTopic();
+    User currentUser = currentUserService.getCurrentUserEntity();
+    UUID currentUserId = currentUser.getId();
+
+    boolean isActorAdmin = authorizationService.isAdmin(currentUser);
+    boolean isActorCreator = topic.getCreatedBy().getId().equals(currentUserId);
+
+    // 3. SECURITY CHECK: Only Admin or Creator can change roles
+    if (!isActorAdmin && !isActorCreator) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    topicMember.setTopicRole(topicRole);
-    topicMemberRepository.save(topicMember);
+
+    // 4. RULE: Cannot change Creator/Owner's role
+    if (targetMember.getTopicRole() == TopicRole.OWNER
+        || topic.getCreatedBy().getId().equals(targetMember.getUser().getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    // 5. RULE: Cannot demote self via this API (Safety check)
+    if (targetMember.getUser().getId().equals(currentUserId)) {
+      throw new AppException(ErrorCode.BAD_REQUEST);
+    }
+
+    targetMember.setTopicRole(newRole);
+    topicMemberRepository.save(targetMember);
   }
 
   public boolean isTopicMember(UUID topicId, UUID userId) {

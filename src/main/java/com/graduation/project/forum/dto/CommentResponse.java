@@ -23,4 +23,12 @@ public class CommentResponse {
   private Boolean deleted;
   private Long reactionCount;
   private Boolean isLiked;
+  private Permissions permissions;
+
+  @Data
+  public static class Permissions {
+    private boolean canEdit;
+    private boolean canDelete;
+    private boolean canReport;
+  }
 }

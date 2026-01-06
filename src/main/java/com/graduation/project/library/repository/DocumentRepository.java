@@ -27,5 +27,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
   List<Document> findByTitle(String title);
 
+  @org.springframework.data.jpa.repository.EntityGraph(attributePaths = { "subject", "uploadedBy" })
   Page<Document> findByUploadedBy_Id(UUID uploadedById, Pageable pageable);
 }
