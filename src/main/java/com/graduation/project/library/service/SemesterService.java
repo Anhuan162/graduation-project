@@ -1,13 +1,14 @@
 package com.graduation.project.library.service;
 
-import com.graduation.project.security.exception.AppException;
-import com.graduation.project.security.exception.ErrorCode;
-import com.graduation.project.library.entity.Semester;
-import com.graduation.project.library.repository.SemesterRepository;
 import com.graduation.project.library.dto.SemesterRequest;
 import com.graduation.project.library.dto.SemesterResponse;
+import com.graduation.project.library.entity.Semester;
 import com.graduation.project.library.mapper.SemesterMapper;
+import com.graduation.project.library.repository.SemesterRepository;
+import com.graduation.project.security.exception.AppException;
+import com.graduation.project.security.exception.ErrorCode;
 import jakarta.transaction.Transactional;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,5 +35,10 @@ public class SemesterService {
             .findById(Integer.valueOf(semesterId))
             .orElseThrow(() -> new AppException(ErrorCode.SEMESTER_NOT_FOUND));
     return semesterMapper.toSemesterResponse(semester);
+  }
+
+  public List<SemesterResponse> getAllSemesters() {
+    List<Semester> semesters = semesterRepository.findAll();
+    return semesters.stream().map(Semester::toResponse).toList();
   }
 }

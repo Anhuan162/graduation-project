@@ -4,6 +4,7 @@ import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.library.dto.SemesterRequest;
 import com.graduation.project.library.dto.SemesterResponse;
 import com.graduation.project.library.service.SemesterService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,5 +28,11 @@ public class AdminSemesterController {
     return ApiResponse.<SemesterResponse>builder()
         .result(semesterService.getSemester(semesterId))
         .build();
+  }
+
+  @GetMapping("/all")
+  public ApiResponse<List<SemesterResponse>> getAllSemesters() {
+    List<SemesterResponse> semesters = semesterService.getAllSemesters();
+    return ApiResponse.<List<SemesterResponse>>builder().result(semesters).build();
   }
 }
