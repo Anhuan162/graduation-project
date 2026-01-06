@@ -13,6 +13,8 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
   @Override
   public void commence(HttpServletRequest req, HttpServletResponse res, AuthenticationException ex)
       throws IOException {
+      System.out.println("ERROR AUTHENTICATION: " + ex.getMessage());
+    ex.printStackTrace();
     ErrorCode errorCode = ErrorCode.UNAUTHENTICATED;
 
     res.setStatus(errorCode.getHttpStatusCode().value());
