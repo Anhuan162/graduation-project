@@ -41,6 +41,9 @@ public class FileMetadata {
 
   private LocalDateTime createdAt = LocalDateTime.now();
 
+  @Column(name = "is_on_drive")
+  private Boolean onDrive;
+
   @JsonIgnore
   @ManyToOne
   @JoinColumn(name = "user_id")
