@@ -37,6 +37,12 @@ public class CpaProfileService {
   public CpaProfileResponse initializeCpaProfile() {
     User user = currentUserService.getCurrentUserEntity();
 
+    // Check if profile exists
+    List<CpaProfile> existingProfiles = cpaProfileRepository.findAllByUserId(user.getId());
+    if (!existingProfiles.isEmpty()) {
+      return cpaProfileMapper.toCpaProfileResponse(existingProfiles.get(0));
+    }
+
     String studentCode = user.getStudentCode();
     if (studentCode == null) {
       throw new AppException(ErrorCode.STUDENT_CODE_NULL);

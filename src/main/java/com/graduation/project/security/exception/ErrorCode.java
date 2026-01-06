@@ -52,7 +52,8 @@ public enum ErrorCode {
   BAD_REQUEST(1042, "Bad request", HttpStatus.BAD_REQUEST),
   SESSION_RESET_PASSWORD_HAS_USED(
       1043, "Reset password session has already been used", HttpStatus.BAD_REQUEST),
-      ;
+  CANNOT_EDIT_APPROVED_POST(1044, "Không thể chỉnh sửa bài viết đã được duyệt", HttpStatus.BAD_REQUEST),
+  ;
 
   private final int code;
   private final String message;

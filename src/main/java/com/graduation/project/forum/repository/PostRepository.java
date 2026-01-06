@@ -19,29 +19,42 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PostRepository extends JpaRepository<Post, UUID> {
 
-  Page<Post> findByTopicIdAndPostStatusAndDeletedFalse(
-      UUID topicId, PostStatus postStatus, Pageable pageable);
+    Page<Post> findByTopicIdAndPostStatusAndDeletedFalse(
+            UUID topicId, PostStatus postStatus, Pageable pageable);
 
-  @Modifying
-  @Query("UPDATE Post p SET p.reactionCount = p.reactionCount + 1 WHERE p.id = :postId")
-  void increaseReactionCount(UUID postId);
+    // For managers - see all posts in topic
+    Page<Post> findByTopicIdAndDeletedFalse(UUID topicId, Pageable pageable);
 
-  @Modifying
-  @Query("UPDATE Post p SET p.reactionCount = p.reactionCount - 1 WHERE p.id = :postId")
-  void decreaseReactionCount(UUID postId);
+    // For regular users - Ghost Post Pattern
+    // Shows: APPROVED posts + user's own PENDING/REJECTED posts
+    @Query("SELECT p FROM Post p WHERE p.topic.id = :topicId AND p.deleted = false AND " +
+            "(p.postStatus = 'APPROVED' OR p.author.id = :userId) " +
+            "ORDER BY p.createdDateTime DESC")
+    Page<Post> findPublicAndOwnPosts(
+            @Param("topicId") UUID topicId,
+            @Param("userId") UUID userId,
+            Pageable pageable);
 
-  Page<Post> findAll(Specification<Post> spec, Pageable pageable);
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Post p SET p.reactionCount = COALESCE(p.reactionCount, 0) + 1 WHERE p.id = :postId")
+    void increaseReactionCount(UUID postId);
 
-  Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Post p SET p.reactionCount = CASE WHEN COALESCE(p.reactionCount, 0) > 0 THEN p.reactionCount - 1 ELSE 0 END WHERE p.id = :postId")
+    void decreaseReactionCount(UUID postId);
 
-  @Query("SELECT DISTINCT p FROM Post p " +
-          "LEFT JOIN FETCH p.comments c " +
-          "WHERE (:#{#post.title} IS NULL OR p.title LIKE CONCAT('%', :#{#post.title}, '%')) AND " +
-          "(:#{#post.reactionCount} IS NULL OR p.reactionCount >= :#{#post.reactionCount}) AND " +
-          "( :#{#post.timeBegin} IS NULL OR p.createdDateTime >= :#{#post.timeBegin}) AND " +
-          "(:#{#post.timeEnd} IS NULL OR p.createdDateTime <= :#{#post.timeEnd}) AND " +
-          " (:#{#post.topicId} is null or :#{#post.topicId} = p.topic.id) and  " +
-          "(p.postStatus = com.graduation.project.forum.constant.PostStatus.APPROVED) AND " +
-          "(c IS NULL OR c.isAccepted = true)")
-  List<Post> getPostAccepted(@Param("post") PostAcceptedFilterRequest postAcceptedRequest);
+    Page<Post> findAll(Specification<Post> spec, Pageable pageable);
+
+    Page<Post> findAllByAuthor_Id(UUID userId, Pageable pageable);
+
+    @Query("SELECT DISTINCT p FROM Post p " +
+            "LEFT JOIN FETCH p.comments c " +
+            "WHERE (:#{#post.title} IS NULL OR p.title LIKE CONCAT('%', :#{#post.title}, '%')) AND " +
+            "(:#{#post.reactionCount} IS NULL OR p.reactionCount >= :#{#post.reactionCount}) AND " +
+            "( :#{#post.timeBegin} IS NULL OR p.createdDateTime >= :#{#post.timeBegin}) AND " +
+            "(:#{#post.timeEnd} IS NULL OR p.createdDateTime <= :#{#post.timeEnd}) AND " +
+            " (:#{#post.topicId} is null or :#{#post.topicId} = p.topic.id) and  " +
+            "(p.postStatus = com.graduation.project.forum.constant.PostStatus.APPROVED) AND " +
+            "(c IS NULL OR c.isAccepted = true)")
+    List<Post> getPostAccepted(@Param("post") PostAcceptedFilterRequest postAcceptedRequest);
 }

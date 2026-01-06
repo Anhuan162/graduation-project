@@ -20,7 +20,7 @@ public class ReactionController {
 
   private final ReactionService reactionService;
 
-  @PostMapping
+  @PostMapping("/toggle")
   public ApiResponse<String> react(@RequestBody ReactionRequest request) {
     reactionService.toggleReaction(request);
     return ApiResponse.<String>builder().result("Success").build();

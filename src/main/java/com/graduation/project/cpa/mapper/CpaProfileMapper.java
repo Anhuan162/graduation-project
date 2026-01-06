@@ -6,15 +6,15 @@ import com.graduation.project.cpa.dto.CpaProfileResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring",  uses = GpaProfileMapper.class)
+@Mapper(componentModel = "spring", uses = GpaProfileMapper.class)
 public interface CpaProfileMapper {
 
   @Mapping(target = "gpaProfiles", source = "gpaProfileRequests")
   CpaProfile toCpaProfile(CpaProfileRequest cpaProfileRequest);
 
-  @Mapping(target = "gpaProfileResponses", source = "gpaProfiles")
+  @Mapping(target = "gpaProfiles", source = "gpaProfiles")
   CpaProfileResponse toCpaProfileResponse(CpaProfile cpaProfile);
 
-  @Mapping(target = "gpaProfileResponses", ignore = true)
+  @Mapping(target = "gpaProfiles", ignore = true)
   CpaProfileResponse toCpaProfileInfoResponse(CpaProfile cpaProfile);
 }

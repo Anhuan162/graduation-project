@@ -15,5 +15,5 @@ public class CpaProfileResponse {
   Double numberCpaScore;
   Double previousNumberCpaScore;
   int accumulatedCredits;
-  List<GpaProfileResponse> gpaProfileResponses;
+  List<GpaProfileResponse> gpaProfiles;
 }

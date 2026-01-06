@@ -4,12 +4,12 @@ import com.graduation.project.auth.dto.response.ApiResponse;
 import com.graduation.project.forum.constant.TopicRole;
 import com.graduation.project.forum.dto.TopicMemberResponse;
 import com.graduation.project.forum.service.TopicMemberService;
-import java.util.List;
+
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,13 +20,22 @@ public class TopicMemberController {
   private final TopicMemberService topicMemberService;
 
   @GetMapping("/topic/{topicId}")
-  public ResponseEntity<List<TopicMemberResponse>> getMembers(@PathVariable UUID topicId) {
-    return ResponseEntity.ok(topicMemberService.getMembers(topicId));
+  public ApiResponse<Page<TopicMemberResponse>> getMembers(
+      @PathVariable UUID topicId,
+      @RequestParam(required = false) Boolean approved,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "10") int size) {
+    Pageable pageable = PageRequest.of(page, size);
+    return ApiResponse.<Page<TopicMemberResponse>>builder()
+        .result(topicMemberService.getMembers(topicId, approved, pageable))
+        .build();
   }
 
   @PostMapping("/join/{topicId}")
-  public ResponseEntity<TopicMemberResponse> join(@PathVariable UUID topicId) {
-    return ResponseEntity.ok(topicMemberService.joinTopic(topicId));
+  public ApiResponse<TopicMemberResponse> join(@PathVariable UUID topicId) {
+    return ApiResponse.<TopicMemberResponse>builder()
+        .result(topicMemberService.joinTopic(topicId))
+        .build();
   }
 
   @PostMapping("/approve/{memberId}")
@@ -37,9 +46,11 @@ public class TopicMemberController {
   }
 
   @DeleteMapping("/{topicId}/kick/{userId}")
-  public ResponseEntity<Void> kick(@PathVariable UUID topicId, @PathVariable UUID userId) {
+  public ApiResponse<String> kick(@PathVariable UUID topicId, @PathVariable UUID userId) {
     topicMemberService.kickMember(topicId, userId);
-    return ResponseEntity.ok().build();
+    return ApiResponse.<String>builder()
+        .result("Member kicked successfully")
+        .build();
   }
 
   @GetMapping("/unapproved-member")

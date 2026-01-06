@@ -83,14 +83,25 @@ public class PostService {
 
   public PostResponse getOne(UUID id) {
     Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
-    var user = currentUserService.getCurrentUserEntity();
+    var userOpt = currentUserService.getCurrentUserEntityOptional();
+    User user = userOpt.orElse(null);
 
-    if (!authorizationService.canManageTopic(user, post.getTopic())
-        && !authorizationService.isPostCreator(post, user)) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
+    // Якщо bài viết đã Approved -> Ai cũng xem được
+    if (PostStatus.APPROVED.equals(post.getPostStatus())) {
+      // Valid
+    } else {
+      // Nếu chưa Approved -> Cần login và có quyền
+      if (user == null) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+      if (!authorizationService.canManageTopic(user, post.getTopic())
+          && !authorizationService.isPostCreator(post, user)) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
     }
+
     List<FileMetadataResponse> attachments = getFileMetadataResponses(post.getId());
-    Boolean isLiked = checkUserLiked(user.getId(), post.getId());
+    Boolean isLiked = (user != null) && checkUserLiked(user.getId(), post.getId());
     return postMapper.toPostResponse(post, attachments, isLiked);
   }
 
@@ -143,7 +154,7 @@ public class PostService {
         likedMap.getOrDefault(post.getId(), false)));
   }
 
-  public Page<DetailPostResponse> getApprovedPostsByTopic(UUID topicId, Pageable pageable) {
+  public Page<DetailPostResponse> getPostsByTopic(UUID topicId, Pageable pageable) {
     Topic topic = topicRepository
         .findById(topicId)
         .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
@@ -151,34 +162,57 @@ public class PostService {
     if (!authorizationService.canViewTopic(topic, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    Page<Post> postPage = postRepository.findByTopicIdAndPostStatusAndDeletedFalse(
-        topicId, PostStatus.APPROVED, pageable);
+
+    // Check if user can manage the topic (creator or manager)
+    boolean isManager = authorizationService.canManageTopic(user, topic);
+
+    Page<Post> postPage;
+
+    if (isManager) {
+      // Managers see ALL posts (APPROVED, PENDING, REJECTED)
+      postPage = postRepository.findByTopicIdAndDeletedFalse(topicId, pageable);
+    } else {
+      // Regular users see:
+      // 1. All APPROVED posts
+      // 2. Their own PENDING/REJECTED posts (Ghost Pattern)
+      postPage = postRepository.findPublicAndOwnPosts(topicId, user.getId(), pageable);
+    }
 
     if (postPage.isEmpty()) {
       return Page.empty(pageable);
     }
     Map<UUID, List<FileMetadataResponse>> filesMap = mapPostWithFileMetadata(postPage);
+    Map<UUID, Boolean> likedMap = user != null
+        ? mapPostWithUserLiked(postPage, user.getId())
+        : Collections.emptyMap();
 
     boolean canManageTopic = authorizationService.canManageTopic(user, topic);
 
     return postPage.map(
         post -> {
           boolean isPostCreator = authorizationService.isPostCreator(post, user);
-          return DetailPostResponse.from(post, filesMap, canManageTopic, isPostCreator);
+          return DetailPostResponse.from(post, filesMap, canManageTopic, isPostCreator,
+              likedMap.getOrDefault(post.getId(), false));
         });
   }
 
   @Transactional
   public PostResponse update(UUID id, PostRequest request) {
     Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
-    post.setTitle(request.getTitle());
-    post.setContent(request.getContent());
-    postRepository.save(post);
     var user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.isPostCreator(post, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
+
+    // Validate post status - only allow editing PENDING posts
+    if (!PostStatus.PENDING.equals(post.getPostStatus())) {
+      throw new AppException(ErrorCode.CANNOT_EDIT_APPROVED_POST);
+    }
+
+    post.setTitle(request.getTitle());
+    post.setContent(request.getContent());
+    postRepository.save(post);
     List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
         request.getFileMetadataIds(), post.getId(), ResourceType.POST, user.getId());
     List<FileMetadataResponse> attachments = fileMetadataList.stream()
@@ -303,7 +337,7 @@ public class PostService {
 
   private Map<UUID, Boolean> mapPostWithUserLiked(Page<Post> postPage, UUID userId) {
     List<UUID> postIds = postPage.getContent().stream().map(Post::getId).toList();
-    List<Reaction> reactions = reactionRepository.findByUserIdAndTargetTypeAndTargetIdIn(
+    List<Reaction> reactions = reactionRepository.findByUser_IdAndTargetTypeAndTargetIdIn(
         userId, TargetType.POST, postIds);
     return reactions.stream()
         .collect(Collectors.toMap(
@@ -321,7 +355,7 @@ public class PostService {
   }
 
   private Boolean checkUserLiked(UUID userId, UUID postId) {
-    return reactionRepository.findByUserIdAndTargetIdAndTargetType(
+    return reactionRepository.findByUser_IdAndTargetIdAndTargetType(
         userId, postId, TargetType.POST).isPresent();
   }
 

@@ -55,6 +55,7 @@ public class Document {
   // Hash code - giúp xác định tệp sai hay trùng lặp không
   private String checksum;
   // authentication
+  @Enumerated(EnumType.STRING)
   private VisibilityStatus visibility;
 
   private int downloadCount;
