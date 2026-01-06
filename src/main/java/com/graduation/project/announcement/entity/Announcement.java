@@ -48,6 +48,8 @@ public class Announcement {
   @Enumerated(EnumType.STRING)
   private AnnouncementType announcementType;
 
+  @Builder.Default private Boolean onDrive = Boolean.FALSE;
+
   @OneToMany(
       mappedBy = "announcement",
       cascade = CascadeType.ALL,

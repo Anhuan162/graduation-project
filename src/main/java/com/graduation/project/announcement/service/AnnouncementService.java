@@ -195,6 +195,11 @@ public class AnnouncementService {
                 cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
           }
 
+          if (Objects.nonNull(request.getOnDrive())) {
+            predicates.add(
+                cb.equal(root.get("onDrive"), request.getOnDrive()));
+          }
+
           if (Objects.nonNull(request.getAnnouncementProvider())) {
             predicates.add(
                 cb.equal(root.get("announcementProvider"), request.getAnnouncementProvider()));
@@ -249,7 +254,9 @@ public class AnnouncementService {
     if (announcement.isEmpty()){
       throw new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND);
     }
-    FileResponse FileResponse = driveService.uploadTextToDrive(announcement.get().getTitle(), announcement.get().getContent());
-    return FileResponse;
+    FileResponse fileResponse = driveService.uploadTextToDrive(announcement.get().getTitle(), announcement.get().getContent());
+    announcement.get().setOnDrive(true);
+    announcementRepository.save(announcement.get());
+    return fileResponse;
   }
 }
