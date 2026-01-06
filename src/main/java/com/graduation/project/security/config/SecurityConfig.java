@@ -1,9 +1,9 @@
 package com.graduation.project.security.config;
 
+import com.graduation.project.auth.security.OAuth2AuthenticationSuccessHandler;
 import com.graduation.project.common.config.CustomPermissionEvaluator;
 import com.graduation.project.security.ultilities.JwtAuthenticationEntryPoint;
 import com.graduation.project.security.ultilities.JwtToUserPrincipalConverter;
-import com.graduation.project.auth.security.OAuth2AuthenticationSuccessHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
@@ -67,7 +67,9 @@ public class SecurityConfig {
                         "/api/auth/**",
                         "/oauth2/**",
                         "/login/**",
-                        "/api/users/**",
+                        "/api/users/register",
+                        "/api/users/verify",
+                        "/api/users/resend",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html")

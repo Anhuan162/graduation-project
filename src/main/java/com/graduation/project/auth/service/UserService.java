@@ -7,10 +7,7 @@ import com.graduation.project.auth.dto.VerifyUserDto;
 import com.graduation.project.auth.dto.request.SearchUserRequest;
 import com.graduation.project.auth.dto.request.SignupRequest;
 import com.graduation.project.auth.dto.request.UserProfileUpdateRequest;
-import com.graduation.project.auth.dto.response.SignupResponse;
-import com.graduation.project.auth.dto.response.UserAuthResponse;
-import com.graduation.project.auth.dto.response.UserProfileResponse;
-import com.graduation.project.auth.dto.response.UserResponse;
+import com.graduation.project.auth.dto.response.*;
 import com.graduation.project.auth.repository.PasswordResetSessionRepository;
 import com.graduation.project.auth.repository.RoleRepository;
 import com.graduation.project.auth.repository.UserRepository;
@@ -55,6 +52,8 @@ public class UserService {
   private final FirebaseService firebaseService;
   private final FacultyRepository facultyRepository;
   private final Validator validator;
+  private final UserRegistrationService userRegistrationService;
+  private final UserProfileService userProfileService;
 
   private String AVATAR_FOLDER = "avatars";
 
@@ -306,7 +305,7 @@ public class UserService {
     return (UserPrincipal) auth.getPrincipal();
   }
 
-  public UserProfileResponse getUserProfile() {
+  public UserProfileResponse getMyProfile() {
     User user = getCurrentUser();
     if (user == null) {
       throw new RuntimeException("User not authenticated or not found");
@@ -319,17 +318,7 @@ public class UserService {
   }
 
   public UserAuthResponse getAuthInfo() {
-    User user = getCurrentUser();
-    if (user == null) {
-      throw new AppException(ErrorCode.UNAUTHENTICATED);
-    }
-    return UserAuthResponse.builder()
-        .id(user.getId().toString())
-        .email(user.getEmail())
-        .fullName(user.getFullName())
-        .avatar(user.getAvatarUrl())
-        .permissions(new HashSet<>(getPermissionOfCurrentUser()))
-        .build();
+    return userProfileService.getAuthInfo();
   }
 
   public List<String> getPermissionOfCurrentUser() {
@@ -404,5 +393,9 @@ public class UserService {
     UserProfileResponse userProfileResponse = user.toUserProfileResponse();
     userProfileResponse.setFacultyName(facultiesName);
     return userProfileResponse;
+  }
+
+  public UserProfileResponse updateProfileInfo(UserProfileUpdateRequest request) {
+    return userProfileService.updateProfileInfo(request);
   }
 }

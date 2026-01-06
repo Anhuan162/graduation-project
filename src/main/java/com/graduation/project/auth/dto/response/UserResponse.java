@@ -19,7 +19,7 @@ public class UserResponse {
   String password;
   String fullName;
   Boolean enabled;
-  String avatar_url;
+  String avatarUrl;
   String phone;
   Provider provider;
   String studentCode;
@@ -33,7 +33,7 @@ public class UserResponse {
         .password(user.getPassword())
         .fullName(user.getFullName())
         .enabled(user.getEnabled())
-        .avatar_url(user.getAvatarUrl())
+        .avatarUrl(user.getAvatarUrl())
         .phone(user.getPhone())
         .studentCode(user.getStudentCode())
         .roles(RoleResponse.from(user.getRoles()))
