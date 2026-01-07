@@ -14,28 +14,32 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface SubjectRepository extends JpaRepository<Subject, UUID> {
 
-    // ThieuNN
-    @Query("SELECT distinct s from Subject as s "
-            + " inner join SubjectReference as sref on sref.subject = s "
-            + " inner join Semester as se on se = sref.semester "
-            + " inner join Faculty as fa on sref.faculty = fa "
-            + " where (:facultyId is null or fa.id = :facultyId) and "
-            + " ( :semesterId is null or se.id = :semesterId)")
-    public List<Subject> findSubjectByFacultyIdAndSemesterId(
-            @Param("facultyId") UUID facultyId, @Param("semesterId") UUID semesterId);
+  // ThieuNN
+  @Query(
+      "SELECT distinct s from Subject as s "
+          + " inner join SubjectReference as sref on sref.subject = s "
+          + " inner join Semester as se on se = sref.semester "
+          + " inner join Faculty as fa on sref.faculty = fa "
+          + " where (:facultyId is null or fa.id = :facultyId) and "
+          + " ( :semesterId is null or se.id = :semesterId)")
+  public List<Subject> findSubjectByFacultyIdAndSemesterId(
+      @Param("facultyId") UUID facultyId, @Param("semesterId") UUID semesterId);
 
-    @Query("SELECT distinct s from Subject as s "
-            + " inner join SubjectReference as sref on sref.subject = s "
-            + " inner join Semester as se on se = sref.semester "
-            + " inner join Faculty as fa on sref.faculty = fa "
-            + " where (:facultyId is null or fa.id = :facultyId) and "
-            + " ( :semesterId is null or se.id = :semesterId) and"
-            + " ( :cohortCode is null or sref.cohortCode = :cohortCode) and"
-            + " ( :subjectName is null or s.subjectName like :subjectName)")
-    Page<Subject> searchSubjects(
-            @Param("facultyId") UUID facultyId,
-            @Param("semesterId") Integer semesterId,
-            @Param("cohortCode") CohortCode cohortCode,
-            @Param("subjectName") String subjectName,
-            Pageable pageable);
+  @Query(
+      "SELECT distinct s from Subject as s "
+          + " left join SubjectReference as sref on sref.subject = s "
+          + " left join Semester as se on se = sref.semester "
+          + " left join Faculty as fa on sref.faculty = fa "
+          + " where (:facultyId is null or fa.id = :facultyId) and "
+          + " ( :semesterId is null or se.id = :semesterId) and "
+          + " ( :cohortCode is null or sref.cohortCode = :cohortCode) and "
+          + " ( :subjectName is null "
+          + "   or LOWER(s.subjectName) LIKE LOWER(CONCAT('%', CAST(:subjectName AS string), '%')) "
+          + " )")
+  Page<Subject> searchSubjects(
+      @Param("facultyId") UUID facultyId,
+      @Param("semesterId") Integer semesterId,
+      @Param("cohortCode") CohortCode cohortCode,
+      @Param("subjectName") String subjectName,
+      Pageable pageable);
 }
