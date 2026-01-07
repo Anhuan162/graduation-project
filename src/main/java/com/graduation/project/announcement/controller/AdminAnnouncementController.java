@@ -24,15 +24,14 @@ public class AdminAnnouncementController {
   private final UserRepository userRepository;
 
   @PostMapping
-  public ApiResponse<CreatedAnnonucementResponse> createAnnouncement(
-      @RequestBody CreatedAnnouncementRequest request,
+  public ApiResponse<AnnouncementResponse> createAnnouncement(
+      @RequestBody CreateAnnouncementRequest request,
       @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-    User user =
-        userRepository
-            .findByEmail(userPrincipal.getEmail())
-            .orElseThrow(() -> new RuntimeException("User not found"));
-    return ApiResponse.<CreatedAnnonucementResponse>builder()
+    User user = userRepository
+        .findByEmail(userPrincipal.getEmail())
+        .orElseThrow(() -> new RuntimeException("User not found"));
+    return ApiResponse.<AnnouncementResponse>builder()
         .result(announcementService.createAnnouncement(request, user))
         .build();
   }
@@ -49,10 +48,9 @@ public class AdminAnnouncementController {
       @PathVariable String announcementId,
       @RequestBody UpdatedAnnouncementRequest request,
       @AuthenticationPrincipal UserPrincipal userPrincipal) {
-    User user =
-        userRepository
-            .findByEmail(userPrincipal.getEmail())
-            .orElseThrow(() -> new RuntimeException("User not found"));
+    User user = userRepository
+        .findByEmail(userPrincipal.getEmail())
+        .orElseThrow(() -> new RuntimeException("User not found"));
     return ApiResponse.<AnnouncementResponse>builder()
         .result(announcementService.updateAnnouncement(announcementId, request, user))
         .build();
@@ -66,20 +64,18 @@ public class AdminAnnouncementController {
         .build();
   }
 
-
   @GetMapping("/all")
   public ApiResponse<Page<AnnouncementResponse>> searchAnnouncements(
       @ModelAttribute SearchAnnouncementRequest request, Pageable pageable) {
-    Page<AnnouncementResponse> announcementResponses =
-        announcementService.searchAnnouncement(request, pageable);
+    Page<AnnouncementResponse> announcementResponses = announcementService.searchAnnouncement(request, pageable);
     return ApiResponse.<Page<AnnouncementResponse>>builder().result(announcementResponses).build();
   }
 
   @PostMapping("/add-to-drive/{announcementId}")
   public ApiResponse<FileResponse> addToDrive(
-    @PathVariable String announcementId
-  ) throws IOException {
-    return ApiResponse.<FileResponse>builder().result(announcementService.addAnnouncementToDrive (announcementId)).build();
+      @PathVariable String announcementId) throws IOException {
+    return ApiResponse.<FileResponse>builder().result(announcementService.addAnnouncementToDrive(announcementId))
+        .build();
   }
 
   @DeleteMapping("/{announcementId}")

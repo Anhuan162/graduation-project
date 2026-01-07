@@ -17,6 +17,8 @@ import lombok.NoArgsConstructor;
 public class ReportResponse {
   private UUID id;
   private UUID reporterId;
+  private String reporterFullName;
+  private String reporterAvatarUrl;
   private ReportReason reason;
 
   private String description;
@@ -25,6 +27,7 @@ public class ReportResponse {
   private TargetType targetType;
   private UUID postId;
   private UUID commentId;
+  private UUID topicId;
 
   private String ipAddress;
   private LocalDateTime createdAt;

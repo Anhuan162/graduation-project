@@ -34,9 +34,10 @@ public class AdminFacultyController {
   }
 
   @GetMapping
-  public ApiResponse<Page<FacultyResponse>> getAllFaculties(Pageable pageable) {
+  public ApiResponse<Page<FacultyResponse>> getAllFaculties(
+      @RequestParam(required = false) String search, Pageable pageable) {
     return ApiResponse.<Page<FacultyResponse>>builder()
-        .result(adminFacultyService.getAllFaculties(pageable))
+        .result(adminFacultyService.getAllFaculties(search, pageable))
         .build();
   }
 

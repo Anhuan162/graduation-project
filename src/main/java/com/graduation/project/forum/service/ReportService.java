@@ -39,18 +39,19 @@ public class ReportService {
   public void createReport(ReportRequest request) {
     User reporter = currentUserService.getCurrentUserEntity();
 
-    Report.ReportBuilder reportBuilder =
-        Report.builder()
-            .reporter(reporter)
-            .reason(request.getReason())
-            .description(request.getDescription())
-            //                .ipAddress(RequestUtils.getClientIpAddress())
-            .status(ReportStatus.PENDING);
+    Report.ReportBuilder reportBuilder = Report.builder()
+        .reporter(reporter)
+        .reason(request.getReason())
+        .description(request.getDescription())
+        // .ipAddress(RequestUtils.getClientIpAddress())
+        .status(ReportStatus.PENDING);
 
     if (request.getTargetType() == TargetType.POST) {
       handlePostReport(request.getTargetId(), reporter, reportBuilder);
     } else if (request.getTargetType() == TargetType.COMMENT) {
       handleCommentReport(request.getTargetId(), reporter, reportBuilder);
+    } else if (request.getTargetType() == TargetType.TOPIC) {
+      handleTopicReport(request.getTargetId(), reporter, reportBuilder);
     } else {
       throw new AppException(ErrorCode.INVALID_REPORT_TARGET);
     }
@@ -59,10 +60,9 @@ public class ReportService {
   }
 
   private void handlePostReport(UUID postId, User reporter, Report.ReportBuilder builder) {
-    Post post =
-        postRepository
-            .findById(postId)
-            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post = postRepository
+        .findById(postId)
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     if (reportRepository.existsByPostIdAndReporterId(postId, reporter.getId())) {
       throw new AppException(ErrorCode.REPORT_ALREADY_EXISTED);
@@ -73,10 +73,9 @@ public class ReportService {
   }
 
   private void handleCommentReport(UUID commentId, User reporter, Report.ReportBuilder builder) {
-    Comment comment =
-        commentRepository
-            .findById(commentId)
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment comment = commentRepository
+        .findById(commentId)
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     if (reportRepository.existsByCommentIdAndReporterId(commentId, reporter.getId())) {
       throw new AppException(ErrorCode.REPORT_ALREADY_EXISTED);
@@ -84,6 +83,19 @@ public class ReportService {
 
     builder.targetType(TargetType.COMMENT);
     builder.comment(comment);
+  }
+
+  private void handleTopicReport(UUID topicId, User reporter, Report.ReportBuilder builder) {
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+
+    if (reportRepository.existsByTopicIdAndReporterId(topicId, reporter.getId())) {
+      throw new AppException(ErrorCode.REPORT_ALREADY_EXISTED);
+    }
+
+    builder.targetType(TargetType.TOPIC);
+    builder.topic(topic);
   }
 
   @Transactional(readOnly = true)
@@ -96,10 +108,9 @@ public class ReportService {
   @Transactional
   public Page<ReportResponse> searchReportsByTopic(UUID topicId, Pageable pageable) {
     User reporter = currentUserService.getCurrentUserEntity();
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     if (!authorizationService.canManageTopic(reporter, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -110,25 +121,38 @@ public class ReportService {
 
   @Transactional(readOnly = true)
   public ReportResponse getReportDetail(UUID id) {
-    Report report =
-        reportRepository
-            .findById(id)
-            .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+    Report report = reportRepository
+        .findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
     return mapToResponse(report);
   }
 
   @Transactional
   public ReportResponse processReport(UUID reportId, ProcessReportRequest request) {
-    Report report =
-        reportRepository
-            .findById(reportId)
-            .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+    Report report = reportRepository
+        .findById(reportId)
+        .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
 
-    report.setStatus(request.getStatus());
+    // Update Audit info
+    report.setAdminNote(request.getNote());
 
-    // 2. Logic xử lý nội dung vi phạm (Nếu Admin chọn xóa)
-    if (request.isDeleteTarget() && request.getStatus() == ReportStatus.RESOLVED) {
-      handleContentDeletion(report);
+    switch (request.getAction()) {
+      case DELETE_CONTENT:
+        report.setStatus(ReportStatus.RESOLVED);
+        handleContentDeletion(report);
+        break;
+
+      case KEEP_CONTENT:
+        // Giữ nội dung, có thể đánh dấu là REJECTED (Báo cáo sai) hoặc RESOLVED (Đã xem
+        // xét nhưng ko xóa)
+        // Ở đây chọn REJECTED để rõ ràng là báo cáo bị từ chối
+        report.setStatus(ReportStatus.REJECTED);
+        break;
+
+      case WARN_USER:
+        // TODO: Implement warn user logic
+        report.setStatus(ReportStatus.RESOLVED);
+        break;
     }
 
     reportRepository.save(report);
@@ -139,7 +163,7 @@ public class ReportService {
   private void handleContentDeletion(Report report) {
     if (report.getTargetType() == TargetType.POST && report.getPost() != null) {
       Post post = report.getPost();
-      if (!post.getDeleted()) { // Chỉ xóa nếu chưa xóa
+      if (!post.getDeleted()) {
         post.setDeleted(true);
         postRepository.save(post);
       }
@@ -170,13 +194,16 @@ public class ReportService {
 
     return ReportResponse.builder()
         .id(report.getId())
-        .reporterId(report.getReporter().getId()) // Hoặc getFullName
+        .reporterId(report.getReporter().getId())
+        .reporterFullName(report.getReporter().getFullName())
+        .reporterAvatarUrl(report.getReporter().getAvatarUrl())
         .reason(report.getReason())
         .description(report.getDescription())
         .status(report.getStatus())
         .targetType(report.getTargetType())
         .postId(report.getTargetType() == TargetType.POST ? targetId : null)
         .commentId(report.getTargetType() == TargetType.COMMENT ? targetId : null)
+        .topicId(report.getTargetType() == TargetType.TOPIC ? targetId : null)
         .targetPreview(targetPreview)
         .createdAt(report.getCreatedAt())
         .build();

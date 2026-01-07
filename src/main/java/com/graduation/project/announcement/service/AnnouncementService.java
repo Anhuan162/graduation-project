@@ -6,6 +6,7 @@ import com.graduation.project.announcement.entity.AnnouncementTarget;
 import com.graduation.project.announcement.entity.Classroom;
 import com.graduation.project.announcement.mapper.AnnouncementMapper;
 import com.graduation.project.announcement.repository.AnnouncementRepository;
+import com.graduation.project.announcement.repository.AnnouncementTargetRepository;
 import com.graduation.project.announcement.repository.ClassroomRepository;
 import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.service.CurrentUserService;
@@ -42,6 +43,7 @@ import org.springframework.stereotype.Service;
 public class AnnouncementService {
   private final AnnouncementRepository announcementRepository;
   private final ClassroomRepository classroomRepository;
+  private final AnnouncementTargetRepository announcementTargetRepository;
   private final CurrentUserService currentUserService;
   private final ApplicationEventPublisher publisher;
   private final FileService fileService;
@@ -50,18 +52,78 @@ public class AnnouncementService {
   private final DriveService driveService;
 
   @Transactional
-  public CreatedAnnonucementResponse createAnnouncement(
-      CreatedAnnouncementRequest request, User user) {
-    Announcement announcement = CreatedAnnouncementRequest.toAnnouncement(request, user);
+  public AnnouncementResponse createAnnouncement(CreateAnnouncementRequest request, User user) {
+    // 1. Save Announcement (Parent)
+    Announcement announcement = Announcement.builder()
+        .title(request.getTitle())
+        .content(request.getContent())
+        .announcementType(request.getAnnouncementType()) // Set type
+        .createdBy(user)
+        .createdDate(LocalDate.now())
+        .announcementStatus(true)
+        .build();
     announcementRepository.save(announcement);
 
-    List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
-        request.getFileMetadataIds(),
+    List<UUID> fileMetadataIds = new ArrayList<>();
+    if (request.getFileMetadataIds() != null) {
+      fileMetadataIds = request.getFileMetadataIds().stream()
+          .map(UUID::fromString)
+          .toList();
+    }
+
+    fileService.updateFileMetadataList(
+        fileMetadataIds,
         announcement.getId(),
         ResourceType.ANNOUNCEMENT,
         user.getId());
-    List<String> urls = fileMetadataList.stream().map(FileMetadata::getUrl).toList();
-    return CreatedAnnonucementResponse.from(announcement, urls);
+
+    // 2. Resolve Targets (Data Explosion)
+    Set<String> classCodesToSave = new HashSet<>();
+
+    if (Boolean.TRUE.equals(request.getIsGlobal())) {
+      classCodesToSave.addAll(classroomRepository.findAllClassCodes());
+    } else {
+      if (!org.springframework.util.CollectionUtils.isEmpty(request.getTargetFaculties())) {
+        List<UUID> facultyIds = request.getTargetFaculties().stream()
+            .map(UUID::fromString)
+            .toList();
+        classCodesToSave.addAll(classroomRepository.findClassCodesByFacultyIdIn(facultyIds));
+      }
+
+      // Cohort Targets
+      if (!org.springframework.util.CollectionUtils.isEmpty(request.getTargetCohorts())) {
+        List<CohortCode> cohorts = request.getTargetCohorts().stream()
+            .map(CohortCode::valueOf)
+            .toList();
+        classCodesToSave.addAll(classroomRepository.findClassCodesBySchoolYearCodeIn(cohorts));
+      }
+
+      // Specific Class Codes
+      if (!org.springframework.util.CollectionUtils.isEmpty(request.getSpecificClassCodes())) {
+        classCodesToSave.addAll(request.getSpecificClassCodes());
+      }
+    }
+
+    // 3. Batch Persistence with Chunking (Memory Optimization)
+    List<String> allCodesList = new ArrayList<>(classCodesToSave);
+    // Guava Lists.partition to split large list into smaller chunks
+    List<List<String>> chunks = com.google.common.collect.Lists.partition(allCodesList, 500);
+
+    for (List<String> chunk : chunks) {
+      List<AnnouncementTarget> targets = chunk.stream()
+          .map(code -> AnnouncementTarget.builder()
+              .announcement(announcement)
+              .classroomCode(code)
+              .build())
+          .toList();
+
+      announcementTargetRepository.saveAll(targets);
+      // Optional: Flush to send statements to DB and clear memory if needed (though
+      // transaction handles commit at end)
+      // announcementTargetRepository.flush();
+      // announcementTargetRepository.flush();
+    }
+    return AnnouncementResponse.from(announcement);
   }
 
   public void releaseAnnouncement(UUID announcementId, ReleaseAnnouncementRequest request) {
@@ -106,7 +168,7 @@ public class AnnouncementService {
                   .announcement(announcement)
                   .build();
             })
-        .toList();
+        .collect(java.util.stream.Collectors.toList());
   }
 
   private Set<String> getAllClassroomCodes(
@@ -146,7 +208,14 @@ public class AnnouncementService {
 
     Set<String> allClassroomCodes = getAllClassroomCodes(
         request.getSchoolYearCodes(), request.getFacultyIds(), request.getClassCodes());
-    announcement.setTargets(generateAnnouncementTargets(allClassroomCodes, announcement));
+
+    // Use clear/addAll to respect orphanRemoval and Hibernate managed collection
+    if (announcement.getTargets() == null) {
+      announcement.setTargets(new ArrayList<>());
+    }
+    announcement.getTargets().clear();
+    announcement.getTargets().addAll(generateAnnouncementTargets(allClassroomCodes, announcement));
+
     announcementRepository.save(announcement);
     return AnnouncementResponse.from(announcement);
   }

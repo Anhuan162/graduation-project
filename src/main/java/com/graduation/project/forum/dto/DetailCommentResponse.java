@@ -23,13 +23,27 @@ public class DetailCommentResponse {
   private LocalDateTime createdDateTime;
   private String url;
   private Boolean deleted;
+  private Permissions permissions;
   private Long reactionCount;
   private boolean isCommentCreator;
   private boolean canSoftDeletePost;
   private Boolean isLiked;
 
+  @Data
+  public static class Permissions {
+    private boolean canEdit;
+    private boolean canDelete;
+    private boolean canReport;
+  }
+
   public static DetailCommentResponse toResponse(
       Comment comment, String url, Boolean isCommentCreator, Boolean canSoftDeletePost, Boolean isLiked) {
+
+    Permissions permissions = new Permissions();
+    permissions.setCanEdit(isCommentCreator);
+    permissions.setCanDelete(isCommentCreator || canSoftDeletePost);
+    permissions.setCanReport(!isCommentCreator);
+
     return DetailCommentResponse.builder()
         .id(comment.getId())
         .content(comment.getContent())
@@ -45,6 +59,7 @@ public class DetailCommentResponse {
         .deleted(comment.getDeleted())
         .url(url)
         .reactionCount(comment.getReactionCount())
+        .permissions(permissions)
         .isCommentCreator(isCommentCreator)
         .canSoftDeletePost(canSoftDeletePost)
         .isLiked(isLiked)

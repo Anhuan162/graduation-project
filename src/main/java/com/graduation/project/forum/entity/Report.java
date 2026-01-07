@@ -11,12 +11,10 @@ import java.util.UUID;
 import lombok.*;
 
 @Entity
-@Table(
-    name = "reports",
-    indexes = {
-      @Index(name = "idx_report_status", columnList = "status"),
-      @Index(name = "idx_report_created_at", columnList = "createdAt")
-    })
+@Table(name = "reports", indexes = {
+    @Index(name = "idx_report_status", columnList = "status"),
+    @Index(name = "idx_report_created_at", columnList = "createdAt")
+})
 @Getter
 @Setter
 @Builder
@@ -53,12 +51,19 @@ public class Report {
   @JoinColumn(name = "post_id")
   private Post post;
 
-  // Liên kết Comment (Nullable)
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "comment_id")
   private Comment comment;
 
+  // Liên kết Topic (Nullable)
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "topic_id")
+  private Topic topic;
+
   // --- END POLYMORPHISM ---
+
+  @Column(columnDefinition = "TEXT")
+  private String adminNote; // Ghi chú của admin/manager khi xử lý report
 
   private String ipAddress;
   private LocalDateTime createdAt;
@@ -66,16 +71,19 @@ public class Report {
   @PrePersist
   protected void onCreate() {
     this.createdAt = LocalDateTime.now();
-    if (this.status == null) this.status = ReportStatus.PENDING;
+    if (this.status == null)
+      this.status = ReportStatus.PENDING;
   }
 
   // Validate logic: 1 Report chỉ được thuộc về Post HOẶC Comment, không cả hai
   @AssertTrue(message = "Report must target either a Post or a Comment")
   public boolean isValidTarget() {
     if (targetType == TargetType.POST) {
-      return post != null && comment == null;
+      return post != null && comment == null && topic == null;
     } else if (targetType == TargetType.COMMENT) {
-      return comment != null && post == null;
+      return comment != null && post == null && topic == null;
+    } else if (targetType == TargetType.TOPIC) {
+      return topic != null && post == null && comment == null;
     }
     return false;
   }

@@ -7,6 +7,8 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.*;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
@@ -18,9 +20,16 @@ public class DetailedAnnouncementResponse {
   String announcementType;
   Boolean announcementStatus;
   String createdBy;
+  String createdByFullName;
+
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
   LocalDate createdDate;
+
   String modifiedBy;
+
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
   LocalDate modifiedDate;
+
   List<AnnouncementFileResponse> attachments;
 
   public static DetailedAnnouncementResponse from(
@@ -34,6 +43,10 @@ public class DetailedAnnouncementResponse {
         .createdBy(
             Objects.nonNull(announcement.getCreatedBy())
                 ? announcement.getCreatedBy().getEmail()
+                : "")
+        .createdByFullName(
+            Objects.nonNull(announcement.getCreatedBy())
+                ? announcement.getCreatedBy().getFullName()
                 : "")
         .createdDate(announcement.getCreatedDate())
         .modifiedBy(
