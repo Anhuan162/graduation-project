@@ -34,10 +34,9 @@ public class AdminFacultyService {
   }
 
   public FacultyResponse updateFaculty(String facultyId, UpdatedFacultyRequest request) {
-    Faculty faculty =
-        facultyRepository
-            .findById(UUID.fromString(facultyId))
-            .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
+    Faculty faculty = facultyRepository
+        .findById(UUID.fromString(facultyId))
+        .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
 
     faculty.setFacultyName(request.getFacultyName());
     faculty.setFacultyCode(request.getFacultyCode());
@@ -47,15 +46,21 @@ public class AdminFacultyService {
     return mapToResponse(faculty);
   }
 
-  public Page<FacultyResponse> getAllFaculties(Pageable pageable) {
-    return facultyRepository.findAll(pageable).map(this::mapToResponse);
+  public Page<FacultyResponse> getAllFaculties(String search, Pageable pageable) {
+    Page<Faculty> faculties;
+    if (search != null && !search.trim().isEmpty()) {
+      faculties = facultyRepository.findByFacultyNameContainingIgnoreCaseOrFacultyCodeContainingIgnoreCase(
+          search, search, pageable);
+    } else {
+      faculties = facultyRepository.findAll(pageable);
+    }
+    return faculties.map(this::mapToResponse);
   }
 
   public void deleteFaculty(String facultyId) {
-    Faculty faculty =
-        facultyRepository
-            .findById(UUID.fromString(facultyId))
-            .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
+    Faculty faculty = facultyRepository
+        .findById(UUID.fromString(facultyId))
+        .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
     facultyRepository.delete(faculty);
   }
 

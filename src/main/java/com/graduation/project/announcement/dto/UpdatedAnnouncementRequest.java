@@ -7,11 +7,15 @@ import java.util.List;
 import java.util.UUID;
 
 import com.graduation.project.cpa.constant.CohortCode;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Value
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UpdatedAnnouncementRequest {
   String title;
   Boolean announcementStatus;

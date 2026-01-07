@@ -48,11 +48,7 @@ public class Announcement {
   @Enumerated(EnumType.STRING)
   private AnnouncementType announcementType;
 
-  @OneToMany(
-      mappedBy = "announcement",
-      cascade = CascadeType.ALL,
-      orphanRemoval = true,
-      fetch = FetchType.LAZY)
+  @OneToMany(mappedBy = "announcement", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
   @Builder.Default
   private List<AnnouncementTarget> targets = new ArrayList<>();
 }
