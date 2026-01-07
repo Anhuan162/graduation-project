@@ -30,7 +30,10 @@ public class AnnouncementResponse {
         .content(announcement.getContent())
         .announcementStatus(announcement.getAnnouncementStatus())
         .announcementType(String.valueOf(announcement.getAnnouncementType()))
-        .createdBy(announcement.getCreatedBy().getEmail())
+        .createdBy(
+            Objects.nonNull(announcement.getCreatedBy())
+                ? announcement.getCreatedBy().getEmail()
+                : "")
         .createdDate(announcement.getCreatedDate())
         .modifiedBy(
             Objects.nonNull(announcement.getModifiedBy())

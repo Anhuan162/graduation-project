@@ -18,6 +18,9 @@ public class TopicMemberResponse {
   private TopicRole topicRole;
   private boolean approved;
   private LocalDateTime joinedAt;
+  private String fullName;
+  private String avatarUrl;
+  private String email;
   private UUID userId;
   private UUID topicId;
 
@@ -29,6 +32,9 @@ public class TopicMemberResponse {
         .approved(topicMember.isApproved())
         .joinedAt(topicMember.getJoinedAt())
         .userId(topicMember.getUser().getId())
+        .fullName(topicMember.getUser().getFullName())
+        .avatarUrl(topicMember.getUser().getAvatarUrl())
+        .email(topicMember.getUser().getEmail())
         .build();
   }
 }

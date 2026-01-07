@@ -20,6 +20,7 @@ import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -51,10 +52,9 @@ public class TokenService {
     }
     JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
-    JWTClaimsSet jwtClaimsSet =
-        isRefreshToken
-            ? buildJwtClaimSetForRefreshToken(user)
-            : buildJwtClaimSetForAccessToken(user);
+    JWTClaimsSet jwtClaimsSet = isRefreshToken
+        ? buildJwtClaimSetForRefreshToken(user)
+        : buildJwtClaimSetForAccessToken(user);
 
     Payload payload = new Payload(jwtClaimsSet.toJSONObject());
 
@@ -91,6 +91,9 @@ public class TokenService {
         .jwtID(UUID.randomUUID().toString())
         .claim("userId", user.getId())
         .claim("scope", buildScope(user))
+        .claim("userId", user.getId().toString())
+        .claim("fullName", user.getFullName())
+        .claim("avatar", user.getAvatarUrl())
         .build();
   }
 
@@ -101,36 +104,47 @@ public class TokenService {
 
     try {
       JWSVerifier verifier = new MACVerifier(secretKey.getBytes());
-
       SignedJWT signedJWT = SignedJWT.parse(token);
 
-      Date expiryTime =
-          (isRefresh)
-              ? new Date(
-                  signedJWT
-                      .getJWTClaimsSet()
-                      .getIssueTime()
-                      .toInstant()
-                      .plus(refreshTokenValidityMs, ChronoUnit.SECONDS)
-                      .toEpochMilli())
-              : signedJWT.getJWTClaimsSet().getExpirationTime();
-
-      var verified = signedJWT.verify(verifier);
-
-      if (!(verified && expiryTime.after(new Date())))
+      // 1. Verify Signature
+      if (!signedJWT.verify(verifier)) {
+        log.error("Token verification failed: Signature invalid");
         throw new AppException(ErrorCode.UNAUTHENTICATED);
+      }
 
-      if (invalidatedTokenRepository.existsByJit(signedJWT.getJWTClaimsSet().getJWTID()))
+      JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
+
+      // 2. Verify Expiration
+      if (new Date().after(claims.getExpirationTime())) {
+        log.error("Token verification failed: Token expired. Exp: {}", claims.getExpirationTime());
         throw new AppException(ErrorCode.UNAUTHENTICATED);
+      }
+
+      // 3. Verify JIT (Invalidated Token)
+      if (invalidatedTokenRepository.existsByJit(claims.getJWTID())) {
+        log.error("Token verification failed: Token JIT invalidated. JIT: {}", claims.getJWTID());
+        throw new AppException(ErrorCode.UNAUTHENTICATED);
+      }
+
+      // 4. Verify User Status & Invalidation Timestamp
+      String email = claims.getSubject();
+      User user = userRepository.findByEmail(email)
+          .orElseThrow(() -> {
+            log.error("Token verification failed: User not found with email {}", email);
+            return new AppException(ErrorCode.UNAUTHENTICATED);
+          });
 
       return signedJWT;
-    } catch (ParseException e) {
-      log.warn("Failed to parse JWT token: {}", token);
-      throw new AppException(ErrorCode.UNAUTHENTICATED);
-    } catch (JOSEException e) {
-      log.error("Failed to verify JWT signature", e);
+    } catch (ParseException | JOSEException e) {
+      log.error("Token verification failed: {}", e.getMessage());
       throw new AppException(ErrorCode.UNAUTHENTICATED);
     }
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void revokeAllUserTokens(User user) {
+    // user.setTokenInvalidationTimestamp(new Date());
+    // userRepository.save(user);
   }
 
   private String buildScope(User user) {

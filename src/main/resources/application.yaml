@@ -15,6 +15,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        jdbc:
+          batch_size: 500
+          order_inserts: true
+          order_updates: true
     show-sql: true
 
   servlet:
@@ -77,7 +81,7 @@ logging:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    accessTokenExpirationMs: 15000     # 15 minutes
+    accessTokenExpirationMs: 90000     # 15 minutes
     refreshTokenExpirationMs: 604800000 # 7 days
   oauth2:
     authorizedRedirectUri: http://localhost:3000/forum

@@ -53,7 +53,8 @@ public enum ErrorCode {
   SESSION_RESET_PASSWORD_HAS_USED(
       1043, "Reset password session has already been used", HttpStatus.BAD_REQUEST),
   URL_NOT_MATCH(1044, "url not match", HttpStatus.BAD_REQUEST),
-  FILE_MUST_UPLOAD_TO_FIRE_BASE_FIRST(1045, "FILE_MUST_UPLOAD_TO_FIRE_BASE_FIRST", HttpStatus.BAD_REQUEST);
+  FILE_MUST_UPLOAD_TO_FIRE_BASE_FIRST(1045, "FILE_MUST_UPLOAD_TO_FIRE_BASE_FIRST", HttpStatus.BAD_REQUEST),
+  CANNOT_EDIT_APPROVED_POST(1046, "Không thể chỉnh sửa bài viết đã được duyệt", HttpStatus.BAD_REQUEST)
   ;
 
   private final int code;

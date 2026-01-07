@@ -38,6 +38,7 @@ public class Document {
   @JoinColumn(name = "approved_by")
   private User approvedBy;
 
+  @Enumerated(EnumType.STRING)
   private DocumentStatus documentStatus;
 
   @Enumerated(EnumType.STRING)
@@ -54,6 +55,7 @@ public class Document {
   // Hash code - giúp xác định tệp sai hay trùng lặp không
   private String checksum;
   // authentication
+  @Enumerated(EnumType.STRING)
   private VisibilityStatus visibility;
 
   private int downloadCount;
@@ -68,10 +70,23 @@ public class Document {
         .title(this.title)
         .description(this.description)
         .documentType(this.documentType)
+        .documentStatus(this.documentStatus != null ? this.documentStatus.name() : "PENDING")
         .urlDoc(this.filePath)
         .urlImage(this.imageUrl)
-        .subjectId(this.id)
+        .subjectId(this.subject != null ? this.subject.getId() : null)
+        .subjectName(this.subject != null ? this.subject.getSubjectName() : null)
+        .subjectCode(this.subject != null ? this.subject.getSubjectCode() : null)
         .id(this.id.toString())
+        .isPremium(false) // Todo: Implement premium logic if needed
+        .viewCount(this.downloadCount) // Using downloadCount as viewCount for now or 0
+        .downloadCount(this.downloadCount)
+        .pageCount(this.size) // Assuming size is pages or strict size? Using size for now.
+        .createdAt(this.createdAt != null ? this.createdAt.toString() : null)
+        .uploadedBy(this.uploadedBy != null ? DocumentResponse.UserSummaryDto.builder()
+            .id(this.uploadedBy.getId().toString())
+            .fullName(this.uploadedBy.getFullName())
+            .avatarUrl(this.uploadedBy.getAvatarUrl())
+            .build() : null)
         .build();
   }
 }

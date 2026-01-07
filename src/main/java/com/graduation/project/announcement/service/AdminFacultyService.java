@@ -5,12 +5,12 @@ import com.graduation.project.announcement.dto.FacultyResponse;
 import com.graduation.project.announcement.dto.UpdatedFacultyRequest;
 import com.graduation.project.announcement.entity.Faculty;
 import com.graduation.project.announcement.repository.FacultyRepository;
-import java.util.List;
-import java.util.UUID;
-
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -34,10 +34,9 @@ public class AdminFacultyService {
   }
 
   public FacultyResponse updateFaculty(String facultyId, UpdatedFacultyRequest request) {
-    Faculty faculty =
-        facultyRepository
-            .findById(UUID.fromString(facultyId))
-            .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
+    Faculty faculty = facultyRepository
+        .findById(UUID.fromString(facultyId))
+        .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
 
     faculty.setFacultyName(request.getFacultyName());
     faculty.setFacultyCode(request.getFacultyCode());
@@ -47,15 +46,21 @@ public class AdminFacultyService {
     return mapToResponse(faculty);
   }
 
-  public List<FacultyResponse> getAllFaculties() {
-    return facultyRepository.findAll().stream().map(this::mapToResponse).toList();
+  public Page<FacultyResponse> getAllFaculties(String search, Pageable pageable) {
+    Page<Faculty> faculties;
+    if (search != null && !search.trim().isEmpty()) {
+      faculties = facultyRepository.findByFacultyNameContainingIgnoreCaseOrFacultyCodeContainingIgnoreCase(
+          search, search, pageable);
+    } else {
+      faculties = facultyRepository.findAll(pageable);
+    }
+    return faculties.map(this::mapToResponse);
   }
 
   public void deleteFaculty(String facultyId) {
-    Faculty faculty =
-        facultyRepository
-            .findById(UUID.fromString(facultyId))
-            .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
+    Faculty faculty = facultyRepository
+        .findById(UUID.fromString(facultyId))
+        .orElseThrow(() -> new IllegalArgumentException("Faculty not found"));
     facultyRepository.delete(faculty);
   }
 

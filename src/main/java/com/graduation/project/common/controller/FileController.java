@@ -28,7 +28,7 @@ public class FileController {
     this.fileService = fileService;
   }
 
-  @PreAuthorize("hasAuthority('CREATE_ANY_FILES') or hasAuthority('CREATE_ALL_FILES')")
+  @PreAuthorize("isAuthenticated()")
   @PostMapping("/upload")
   public ApiResponse<FileMetadataResponse> uploadFile(
       @RequestParam("file") MultipartFile file,
@@ -37,8 +37,8 @@ public class FileController {
       @RequestParam(required = false) String resourceType,
       @RequestParam(required = false) String resourceId)
       throws IOException {
-    FileMetadataResponse metadata =
-        fileService.uploadAndSaveFile(file, folderName, accessType, resourceType, resourceId);
+    FileMetadataResponse metadata = fileService.uploadAndSaveFile(file, folderName, accessType, resourceType,
+        resourceId);
 
     return ApiResponse.<FileMetadataResponse>builder().result(metadata).build();
   }
@@ -83,8 +83,8 @@ public class FileController {
 
   @GetMapping
   public ApiResponse<Page<FileMetadataResponse>> searchFiles(
-          @ModelAttribute SearchFileRequest searchFileRequest,
-          @PageableDefault(page = 0, size = 10, sort = "createdAt")Pageable pageable) {
+      @ModelAttribute SearchFileRequest searchFileRequest,
+      @PageableDefault(page = 0, size = 10, sort = "createdAt") Pageable pageable) {
     return ApiResponse.<Page<FileMetadataResponse>>builder()
         .result(fileService.searchFiles(searchFileRequest, pageable))
         .build();
@@ -92,10 +92,9 @@ public class FileController {
 
   @PostMapping("/upload-to-drive")
   public ApiResponse<FileResponse> uploadToDrive(
-          @RequestBody FileMetadataSelected fileMetadataSelected
-          ) throws IOException {
+      @RequestBody FileMetadataSelected fileMetadataSelected) throws IOException {
     return ApiResponse.<FileResponse>builder()
-            .result(fileService.uploadToDrive(fileMetadataSelected))
-            .build();
+        .result(fileService.uploadToDrive(fileMetadataSelected))
+        .build();
   }
 }

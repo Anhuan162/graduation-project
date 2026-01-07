@@ -15,30 +15,34 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
 
-  // Tìm xem user này đã thả tim vào đối tượng này chưa
-  Optional<Reaction> findByUserIdAndTargetIdAndTargetType(
-      UUID userId, UUID targetId, TargetType targetType);
+        // Tìm xem user này đã thả tim vào đối tượng này chưa
+        Optional<Reaction> findByUser_IdAndTargetIdAndTargetType(
+                        UUID userId, UUID targetId, TargetType targetType);
 
-  // Đếm số lượng cảm xúc (Ví dụ: Bài post này có bao nhiêu TIM?)
-  long countByTargetIdAndTargetTypeAndType(UUID targetId, TargetType targetType, ReactionType type);
+        // Đếm số lượng cảm xúc (Ví dụ: Bài post này có bao nhiêu TIM?)
+        long countByTargetIdAndTargetTypeAndType(UUID targetId, TargetType targetType, ReactionType type);
 
-  // Đếm tổng số cảm xúc của bài viết
-  long countByTargetIdAndTargetType(UUID targetId, TargetType targetType);
+        // Đếm tổng số cảm xúc của bài viết
+        long countByTargetIdAndTargetType(UUID targetId, TargetType targetType);
 
-  // Lấy danh sách reaction của 1 bài viết/comment (để hiển thị ai đã like)
-  Page<Reaction> findAllByTargetIdAndTargetType(
-      UUID targetId, TargetType targetType, Pageable pageable);
+        // Lấy danh sách reaction của 1 bài viết/comment (để hiển thị ai đã like)
+        Page<Reaction> findAllByTargetIdAndTargetType(
+                        UUID targetId, TargetType targetType, Pageable pageable);
 
-  // Lấy danh sách reaction theo loại cụ thể (VD: Chỉ xem ai thả tim)
-  Page<Reaction> findAllByTargetIdAndTargetTypeAndType(
-      UUID targetId, TargetType targetType, ReactionType type, Pageable pageable);
+        // Lấy danh sách reaction theo loại cụ thể (VD: Chỉ xem ai thả tim)
+        Page<Reaction> findAllByTargetIdAndTargetTypeAndType(
+                        UUID targetId, TargetType targetType, ReactionType type, Pageable pageable);
 
-  // [QUAN TRỌNG] Đếm số lượng từng loại reaction (Group By)
-  // Trả về dạng Interface Projection bên dưới
-  @Query(
-      "SELECT r.type as type, COUNT(r) as count "
-          + "FROM Reaction r "
-          + "WHERE r.targetId = :targetId AND r.targetType = :targetType "
-          + "GROUP BY r.type")
-  List<ReactionCountProjection> countReactionsByTarget(UUID targetId, TargetType targetType);
+        // [QUAN TRỌNG] Đếm số lượng từng loại reaction (Group By)
+        // Trả về dạng Interface Projection bên dưới
+        @Query("SELECT r.type as type, COUNT(r) as count "
+                        + "FROM Reaction r "
+                        + "WHERE r.targetId = :targetId AND r.targetType = :targetType "
+                        + "GROUP BY r.type")
+        List<ReactionCountProjection> countReactionsByTarget(UUID targetId, TargetType targetType);
+
+        // [BATCH QUERY] Lấy danh sách reactions của user cho nhiều posts cùng lúc
+        // Dùng để check xem user đã like những post nào trong list
+        List<Reaction> findByUser_IdAndTargetTypeAndTargetIdIn(
+                        UUID userId, TargetType targetType, List<UUID> targetIds);
 }

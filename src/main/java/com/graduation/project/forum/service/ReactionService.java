@@ -39,57 +39,71 @@ public class ReactionService {
 
   @Transactional
   public void toggleReaction(ReactionRequest request) {
-    User user = currentUserService.getCurrentUserEntity();
-    var existingReactionOpt =
-        reactionRepository.findByUserIdAndTargetIdAndTargetType(
-            user.getId(), request.getTargetId(), request.getTargetType());
+    try {
+      User user = currentUserService.getCurrentUserEntity();
+      var existingReactionOpt = reactionRepository.findByUser_IdAndTargetIdAndTargetType(
+          user.getId(), request.getTargetId(), request.getTargetType());
 
-    if (existingReactionOpt.isPresent()) {
-      Reaction existingReaction = existingReactionOpt.get();
+      if (existingReactionOpt.isPresent()) {
+        Reaction existingReaction = existingReactionOpt.get();
 
-      if (existingReaction.getType() == request.getReactionType()) {
-        // TRƯỜNG HỢP A: Đã thả rồi, bấm lại y hệt -> XÓA (Unlike)
-        reactionRepository.delete(existingReaction);
-        updateReactionCount(request.getTargetId(), request.getTargetType(), false);
+        if (existingReaction.getType() == request.getReactionType()) {
+          // TRƯỜNG HỢP A: Đã thả rồi, bấm lại y hệt -> XÓA (Unlike)
+          reactionRepository.delete(existingReaction);
+          reactionRepository.flush(); // FORCE FLUSH
+          updateReactionCount(request.getTargetId(), request.getTargetType(), false);
+        } else {
+          // TRƯỜNG HỢP B: Đã thả rồi, nhưng đổi loại (Like -> Love) -> CẬP NHẬT
+          existingReaction.setType(request.getReactionType());
+          reactionRepository.save(existingReaction);
+          reactionRepository.flush(); // FORCE FLUSH
+        }
       } else {
-        // TRƯỜNG HỢP B: Đã thả rồi, nhưng đổi loại (Like -> Love) -> CẬP NHẬT
-        existingReaction.setType(request.getReactionType());
-        reactionRepository.save(existingReaction);
+        // TRƯỜNG HỢP C: Chưa thả bao giờ -> TẠO MỚI
+        createNewReaction(request, user);
       }
-    } else {
-      // TRƯỜNG HỢP C: Chưa thả bao giờ -> TẠO MỚI
-      UUID receiverId = null;
+    } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+      // Concurrent modification detected (spam click).
+      // Just ignore or maybe logging, as the other transaction likely succeeded in
+      // doing what the user wanted (or the opposite)
+      // Since it's a toggle, effectively "last one wins" or "first one wins" is
+      // acceptable for social features.
+      // Ignoring ensures 500 is not returned to client.
+      log.warn("Concurrent reaction toggle detected for user {} on target {}",
+          currentUserService.getCurrentUserId(), request.getTargetId());
+    }
+  }
 
-      if (request.getTargetType().equals(TargetType.POST)) {
-        var post =
-            postRepository
-                .findById(request.getTargetId())
-                .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
-        receiverId = post.getAuthor().getId();
-      } else if (request.getTargetType().equals(TargetType.COMMENT)) {
-        var comment =
-            commentRepository
-                .findById(request.getTargetId())
-                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
-        receiverId = comment.getAuthor().getId();
-      }
+  private void createNewReaction(ReactionRequest request, User user) {
+    UUID receiverId = null;
 
-      Reaction newReaction =
-          Reaction.builder()
-              .user(user)
-              .targetId(request.getTargetId())
-              .targetType(request.getTargetType())
-              .type(request.getReactionType())
-              .createdAt(LocalDateTime.now())
-              .build();
+    if (request.getTargetType().equals(TargetType.POST)) {
+      var post = postRepository
+          .findById(request.getTargetId())
+          .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+      receiverId = post.getAuthor().getId();
+    } else if (request.getTargetType().equals(TargetType.COMMENT)) {
+      var comment = commentRepository
+          .findById(request.getTargetId())
+          .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+      receiverId = comment.getAuthor().getId();
+    }
 
-      reactionRepository.save(newReaction);
-      updateReactionCount(request.getTargetId(), request.getTargetType(), true);
+    Reaction newReaction = Reaction.builder()
+        .user(user)
+        .targetId(request.getTargetId())
+        .targetType(request.getTargetType())
+        .type(request.getReactionType())
+        .createdAt(LocalDateTime.now())
+        .build();
 
-      if (receiverId != null && !receiverId.equals(user.getId())) {
-        ReactionEvent reactionEvent = ReactionEvent.from(newReaction, user, receiverId);
-        publisher.publishEvent(reactionEvent);
-      }
+    reactionRepository.save(newReaction);
+    reactionRepository.flush(); // FORCE FLUSH
+    updateReactionCount(request.getTargetId(), request.getTargetType(), true);
+
+    if (receiverId != null && !receiverId.equals(user.getId())) {
+      ReactionEvent reactionEvent = ReactionEvent.from(newReaction, user, receiverId);
+      publisher.publishEvent(reactionEvent);
     }
   }
 
@@ -112,15 +126,13 @@ public class ReactionService {
   @Transactional(readOnly = true)
   public ReactionSummary getReactionSummary(UUID targetId, TargetType targetType) {
     // 1. Lấy thống kê số lượng (Group by Type)
-    List<ReactionCountProjection> projections =
-        reactionRepository.countReactionsByTarget(targetId, targetType);
+    List<ReactionCountProjection> projections = reactionRepository.countReactionsByTarget(targetId, targetType);
 
     // Convert List Projection sang Map<Type, Long>
-    Map<ReactionType, Long> counts =
-        projections.stream()
-            .collect(
-                Collectors.toMap(
-                    ReactionCountProjection::getType, ReactionCountProjection::getCount));
+    Map<ReactionType, Long> counts = projections.stream()
+        .collect(
+            Collectors.toMap(
+                ReactionCountProjection::getType, ReactionCountProjection::getCount));
 
     // Tính tổng số reaction
     long total = counts.values().stream().mapToLong(Long::longValue).sum();
@@ -129,12 +141,12 @@ public class ReactionService {
     ReactionType currentUserReaction = null;
     try {
       UUID currentUserId = currentUserService.getCurrentUserId();
-      // Nếu user chưa login thì currentUserId có thể null hoặc throw exception, cần handle tùy
+      // Nếu user chưa login thì currentUserId có thể null hoặc throw exception, cần
+      // handle tùy
       // logic auth của bạn
       if (currentUserId != null) {
-        Optional<Reaction> myReaction =
-            reactionRepository.findByUserIdAndTargetIdAndTargetType(
-                currentUserId, targetId, targetType);
+        Optional<Reaction> myReaction = reactionRepository.findByUser_IdAndTargetIdAndTargetType(
+            currentUserId, targetId, targetType);
         if (myReaction.isPresent()) {
           currentUserReaction = myReaction.get().getType();
         }
@@ -157,21 +169,19 @@ public class ReactionService {
     Page<Reaction> page;
 
     if (filterType != null) {
-      page =
-          reactionRepository.findAllByTargetIdAndTargetTypeAndType(
-              targetId, targetType, filterType, pageable);
+      page = reactionRepository.findAllByTargetIdAndTargetTypeAndType(
+          targetId, targetType, filterType, pageable);
     } else {
       page = reactionRepository.findAllByTargetIdAndTargetType(targetId, targetType, pageable);
     }
 
     // Map Entity sang DTO
     return page.map(
-        reaction ->
-            ReactionDetailResponse.builder()
-                .userId(reaction.getUser().getId())
-                .username(reaction.getUser().getFullName()) // Giả sử User entity có field này
-                .avatarUrl(reaction.getUser().getAvatarUrl()) // Giả sử User
-                .type(reaction.getType())
-                .build());
+        reaction -> ReactionDetailResponse.builder()
+            .userId(reaction.getUser().getId())
+            .username(reaction.getUser().getFullName()) // Giả sử User entity có field này
+            .avatarUrl(reaction.getUser().getAvatarUrl()) // Giả sử User
+            .type(reaction.getType())
+            .build());
   }
 }

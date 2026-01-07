@@ -43,89 +43,84 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
     this.tokenService = tokenService;
     this.redirectUri = redirectUri;
   }
+    @Override
+    @Transactional
+    public void onAuthenticationSuccess(
+            HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+            throws IOException {
+        OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
+        String provider = "LOCAL";
 
-  @Override
-  @Transactional
-  public void onAuthenticationSuccess(
-      HttpServletRequest request, HttpServletResponse response, Authentication authentication)
-      throws IOException {
-    OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
-    String provider = "LOCAL";
+        // Lấy Provider ID (Google/Facebook)
+        if (authentication instanceof OAuth2AuthenticationToken token) {
+            provider = token.getAuthorizedClientRegistrationId().toUpperCase();
+        }
+        Provider providerEnum = Provider.valueOf(provider);
 
-    // Lấy Provider ID (Google/Facebook)
-    if (authentication instanceof OAuth2AuthenticationToken token) {
-      provider = token.getAuthorizedClientRegistrationId().toUpperCase();
+        String providerUserId = provider.equals("GOOGLE")
+                ? (String) oauthUser.getAttribute("sub")
+                : (String) oauthUser.getAttribute("id");
+
+        String email = oauthUser.getAttribute("email");
+        if (email == null) email = providerUserId + "@" + provider.toLowerCase() + ".oauth";
+
+        String fullName = extractFullName(oauthUser, email);
+
+        String avatarUrl = (String) oauthUser.getAttribute("picture");
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            avatarUrl = "https://ui-avatars.com/api/?name=" + fullName.replace(" ", "+") + "&size=128&background=random";
+        }
+
+        User user;
+        Optional<OauthAccount> accOpt = oauthRepo.findByProviderAndProviderUserId(providerEnum, providerUserId);
+
+        if (accOpt.isPresent()) {
+            user = accOpt.get().getUser();
+            user = syncUserData(user, fullName, avatarUrl);
+        } else {
+            Optional<User> userByEmail = userRepo.findByEmail(email);
+
+            if (userByEmail.isPresent()) {
+                user = userByEmail.get();
+                user = syncUserData(user, fullName, avatarUrl);
+            } else {
+                user = createNewUser(email, fullName, avatarUrl, providerEnum);
+            }
+
+            OauthAccount newAcc = new OauthAccount();
+            newAcc.setProvider(providerEnum);
+            newAcc.setProviderUserId(providerUserId);
+            newAcc.setUser(user);
+            oauthRepo.save(newAcc);
+        }
+
+        // 3. Generate Token & Redirect
+        String accessToken = tokenService.generateToken(user, false);
+        String refreshToken = tokenService.generateToken(user, true);
+
+        addCookie(response, "accessToken", accessToken, 3600);
+        addCookie(response, "refreshToken", refreshToken, 86400);
+
+        response.sendRedirect(redirectUri);
     }
-    Provider providerEnum = Provider.valueOf(provider);
-
-    String providerUserId = provider.equals("GOOGLE")
-        ? (String) oauthUser.getAttribute("sub")
-        : (String) oauthUser.getAttribute("id");
-
-    String email = oauthUser.getAttribute("email");
-    if (email == null) email = providerUserId + "@" + provider.toLowerCase() + ".oauth";
-
-    String fullName = extractFullName(oauthUser, email);
-
-    String avatarUrl = (String) oauthUser.getAttribute("picture");
-    if (avatarUrl == null || avatarUrl.isBlank()) {
-      avatarUrl = "https://ui-avatars.com/api/?name=" + fullName.replace(" ", "+") + "&size=128&background=random";
-    }
-
-    User user;
-    Optional<OauthAccount> accOpt = oauthRepo.findByProviderAndProviderUserId(providerEnum, providerUserId);
-
-    if (accOpt.isPresent()) {
-      user = accOpt.get().getUser();
-      user = syncUserData(user, fullName, avatarUrl);
-    } else {
-      Optional<User> userByEmail = userRepo.findByEmail(email);
-
-      if (userByEmail.isPresent()) {
-        user = userByEmail.get();
-        user = syncUserData(user, fullName, avatarUrl);
-      } else {
-        user = createNewUser(email, fullName, avatarUrl, providerEnum);
-      }
-
-      OauthAccount newAcc = new OauthAccount();
-      newAcc.setProvider(providerEnum);
-      newAcc.setProviderUserId(providerUserId);
-      newAcc.setUser(user);
-      oauthRepo.save(newAcc);
-    }
-
-    // 3. Generate Token & Redirect
-    String accessToken = tokenService.generateToken(user, false);
-    String refreshToken = tokenService.generateToken(user, true);
-
-    addCookie(response, "accessToken", accessToken, 3600);
-    addCookie(response, "refreshToken", refreshToken, 86400);
-
-    response.sendRedirect(redirectUri);
-  }
 
   private String extractFullName(OAuth2User oauthUser, String fallbackEmail) {
     String name = (String) oauthUser.getAttribute("name");
-    if (name != null && !name.isBlank())
-      return name;
+    if (name != null && !name.isBlank()) return name;
 
     String givenName = (String) oauthUser.getAttribute("given_name");
     String familyName = (String) oauthUser.getAttribute("family_name");
 
-    if (givenName != null && familyName != null)
-      return givenName + " " + familyName;
-    if (givenName != null)
-      return givenName;
-    if (familyName != null)
-      return familyName;
+    if (givenName != null && familyName != null) return givenName + " " + familyName;
+    if (givenName != null) return givenName;
+    if (familyName != null) return familyName;
 
     return fallbackEmail;
   }
 
   private User createNewUser(String email, String fullName, String avatarUrl, Provider provider) {
-    Role userRole = roleRepo.findByName("USER")
-        .orElseThrow(() -> new RuntimeException("Role USER not found"));
+    Role userRole =
+        roleRepo.findByName("USER").orElseThrow(() -> new RuntimeException("Role USER not found"));
 
     User u = new User();
     u.setEmail(email);

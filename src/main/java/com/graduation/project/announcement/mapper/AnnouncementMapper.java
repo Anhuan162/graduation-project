@@ -1,1 +1,23 @@
-package com.graduation.project.announcement.mapper;import com.graduation.project.announcement.dto.AnnouncementResponse;import com.graduation.project.announcement.dto.FullAnnouncementResponse;import com.graduation.project.announcement.entity.Announcement;import java.util.List;import org.mapstruct.*;import org.mapstruct.Mapper;@Mapper(componentModel = "spring")public interface AnnouncementMapper {  @Mapping(source = "createdBy.fullName", target = "createdByFullName")  @Mapping(source = "modifiedBy.fullName", target = "modifiedByFullName")  @Mapping(source = "targets", target = "announcementTargetResponses")  FullAnnouncementResponse toFullResponse(Announcement entity);  @Mapping(source = "createdBy.fullName", target = "createdBy")  @Mapping(source = "modifiedBy.fullName", target = "modifiedBy")  AnnouncementResponse toResponse(Announcement entity);  List<FullAnnouncementResponse> toResponseList(List<Announcement> announcements);}
+package com.graduation.project.announcement.mapper;
+
+import com.graduation.project.announcement.dto.AnnouncementResponse;
+import com.graduation.project.announcement.dto.FullAnnouncementResponse;
+import com.graduation.project.announcement.entity.Announcement;
+import java.util.List;
+import org.mapstruct.*;
+import org.mapstruct.Mapper;
+
+@Mapper(componentModel = "spring")
+public interface AnnouncementMapper {
+
+  @Mapping(source = "createdBy.fullName", target = "createdByFullName")
+  @Mapping(source = "modifiedBy.fullName", target = "modifiedByFullName")
+  @Mapping(source = "targets", target = "announcementTargetResponses")
+  FullAnnouncementResponse toFullResponse(Announcement entity);
+
+  @Mapping(source = "createdBy.fullName", target = "createdBy")
+  @Mapping(source = "modifiedBy.fullName", target = "modifiedBy")
+  AnnouncementResponse toResponse(Announcement entity);
+
+  List<FullAnnouncementResponse> toResponseList(List<Announcement> announcements);
+}

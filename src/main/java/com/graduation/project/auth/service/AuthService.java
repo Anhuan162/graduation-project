@@ -18,6 +18,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -32,10 +33,9 @@ public class AuthService {
 
   public AuthenticationResponse login(AuthenticationRequest request) {
     PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
-    User user =
-        userRepository
-            .findByEmail(request.getEmail())
-            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    User user = userRepository
+        .findByEmail(request.getEmail())
+        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
     boolean authenticated = passwordEncoder.matches(request.getPassword(), user.getPassword());
 
@@ -49,35 +49,27 @@ public class AuthService {
     String accessToken = tokenService.generateToken(user, false);
     String refreshToken = tokenService.generateToken(user, true);
 
-    TokenResponse tokenResponse = new TokenResponse(accessToken, refreshToken);
-    List<PermissionResponse> permissionResponses = new ArrayList<>();
-    user.getRoles()
-        .forEach(
-            role ->
-                role.getPermissions()
-                    .forEach(
-                        permission ->
-                            permissionResponses.add(
-                                new PermissionResponse(
-                                    permission.getName(),
-                                    Objects.nonNull(permission.getResourceType())
-                                        ? permission.getResourceType().toString()
-                                        : null,
-                                    Objects.nonNull(permission.getPermissionType())
-                                        ? permission.getPermissionType().toString()
-                                        : null))));
-    UserResponse userResponse = UserResponse.from(user);
-
     return AuthenticationResponse.builder()
-        .permissionResponse(permissionResponses)
-        .tokenResponse(tokenResponse)
-        .userResponse(userResponse)
+        .accessToken(accessToken)
+        .refreshToken(refreshToken)
+        .user(UserResponse.from(user))
         .build();
   }
 
   public RefreshTokenResponse refreshToken(String refreshToken) throws ParseException {
     var signedJWT = tokenService.verifyToken(refreshToken, true);
-    User user = invalidateValidToken(signedJWT);
+    User user;
+    try {
+      user = invalidateValidToken(signedJWT);
+    } catch (DataIntegrityViolationException e) {
+      log.error("Token reuse detected for JIT: {}", signedJWT.getJWTClaimsSet().getJWTID());
+      String email = signedJWT.getJWTClaimsSet().getSubject();
+      User compromisedUser = userRepository.findByEmail(email).orElse(null);
+      if (compromisedUser != null) {
+        tokenService.revokeAllUserTokens(compromisedUser);
+      }
+      throw new AppException(ErrorCode.UNAUTHENTICATED);
+    }
 
     String newRefreshToken = tokenService.generateToken(user, true);
     String newAccessToken = tokenService.generateToken(user, false);
@@ -92,19 +84,17 @@ public class AuthService {
     var expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
     var issuedAt = signedJWT.getJWTClaimsSet().getIssueTime();
     String email = signedJWT.getJWTClaimsSet().getSubject();
-    User user =
-        userRepository
-            .findByEmail(email)
-            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    User user = userRepository
+        .findByEmail(email)
+        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-    InvalidatedToken invalidatedToken =
-        InvalidatedToken.builder()
-            .id(UUID.randomUUID())
-            .jit(jit)
-            .issuedAt(issuedAt)
-            .expiryTime(expirationTime)
-            .user(user)
-            .build();
+    InvalidatedToken invalidatedToken = InvalidatedToken.builder()
+        .id(UUID.randomUUID())
+        .jit(jit)
+        .issuedAt(issuedAt)
+        .expiryTime(expirationTime)
+        .user(user)
+        .build();
 
     invalidatedTokenRepository.save(invalidatedToken);
     log.debug("Invalidated token for user {}", email);

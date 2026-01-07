@@ -13,33 +13,31 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface CommentRepository extends JpaRepository<Comment, UUID> {
-  @Query(
-      "SELECT new com.graduation.project.forum.dto.CommentWithReplyCountResponse("
-          + "c.id, c.content, c.author.id, c.createdDateTime, COUNT(r), f.url) "
-          + "FROM Comment c "
-          + "LEFT JOIN c.replies r "
-          + "LEFT JOIN FileMetadata f ON f.resourceId = c.id AND f.resourceType = 'COMMENT' "
-          + "WHERE c.post.id = :postId AND c.parent IS NULL AND c.deleted IS FALSE "
-          + "GROUP BY c.id, c.content, c.author.id, c.createdDateTime, f.url")
-  Page<CommentWithReplyCountResponse> findRootCommentsWithCount(
-      @Param("postId") UUID postId, Pageable pageable);
+        @Query("SELECT new com.graduation.project.forum.dto.CommentWithReplyCountResponse("
+                        + "c.id, c.content, c.author.id, c.author.fullName, c.author.avatarUrl, c.createdDateTime, COUNT(r), f.url, c.parent.id, c.reactionCount) "
+                        + "FROM Comment c "
+                        + "LEFT JOIN c.replies r "
+                        + "LEFT JOIN FileMetadata f ON f.resourceId = c.id AND f.resourceType = 'COMMENT' "
+                        + "WHERE c.post.id = :postId AND c.deleted IS FALSE "
+                        + "GROUP BY c.id, c.content, c.author.id, c.author.fullName, c.author.avatarUrl, c.createdDateTime, f.url, c.parent.id, c.reactionCount")
+        Page<CommentWithReplyCountResponse> findRootCommentsWithCount(
+                        @Param("postId") UUID postId, Pageable pageable);
 
-  @Query(
-      "SELECT c FROM Comment c "
-          + "LEFT JOIN FETCH c.author "
-          + // Fetch author để tránh lazy loading
-          "WHERE c.parent.id = :parentId")
-  Page<Comment> findRepliesByParentId(@Param("parentId") UUID parentId, Pageable pageable);
+        @Query("SELECT c FROM Comment c "
+                        + "LEFT JOIN FETCH c.author "
+                        + // Fetch author để tránh lazy loading
+                        "WHERE c.parent.id = :parentId")
+        Page<Comment> findRepliesByParentId(@Param("parentId") UUID parentId, Pageable pageable);
 
-  @Modifying
-  @Query("UPDATE Comment c SET c.reactionCount = c.reactionCount + 1 WHERE c.id = :commentId")
-  void increaseReactionCount(@Param("commentId") UUID commentId);
+        @Modifying(clearAutomatically = true)
+        @Query("UPDATE Comment c SET c.reactionCount = COALESCE(c.reactionCount, 0) + 1 WHERE c.id = :commentId")
+        void increaseReactionCount(@Param("commentId") UUID commentId);
 
-  @Modifying
-  @Query("UPDATE Comment c SET c.reactionCount = c.reactionCount - 1 WHERE c.id = :commentId")
-  void decreaseReactionCount(@Param("commentId") UUID commentId);
+        @Modifying(clearAutomatically = true)
+        @Query("UPDATE Comment c SET c.reactionCount = CASE WHEN COALESCE(c.reactionCount, 0) > 0 THEN c.reactionCount - 1 ELSE 0 END WHERE c.id = :commentId")
+        void decreaseReactionCount(@Param("commentId") UUID commentId);
 
-  Page<CommentResponse> findAll(Specification<Comment> spec, Pageable pageable);
+        Page<CommentResponse> findAll(Specification<Comment> spec, Pageable pageable);
 
-  Page<Comment> findAllByAuthorIdAndDeletedFalse(UUID id, Pageable pageable);
+        Page<Comment> findAllByAuthorIdAndDeletedFalse(UUID id, Pageable pageable);
 }

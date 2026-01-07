@@ -8,6 +8,7 @@ import lombok.*;
 @Builder
 public class GradeSubjectAverageProfileRequest {
   String id;
+  String subjectId;
   String letterCurrentScore;
   String letterImprovementScore;
 }

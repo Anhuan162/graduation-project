@@ -48,12 +48,7 @@ public class UserController {
   @GetMapping
   ApiResponse<Page<UserResponse>> searchUsers(
       @ModelAttribute SearchUserRequest searchUserRequest,
-      @PageableDefault(
-              page = 0,
-              size = 10,
-              sort = "registrationDate",
-              direction = Sort.Direction.DESC)
-          Pageable pageable) {
+      @PageableDefault(page = 0, size = 10, sort = "registrationDate", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<UserResponse>>builder()
         .result(userService.searchUsers(searchUserRequest, pageable))
         .build();

@@ -42,11 +42,11 @@ public class CpaProfileController {
         .build();
   }
 
-  @PutMapping("/calculate-cpa-score/{cpaProfileId}")
-  public ApiResponse<CpaProfileResponse> addScoreForGpaProfile(
+  @PutMapping("/update-cpa-score/{cpaProfileId}")
+  public ApiResponse<CpaProfileResponse> updateScoreForGpaProfile(
       @PathVariable String cpaProfileId, @RequestBody CpaProfileRequest cpaProfileRequest) {
     return ApiResponse.<CpaProfileResponse>builder()
-        .result(cpaProfileService.calculateCpaScore(cpaProfileId, cpaProfileRequest))
+        .result(cpaProfileService.updateCpaProfile(cpaProfileId, cpaProfileRequest))
         .build();
   }
 
@@ -59,8 +59,7 @@ public class CpaProfileController {
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<Page<CpaProfileResponse>> getCpaProfiles(
-      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
-          Pageable pageable) {
+      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<CpaProfileResponse>>builder()
         .result(cpaProfileService.getCpaProfiles(pageable))
         .build();

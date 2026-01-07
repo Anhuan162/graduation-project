@@ -13,6 +13,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,11 +65,13 @@ public class PostController {
   }
 
   @GetMapping("/topic/{topicId}")
-  public ApiResponse<Page<DetailPostResponse>> getApprovedPostsByTopic(
-      @PathVariable UUID topicId, Pageable pageable) {
-    return ApiResponse.<Page<DetailPostResponse>>builder()
-        .result(postService.getApprovedPostsByTopic(topicId, pageable))
-        .build();
+  public ApiResponse<Page<DetailPostResponse>> getPostsByTopic(
+      @PathVariable UUID topicId,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "10") int size) {
+    Pageable pageable = PageRequest.of(page, size);
+    Page<DetailPostResponse> result = postService.getPostsByTopic(topicId, pageable);
+    return ApiResponse.<Page<DetailPostResponse>>builder().result(result).build();
   }
 
   @PutMapping("/upgrade-post/{postId}")
@@ -105,24 +108,22 @@ public class PostController {
   @PreAuthorize("hasRole('ADMIN')")
   @GetMapping("/post-accepted")
   public ApiResponse<List<PostAcceptedResonse>> getPostAccepted(
-          @ModelAttribute PostAcceptedFilterRequest postAcceptedRequest
-          ) {
+      @ModelAttribute PostAcceptedFilterRequest postAcceptedRequest) {
     List<PostAcceptedResonse> res = postService.searchPostAccepted(postAcceptedRequest);
     return ApiResponse.<List<PostAcceptedResonse>>builder()
-            .result(res)
-            .build();
+        .result(res)
+        .build();
   }
 
   @PreAuthorize("hasRole('ADMIN')")
   @PostMapping("/post-accepted/upload")
   public ApiResponse<FileResponse> postAcceptedSelect(
-     @RequestBody PostAcceptedSelectList postAcceptedSelectList
-  ) throws IOException {
-    String fileName = postAcceptedSelectList.getNameFile() +"-" + UUID.randomUUID().toString();
+      @RequestBody PostAcceptedSelectList postAcceptedSelectList) throws IOException {
+    String fileName = postAcceptedSelectList.getNameFile() + "-" + UUID.randomUUID().toString();
     postAcceptedSelectList.setNameFile(fileName);
     return ApiResponse.<FileResponse>builder()
-            .result(postService.upLoadPostAndCommentToDrive(postAcceptedSelectList))
-            .build();
+        .result(postService.upLoadPostAndCommentToDrive(postAcceptedSelectList))
+        .build();
   }
 
 }

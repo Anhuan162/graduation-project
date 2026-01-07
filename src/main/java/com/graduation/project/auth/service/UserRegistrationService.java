@@ -56,6 +56,7 @@ public class UserRegistrationService {
         User user = new User();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setFullName(request.getFullName());
         user.setProvider(Provider.LOCAL);
         user.setEnabled(false);
         user.setRoles(roles);

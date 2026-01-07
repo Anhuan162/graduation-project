@@ -17,7 +17,7 @@ import com.graduation.project.event.dto.NotificationEventDTO;
 import com.graduation.project.event.producer.StreamProducer;
 import com.graduation.project.forum.dto.TopicMemberResponse;
 import java.time.LocalDateTime;
-import java.util.List;
+
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -38,19 +38,23 @@ public class TopicMemberService {
   private final CurrentUserService currentUserService;
   private final UserRepository userRepository;
   private final StreamProducer streamProducer;
+  private final AuthorizationService authorizationService;
 
-  public List<TopicMemberResponse> getMembers(UUID topicId) {
-    return topicMemberRepository.findByTopicId(topicId).stream()
-        .map(TopicMemberResponse::toTopicMemberResponse)
-        .toList();
+  public Page<TopicMemberResponse> getMembers(UUID topicId, Boolean approved, Pageable pageable) {
+    Page<TopicMember> page;
+    if (approved != null) {
+      page = topicMemberRepository.findByTopicIdAndApproved(topicId, approved, pageable);
+    } else {
+      page = topicMemberRepository.findByTopicId(topicId, pageable);
+    }
+    return page.map(TopicMemberResponse::toTopicMemberResponse);
   }
 
   @Transactional
   public TopicMemberResponse joinTopic(UUID topicId) {
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
 
@@ -59,42 +63,38 @@ public class TopicMemberService {
       throw new AppException(ErrorCode.TOPIC_MEMBER_EXISTED);
     }
 
-    if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
+    TopicMember topicMember = TopicMember.builder()
+        .topic(topic)
+        .user(user)
+        .topicRole(TopicRole.MEMBER)
+        .joinedAt(LocalDateTime.now())
+        .build();
 
-    TopicMember topicMember =
-        TopicMember.builder()
-            .topic(topic)
-            .user(user)
-            .topicRole(TopicRole.MEMBER)
-            .joinedAt(LocalDateTime.now())
-            .build();
-
-    // PUBLIC → join ngay
+    // PUBLIC → join ngay (approved = true)
     if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) {
       topicMember.setApproved(true);
       return TopicMemberResponse.toTopicMemberResponse(topicMemberRepository.save(topicMember));
     }
-    Set<UUID> managerIds =
-        topic.getTopicMembers().stream()
-            .filter(t -> t.getTopicRole().equals(TopicRole.MANAGER))
-            .map(TopicMember::getId)
-            .collect(Collectors.toSet());
-    // PRIVATE → pending approval
+
+    // PRIVATE → pending approval (approved = false)
+    Set<UUID> managerIds = topic.getTopicMembers().stream()
+        .filter(t -> t.getTopicRole().equals(TopicRole.MANAGER))
+        .map(TopicMember::getId)
+        .collect(Collectors.toSet());
+
     topicMember.setApproved(false);
     topicMemberRepository.save(topicMember);
-    NotificationEventDTO dto =
-        NotificationEventDTO.builder()
-            .relatedId(topicMember.getId())
-            .type(ResourceType.TOPIC_MEMBER)
-            .title("Join Topic")
-            .content(user.getFullName() + "want to join your topic")
-            .senderId(user.getId())
-            .senderName(user.getEmail())
-            .receiverIds(managerIds) // build list of UUID receivers
-            .createdAt(LocalDateTime.now())
-            .build();
+
+    NotificationEventDTO dto = NotificationEventDTO.builder()
+        .relatedId(topicMember.getId())
+        .type(ResourceType.TOPIC_MEMBER)
+        .title("Join Topic")
+        .content(user.getFullName() + " want to join your topic")
+        .senderId(user.getId())
+        .senderName(user.getEmail())
+        .receiverIds(managerIds)
+        .createdAt(LocalDateTime.now())
+        .build();
     EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
     streamProducer.publish(eventEnvelope);
     return TopicMemberResponse.toTopicMemberResponse(topicMember);
@@ -102,10 +102,9 @@ public class TopicMemberService {
 
   @Transactional
   public TopicMemberResponse approveJoin(UUID topicMemberId) {
-    TopicMember tm =
-        topicMemberRepository
-            .findById(topicMemberId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
+    TopicMember tm = topicMemberRepository
+        .findById(topicMemberId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
     User current = currentUserService.getCurrentUserEntity();
 
@@ -115,17 +114,16 @@ public class TopicMemberService {
 
     tm.setApproved(true);
     TopicMember save = topicMemberRepository.save(tm);
-    NotificationEventDTO dto =
-        NotificationEventDTO.builder()
-            .relatedId(topicMemberId)
-            .type(ResourceType.TOPIC_MEMBER)
-            .title("Approve Member")
-            .content("Bạn đã được chấp thuận là thành viên của Topic")
-            .senderId(current.getId())
-            .senderName(current.getEmail())
-            .receiverIds(Set.of(tm.getUser().getId())) // build list of UUID receivers
-            .createdAt(LocalDateTime.now())
-            .build();
+    NotificationEventDTO dto = NotificationEventDTO.builder()
+        .relatedId(topicMemberId)
+        .type(ResourceType.TOPIC_MEMBER)
+        .title("Approve Member")
+        .content("Bạn đã được chấp thuận là thành viên của Topic")
+        .senderId(current.getId())
+        .senderName(current.getEmail())
+        .receiverIds(Set.of(tm.getUser().getId())) // build list of UUID receivers
+        .createdAt(LocalDateTime.now())
+        .build();
     EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
     streamProducer.publish(eventEnvelope);
     return TopicMemberResponse.toTopicMemberResponse(save);
@@ -133,23 +131,55 @@ public class TopicMemberService {
 
   @Transactional
   public void kickMember(UUID topicId, UUID userId) {
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
-    User current = currentUserService.getCurrentUserEntity();
+    User currentUser = currentUserService.getCurrentUserEntity();
+    UUID currentUserId = currentUser.getId();
 
-    if (!canManageTopic(current, topic)) {
+    // 1. Get Actor (Requester) Member Info
+    TopicMember actor = topicMemberRepository
+        .findByUserIdAndTopicId(currentUserId, topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED)); // Not even a member
+
+    // 2. Get Target (Victim) Member Info
+    TopicMember target = topicMemberRepository
+        .findByUserIdAndTopicId(userId, topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
+
+    // 3. Rule 1: No self-kicking
+    if (actor.getId().equals(target.getId())) {
+      throw new AppException(ErrorCode.BAD_REQUEST); // "Cannot kick yourself"
+    }
+
+    // 4. Rule 2: Protect Creator/Owner
+    if (target.getTopicRole() == TopicRole.OWNER || topic.getCreatedBy().getId().equals(target.getUser().getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED); // "Cannot kick Creator"
+    }
+
+    // 5. Rule 3: Hierarchy Check (Actor must be > Target)
+    boolean isActorAdmin = authorizationService.isAdmin(currentUser);
+    boolean isActorCreator = topic.getCreatedBy().getId().equals(currentUserId);
+    boolean isActorManager = actor.getTopicRole() == TopicRole.MANAGER;
+
+    if (isActorAdmin || isActorCreator) {
+      // Admin/Creator can kick anyone (except Creator, handled above)
+      // Valid
+    } else if (isActorManager) {
+      // Manager cannot kick other Managers
+      if (target.getTopicRole() == TopicRole.MANAGER) {
+        throw new AppException(ErrorCode.UNAUTHORIZED); // "Manager cannot kick Manager"
+      }
+      // Manager cannot kick Creator (handled above)
+      // Manager can kick Member -> OK
+    } else {
+      // Members cannot kick anyone
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    TopicMember tm =
-        topicMemberRepository
-            .findByUserIdAndTopicId(userId, topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
-
-    topicMemberRepository.delete(tm);
+    // 6. Execute Delete
+    topicMemberRepository.delete(target);
   }
 
   public Page<TopicMemberResponse> findUnapprovedMember(Pageable pageable) {
@@ -163,29 +193,52 @@ public class TopicMemberService {
   }
 
   @Transactional
-  public void addTopicMember(UUID topicId, UUID userId, String topicRole) {
-    Topic topic =
-        topicRepository
-            .findById(topicId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+  public void addTopicMember(UUID topicId, UUID userId, String topicRoleStr) {
+    Topic topic = topicRepository
+        .findById(topicId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
-    User userToAdd =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    TopicRole roleToAdd;
+    try {
+      roleToAdd = TopicRole.valueOf(topicRoleStr);
+    } catch (IllegalArgumentException e) {
+      throw new AppException(ErrorCode.BAD_REQUEST);
+    }
 
     User currentUser = currentUserService.getCurrentUserEntity();
+    boolean isActorAdmin = authorizationService.isAdmin(currentUser);
+    boolean isActorCreator = topic.getCreatedBy().getId().equals(currentUser.getId());
 
-    // --- chỉ creator hoặc admin mới được add ---
-    boolean canEditTopic = canManageTopic(currentUser, topic);
+    // Check if actor is manager
+    boolean isActorManager = topicMemberRepository.findByUserIdAndTopicId(currentUser.getId(), topicId)
+        .map(tm -> tm.getTopicRole() == TopicRole.MANAGER)
+        .orElse(false);
 
-    if (!canEditTopic) {
+    // LOGIC CHECK
+    if (isActorAdmin || isActorCreator) {
+      // Pass
+    } else if (isActorManager) {
+      // Manager CANNOT add other Managers
+      if (roleToAdd == TopicRole.MANAGER || roleToAdd == TopicRole.OWNER) {
+        throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+      // Manager add Member -> OK
+    } else {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
+
+    User userToAdd = userRepository
+        .findById(userId)
+        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+    if (topicMemberRepository.existsByUserIdAndTopicId(userId, topicId)) {
+      throw new AppException(ErrorCode.TOPIC_MEMBER_EXISTED);
+    }
+
     TopicMember topicMember = new TopicMember();
     topicMember.setTopic(topic);
     topicMember.setUser(userToAdd);
-    topicMember.setTopicRole(TopicRole.valueOf(topicRole));
+    topicMember.setTopicRole(roleToAdd);
     topicMember.setApproved(true);
     topicMember.setJoinedAt(LocalDateTime.now());
 
@@ -199,10 +252,9 @@ public class TopicMemberService {
 
   @Transactional
   public void removeTopicMember(UUID topicMemberId) {
-    TopicMember topicMember =
-        topicMemberRepository
-            .findById(topicMemberId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
+    TopicMember topicMember = topicMemberRepository
+        .findById(topicMemberId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
@@ -217,28 +269,45 @@ public class TopicMemberService {
   private boolean canManageTopic(User currentUser, Topic topic) {
     boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().equals("ADMIN"));
     boolean isCreator = topic.getCreatedBy().getId().equals(currentUser.getId());
-    boolean isManager =
-        topic.getTopicMembers().stream()
-            .anyMatch(
-                m ->
-                    m.getUser().getId().equals(currentUser.getId())
-                        && m.getTopicRole() == TopicRole.MANAGER);
+    boolean isManager = topic.getTopicMembers().stream()
+        .anyMatch(
+            m -> m.getUser().getId().equals(currentUser.getId())
+                && m.getTopicRole() == TopicRole.MANAGER);
 
     return isAdmin || isCreator || isManager;
   }
 
-  public void updateTopicMember(UUID topicMemberId, TopicRole topicRole) {
-    TopicMember topicMember =
-        topicMemberRepository
-            .findById(topicMemberId)
-            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
-    User currentUser = currentUserService.getCurrentUserEntity();
+  @Transactional
+  public void updateTopicMember(UUID topicMemberId, TopicRole newRole) {
+    TopicMember targetMember = topicMemberRepository
+        .findById(topicMemberId)
+        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_MEMBER_NOT_FOUND));
 
-    if (!canManageTopic(currentUser, topicMember.getTopic())) {
+    Topic topic = targetMember.getTopic();
+    User currentUser = currentUserService.getCurrentUserEntity();
+    UUID currentUserId = currentUser.getId();
+
+    boolean isActorAdmin = authorizationService.isAdmin(currentUser);
+    boolean isActorCreator = topic.getCreatedBy().getId().equals(currentUserId);
+
+    // 3. SECURITY CHECK: Only Admin or Creator can change roles
+    if (!isActorAdmin && !isActorCreator) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    topicMember.setTopicRole(topicRole);
-    topicMemberRepository.save(topicMember);
+
+    // 4. RULE: Cannot change Creator/Owner's role
+    if (targetMember.getTopicRole() == TopicRole.OWNER
+        || topic.getCreatedBy().getId().equals(targetMember.getUser().getId())) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    // 5. RULE: Cannot demote self via this API (Safety check)
+    if (targetMember.getUser().getId().equals(currentUserId)) {
+      throw new AppException(ErrorCode.BAD_REQUEST);
+    }
+
+    targetMember.setTopicRole(newRole);
+    topicMemberRepository.save(targetMember);
   }
 
   public boolean isTopicMember(UUID topicId, UUID userId) {
@@ -246,7 +315,8 @@ public class TopicMemberService {
   }
 
   public boolean canViewTopic(Topic topic, User user) {
-    if (topic.getTopicVisibility() == TopicVisibility.PUBLIC) return true;
+    if (topic.getTopicVisibility() == TopicVisibility.PUBLIC)
+      return true;
     return isTopicMember(topic.getId(), user.getId());
   }
 }

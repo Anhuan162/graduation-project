@@ -4,6 +4,7 @@ import com.graduation.project.auth.dto.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,15 +13,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 @ControllerAdvice
 public class GlobalHandleException {
 
-  @ExceptionHandler(value = RuntimeException.class)
-  ResponseEntity<ApiResponse<?>> handlingRuntimeException(RuntimeException exception) {
-    log.error("Exception: ", exception);
+  @ExceptionHandler(value = AuthorizationDeniedException.class)
+  ResponseEntity<ApiResponse<?>> handlingAuthorizationDeniedException(AuthorizationDeniedException exception) {
+    log.warn("Authorization denied: {}", exception.getMessage());
     ApiResponse<?> apiResponse = new ApiResponse<>();
 
-    apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
-    apiResponse.setMessage(exception.getMessage());
+    apiResponse.setCode(ErrorCode.UNAUTHORIZED.getCode());
+    apiResponse.setMessage("Access Denied");
 
-    return ResponseEntity.badRequest().body(apiResponse);
+    return ResponseEntity.status(ErrorCode.UNAUTHORIZED.getHttpStatusCode()).body(apiResponse);
   }
 
   @ExceptionHandler(Exception.class)
@@ -56,14 +57,14 @@ public class GlobalHandleException {
     return ResponseEntity.status(ErrorCode.UNAUTHORIZED.getHttpStatusCode()).body(apiResponse);
   }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<?>> handleValidationErrors(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getAllErrors().getFirst().getDefaultMessage();
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity<ApiResponse<?>> handleValidationErrors(MethodArgumentNotValidException ex) {
+    String message = ex.getBindingResult().getAllErrors().getFirst().getDefaultMessage();
 
-        ApiResponse<?> apiResponse = new ApiResponse<>();
-        apiResponse.setCode(ErrorCode.UNAUTHORIZED.getCode());
-        apiResponse.setMessage(message);
-        return ResponseEntity.badRequest()
-                .body(apiResponse);
-    }
+    ApiResponse<?> apiResponse = new ApiResponse<>();
+    apiResponse.setCode(ErrorCode.UNAUTHORIZED.getCode());
+    apiResponse.setMessage(message);
+    return ResponseEntity.badRequest()
+        .body(apiResponse);
+  }
 }

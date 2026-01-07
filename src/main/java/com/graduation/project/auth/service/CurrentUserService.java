@@ -44,6 +44,16 @@ public class CurrentUserService {
         .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
   }
 
+  /** Lấy entity User từ database hoặc trả về empty nếu không có user đăng nhập */
+  public java.util.Optional<User> getCurrentUserEntityOptional() {
+    try {
+      String email = getCurrentUserEmail();
+      return userRepository.findByEmail(email);
+    } catch (Exception e) {
+      return java.util.Optional.empty();
+    }
+  }
+
   /** Kiểm tra role hiện tại có phải ADMIN không */
   public boolean isCurrentUserAdmin() {
     return getCurrentUserPrincipal().getAuthorities().stream()

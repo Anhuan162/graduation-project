@@ -92,10 +92,9 @@ public class UserService {
   }
 
   public void verifyEmail(VerifyUserDto request) {
-    VerificationToken verificationToken =
-        verificationTokenRepository
-            .findByToken(request.getVerificationCode())
-            .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+    VerificationToken verificationToken = verificationTokenRepository
+        .findByToken(request.getVerificationCode())
+        .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
 
     if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
       throw new AppException(ErrorCode.TOKEN_EXPIRED);
@@ -133,21 +132,20 @@ public class UserService {
   private void sendVerificationEmail(User user, String token) { // TODO: Update with company logo
     String subject = "Account Verification";
     String verificationCode = "VERIFICATION CODE " + token;
-    String htmlMessage =
-        "<html>"
-            + "<body style=\"font-family: Arial, sans-serif;\">"
-            + "<div style=\"background-color: #f5f5f5; padding: 20px;\">"
-            + "<h2 style=\"color: #333;\">Welcome to our app!</h2>"
-            + "<p style=\"font-size: 16px;\">Please enter the verification code below to continue:</p>"
-            + "<div style=\"background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);\">"
-            + "<h3 style=\"color: #333;\">Verification Code:</h3>"
-            + "<p style=\"font-size: 18px; font-weight: bold; color: #007bff;\">"
-            + verificationCode
-            + "</p>"
-            + "</div>"
-            + "</div>"
-            + "</body>"
-            + "</html>";
+    String htmlMessage = "<html>"
+        + "<body style=\"font-family: Arial, sans-serif;\">"
+        + "<div style=\"background-color: #f5f5f5; padding: 20px;\">"
+        + "<h2 style=\"color: #333;\">Welcome to our app!</h2>"
+        + "<p style=\"font-size: 16px;\">Please enter the verification code below to continue:</p>"
+        + "<div style=\"background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);\">"
+        + "<h3 style=\"color: #333;\">Verification Code:</h3>"
+        + "<p style=\"font-size: 18px; font-weight: bold; color: #007bff;\">"
+        + verificationCode
+        + "</p>"
+        + "</div>"
+        + "</div>"
+        + "</body>"
+        + "</html>";
 
     emailService.sendVerificationEmail(user.getEmail(), subject, htmlMessage);
   }
@@ -161,48 +159,47 @@ public class UserService {
   public Page<UserResponse> searchUsers(SearchUserRequest searchUserRequest, Pageable pageable) {
     log.info("In method get Users");
 
-    Specification<User> spec =
-        (root, query, cb) -> {
-          List<Predicate> predicates = new ArrayList<>();
+    Specification<User> spec = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
 
-          if (searchUserRequest.getEmail() != null
-              && !searchUserRequest.getEmail().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("email")),
-                    "%" + searchUserRequest.getEmail().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getEmail() != null
+          && !searchUserRequest.getEmail().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("email")),
+                "%" + searchUserRequest.getEmail().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getFullName() != null
-              && !searchUserRequest.getFullName().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("fullName")),
-                    "%" + searchUserRequest.getFullName().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getFullName() != null
+          && !searchUserRequest.getFullName().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("fullName")),
+                "%" + searchUserRequest.getFullName().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getStudentCode() != null
-              && !searchUserRequest.getStudentCode().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("studentCode")),
-                    "%" + searchUserRequest.getStudentCode().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getStudentCode() != null
+          && !searchUserRequest.getStudentCode().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("studentCode")),
+                "%" + searchUserRequest.getStudentCode().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getClassCode() != null
-              && !searchUserRequest.getClassCode().trim().isEmpty()) {
-            predicates.add(
-                cb.like(
-                    cb.lower(root.get("classCode")),
-                    "%" + searchUserRequest.getClassCode().toLowerCase() + "%"));
-          }
+      if (searchUserRequest.getClassCode() != null
+          && !searchUserRequest.getClassCode().trim().isEmpty()) {
+        predicates.add(
+            cb.like(
+                cb.lower(root.get("classCode")),
+                "%" + searchUserRequest.getClassCode().toLowerCase() + "%"));
+      }
 
-          if (searchUserRequest.getEnable() != null) {
-            predicates.add(cb.equal(root.get("enabled"), searchUserRequest.getEnable()));
-          }
+      if (searchUserRequest.getEnable() != null) {
+        predicates.add(cb.equal(root.get("enabled"), searchUserRequest.getEnable()));
+      }
 
-          return cb.and(predicates.toArray(new Predicate[0]));
-        };
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
 
     return userRepository.findAll(spec, pageable).map(UserResponse::from);
   }
@@ -222,18 +219,19 @@ public class UserService {
 
     User user = userRepository.findUserByEmail(email);
     if (user == null) {
-      throw new AppException(ErrorCode.EMAIL_NOT_FOUND);
+      log.info("Reset password requested for non-existent email: {}", email);
+      return email; // Return 200 OK to prevent enumeration
     }
 
     String otp = generateVerificationCode();
     try {
       sendVerificationEmail(user, otp);
     } catch (Exception e) {
+      log.error("Failed to send email to user {}", email, e);
       throw new AppException(ErrorCode.CAN_NOT_SEND_EMAIL);
     }
 
-    PasswordResetSession passwordResetSession =
-        passwordResetSessionRepository.findByEmailAndNotUsed(email);
+    PasswordResetSession passwordResetSession = passwordResetSessionRepository.findByEmailAndNotUsed(email);
     if (passwordResetSession == null) {
       PasswordResetSession newPasswordResetSession = new PasswordResetSession();
       newPasswordResetSession.setEmail(email);
@@ -250,8 +248,8 @@ public class UserService {
   }
 
   public String verifyOtp(String otp, String email) {
-    PasswordResetSession passwordResetSession =
-        passwordResetSessionRepository.findPasswordResetSessionByEmailAndOtp(email, otp);
+    PasswordResetSession passwordResetSession = passwordResetSessionRepository
+        .findPasswordResetSessionByEmailAndOtp(email, otp);
     if (passwordResetSession == null) {
       throw new AppException(ErrorCode.INVALID_TOKEN);
     }
@@ -269,8 +267,7 @@ public class UserService {
     } catch (Exception e) {
       throw new AppException(ErrorCode.UUID_IS_INVALID);
     }
-    Optional<PasswordResetSession> passwordResetSession =
-        passwordResetSessionRepository.findById(sessionId);
+    Optional<PasswordResetSession> passwordResetSession = passwordResetSessionRepository.findById(sessionId);
     if (passwordResetSession == null || passwordResetSession.isEmpty()) {
       throw new AppException(ErrorCode.SESSION_REST_PASSWORD_NOT_FOUND);
     }

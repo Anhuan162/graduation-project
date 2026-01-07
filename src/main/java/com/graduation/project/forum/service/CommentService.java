@@ -6,11 +6,15 @@ import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.*;
 import com.graduation.project.common.entity.User;
 import com.graduation.project.common.service.FileService;
+import com.graduation.project.common.dto.UserSummaryDto;
 import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
+import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.repository.CommentRepository;
 import com.graduation.project.forum.repository.PostRepository;
+import com.graduation.project.forum.repository.ReactionRepository;
+import com.graduation.project.forum.entity.Reaction;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
@@ -31,6 +35,7 @@ public class CommentService {
 
   private final PostRepository postRepository;
   private final CommentRepository commentRepository;
+  private final ReactionRepository reactionRepository;
   private final CurrentUserService currentUserService;
   private final AuthorizationService authorizationService;
   private final FileMetadataRepository fileMetadataRepository;
@@ -43,10 +48,9 @@ public class CommentService {
 
   @Transactional
   public CommentResponse createRootComment(String postId, CommentRequest request) {
-    Post post =
-        postRepository
-            .findById(UUID.fromString(postId))
-            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post = postRepository
+        .findById(UUID.fromString(postId))
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canViewTopic(post.getTopic(), user)) {
@@ -60,15 +64,14 @@ public class CommentService {
 
     CreatedCommentEvent createdCommentEvent = CreatedCommentEvent.from(comment);
     publisher.publishEvent(createdCommentEvent);
-    return toResponse(comment, fileUrl);
+    return toResponse(comment, fileUrl, false); // Newly created comment is not liked yet
   }
 
   @Transactional
   public CommentResponse replyToComment(String parentId, CommentRequest request) {
-    Comment parent =
-        commentRepository
-            .findById(UUID.fromString(parentId))
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment parent = commentRepository
+        .findById(UUID.fromString(parentId))
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
@@ -82,18 +85,17 @@ public class CommentService {
 
     CreatedCommentEvent event = CreatedCommentEvent.from(reply);
     publisher.publishEvent(event);
-    return toResponse(reply, fileUrl);
+    return toResponse(reply, fileUrl, false); // Reply is not liked
   }
 
   @Transactional(readOnly = true)
   public Page<CommentWithReplyCountResponse> getRootComments(String postId, Pageable pageable) {
-    Post post =
-        postRepository
-            .findById(UUID.fromString(postId))
-            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post = postRepository
+        .findById(UUID.fromString(postId))
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     // Sử dụng Query tối ưu trong Repository, không loop để count nữa
-    Page<CommentWithReplyCountResponse> commentPage =
-        commentRepository.findRootCommentsWithCount(UUID.fromString(postId), pageable);
+    Page<CommentWithReplyCountResponse> commentPage = commentRepository
+        .findRootCommentsWithCount(UUID.fromString(postId), pageable);
     User currentUser = currentUserService.getCurrentUserEntity();
     boolean canSoftDeletePost = authorizationService.canSoftDeletePost(post, currentUser);
 
@@ -101,38 +103,57 @@ public class CommentService {
         .getContent()
         .forEach(
             c -> {
-              boolean isCommentCreator = currentUser.getId().equals(c.getAuthorId());
+              boolean isCommentCreator = currentUser.getId().equals(c.getAuthor().getId());
               c.setCommentCreator(isCommentCreator);
               c.setCanSoftDeletePost(canSoftDeletePost);
+
+              CommentWithReplyCountResponse.Permissions permissions = new CommentWithReplyCountResponse.Permissions();
+              permissions.setCanEdit(isCommentCreator);
+              permissions.setCanDelete(isCommentCreator || canSoftDeletePost);
+              permissions.setCanReport(!isCommentCreator);
+              c.setPermissions(permissions);
             });
+
+    if (currentUser != null) {
+      List<UUID> commentIds = commentPage.getContent().stream().map(CommentWithReplyCountResponse::getId).toList();
+      List<Reaction> reactions = reactionRepository.findByUser_IdAndTargetTypeAndTargetIdIn(
+          currentUser.getId(), TargetType.COMMENT, commentIds);
+      Set<UUID> likedCommentIds = reactions.stream().map(Reaction::getTargetId).collect(Collectors.toSet());
+      commentPage.getContent().forEach(c -> c.setIsLiked(likedCommentIds.contains(c.getId())));
+    }
+
     return commentPage;
   }
 
   @Transactional(readOnly = true)
   public Page<DetailCommentResponse> getReplies(String commentId, Pageable pageable) {
     UUID parentId = UUID.fromString(commentId);
-    Comment parentComment =
-        commentRepository
-            .findById(parentId)
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment parentComment = commentRepository
+        .findById(parentId)
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
     Page<Comment> comments = commentRepository.findRepliesByParentId(parentId, pageable);
 
     User currentUser = currentUserService.getCurrentUserEntity();
     List<UUID> commentIds = comments.getContent().stream().map(Comment::getId).toList();
 
-    Map<UUID, String> fileMap =
-        fileMetadataRepository
-            .findAllByResourceIdInAndResourceType(commentIds, ResourceType.COMMENT)
-            .stream()
-            .collect(
-                Collectors.toMap(FileMetadata::getResourceId, FileMetadata::getUrl, (a, b) -> a));
-    boolean canSoftDeletePost =
-        authorizationService.canSoftDeletePost(parentComment.getPost(), currentUser);
+    Map<UUID, String> fileMap = fileMetadataRepository
+        .findAllByResourceIdInAndResourceType(commentIds, ResourceType.COMMENT)
+        .stream()
+        .collect(
+            Collectors.toMap(FileMetadata::getResourceId, FileMetadata::getUrl, (a, b) -> a));
+    Map<UUID, Boolean> likedMap = new HashMap<>();
+    if (currentUser != null) {
+      List<Reaction> reactions = reactionRepository.findByUser_IdAndTargetTypeAndTargetIdIn(
+          currentUser.getId(), TargetType.COMMENT, commentIds);
+      reactions.forEach(r -> likedMap.put(r.getTargetId(), true));
+    }
+
+    boolean canSoftDeletePost = authorizationService.canSoftDeletePost(parentComment.getPost(), currentUser);
     return comments.map(
         c -> {
           boolean isCommentCreator = authorizationService.isCommentCreator(c, currentUser);
           return DetailCommentResponse.toResponse(
-              c, fileMap.get(c.getId()), isCommentCreator, canSoftDeletePost);
+              c, fileMap.get(c.getId()), isCommentCreator, canSoftDeletePost, likedMap.getOrDefault(c.getId(), false));
         });
   }
 
@@ -148,11 +169,11 @@ public class CommentService {
   }
 
   private String handleFileMetadata(UUID fileId, Comment comment, User user) {
-    if (fileId == null) return null;
-    FileMetadata fileMetadata =
-        fileMetadataRepository
-            .findById(fileId)
-            .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+    if (fileId == null)
+      return null;
+    FileMetadata fileMetadata = fileMetadataRepository
+        .findById(fileId)
+        .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
 
     fileService.updateResourceTarget(
         comment.getId(), ResourceType.COMMENT, user.getId(), fileMetadata);
@@ -160,26 +181,11 @@ public class CommentService {
     return fileMetadata.getUrl();
   }
 
-  private CommentResponse toResponse(Comment c, String url) {
-    return CommentResponse.builder()
-        .id(c.getId())
-        .content(c.getContent())
-        .authorId(c.getAuthor().getId())
-        .parentId(Objects.nonNull(c.getParent()) ? c.getParent().getId() : null)
-        .postId(c.getPost().getId())
-        .deleted(c.getDeleted())
-        .createdDateTime(c.getCreatedDateTime())
-        .url(url)
-        .reactionCount(c.getReactionCount())
-        .build();
-  }
-
   @Transactional
   public CommentResponse updateComment(String commentId, CommentRequest request) {
-    Comment comment =
-        commentRepository
-            .findById(UUID.fromString(commentId))
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment comment = commentRepository
+        .findById(UUID.fromString(commentId))
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.isCommentCreator(comment, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -188,17 +194,18 @@ public class CommentService {
     commentRepository.save(comment);
 
     String fileUrl = handleFileMetadata(request.getFileMetadataId(), comment, user);
-    return toResponse(comment, fileUrl);
+    boolean isLiked = reactionRepository.findByUser_IdAndTargetIdAndTargetType(
+        user.getId(), comment.getId(), TargetType.COMMENT).isPresent();
+    return toResponse(comment, fileUrl, isLiked);
   }
 
   // updateComment và deleteComment giữ nguyên logic nhưng nên dùng helper
   // sendNotification/logActivity
   @Transactional
   public CommentResponse softDeleteComment(String commentId) {
-    Comment comment =
-        commentRepository
-            .findById(UUID.fromString(commentId))
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment comment = commentRepository
+        .findById(UUID.fromString(commentId))
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.canSoftDeleteComment(comment, user)) {
@@ -207,51 +214,52 @@ public class CommentService {
     comment.setDeleted(true);
     // Nên xóa luôn liên kết file nếu cần
     commentRepository.save(comment);
-    return toResponse(comment, null);
+
+    boolean isLiked = reactionRepository.findByUser_IdAndTargetIdAndTargetType(
+        user.getId(), comment.getId(), TargetType.COMMENT).isPresent();
+    return toResponse(comment, null, isLiked);
   }
 
   @Transactional
   public Page<CommentResponse> searchComments(SearchCommentRequest request, Pageable pageable) {
-    Specification<Comment> spec =
-        (root, query, cb) -> {
-          List<Predicate> predicates = new ArrayList<>();
+    Specification<Comment> spec = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
 
-          if (Objects.nonNull(request.getAuthorId())) {
-            predicates.add(cb.equal(root.get("user").get("id"), request.getAuthorId()));
-          }
+      if (Objects.nonNull(request.getAuthorId())) {
+        predicates.add(cb.equal(root.get("user").get("id"), request.getAuthorId()));
+      }
 
-          if (Objects.nonNull(request.getDeleted())) {
-            predicates.add(cb.equal(root.get("deleted"), request.getDeleted()));
-          }
+      if (Objects.nonNull(request.getDeleted())) {
+        predicates.add(cb.equal(root.get("deleted"), request.getDeleted()));
+      }
 
-          if (Objects.nonNull(request.getPostId())) {
-            predicates.add(cb.equal(root.get("post").get("id"), request.getPostId()));
-          }
+      if (Objects.nonNull(request.getPostId())) {
+        predicates.add(cb.equal(root.get("post").get("id"), request.getPostId()));
+      }
 
-          if (request.getFromDate() != null) {
-            predicates.add(
-                cb.greaterThanOrEqualTo(
-                    root.get("createdDateTime"), request.getFromDate().atStartOfDay()));
-          }
-          if (request.getToDate() != null) {
-            predicates.add(
-                cb.lessThanOrEqualTo(
-                    root.get("createdDateTime"), request.getToDate().atTime(23, 59, 59)));
-          }
+      if (request.getFromDate() != null) {
+        predicates.add(
+            cb.greaterThanOrEqualTo(
+                root.get("createdDateTime"), request.getFromDate().atStartOfDay()));
+      }
+      if (request.getToDate() != null) {
+        predicates.add(
+            cb.lessThanOrEqualTo(
+                root.get("createdDateTime"), request.getToDate().atTime(23, 59, 59)));
+      }
 
-          Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDateTime")));
+      Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDateTime")));
 
-          return cb.and(predicates.toArray(new Predicate[0]));
-        };
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
     return commentRepository.findAll(spec, pageable);
   }
 
   @Transactional
   public DetailCommentResponse getComment(UUID commentId) {
-    Comment comment =
-        commentRepository
-            .findById(commentId)
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment comment = commentRepository
+        .findById(commentId)
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
 
@@ -261,40 +269,93 @@ public class CommentService {
 
     boolean isCommentCreator = authorizationService.isCommentCreator(comment, user);
     boolean canSoftDeletePost = authorizationService.canSoftDeletePost(comment.getPost(), user);
-    String fileUrl =
-        fileMetadataRepository
-            .findByResourceIdAndResourceType(commentId, ResourceType.COMMENT)
-            .map(FileMetadata::getUrl)
-            .orElse(null);
+    String fileUrl = fileMetadataRepository
+        .findByResourceIdAndResourceType(commentId, ResourceType.COMMENT)
+        .map(FileMetadata::getUrl)
+        .orElse(null);
 
-    return DetailCommentResponse.toResponse(comment, fileUrl, isCommentCreator, canSoftDeletePost);
+    boolean isLiked = false;
+    if (user != null) {
+      isLiked = reactionRepository.findByUser_IdAndTargetIdAndTargetType(
+          user.getId(), commentId, TargetType.COMMENT).isPresent();
+    }
+
+    return DetailCommentResponse.toResponse(comment, fileUrl, isCommentCreator, canSoftDeletePost, isLiked);
   }
 
   @Transactional
   public Page<CommentResponse> getMyComments(Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();
-    Page<Comment> comments =
-        commentRepository.findAllByAuthorIdAndDeletedFalse(user.getId(), pageable);
-    return comments.map(c -> toResponse(c, null));
+    Page<Comment> comments = commentRepository.findAllByAuthorIdAndDeletedFalse(user.getId(), pageable);
+
+    // Batch fetch likes for my comments
+    List<UUID> commentIds = comments.getContent().stream().map(Comment::getId).toList();
+    Set<UUID> likedCommentIds = new HashSet<>();
+    if (!commentIds.isEmpty()) {
+      List<Reaction> reactions = reactionRepository.findByUser_IdAndTargetTypeAndTargetIdIn(
+          user.getId(), TargetType.COMMENT, commentIds);
+      reactions.forEach(r -> likedCommentIds.add(r.getTargetId()));
+    }
+
+    return comments.map(c -> toResponse(c, null, likedCommentIds.contains(c.getId())));
+  }
+
+  private CommentResponse toResponse(Comment c, String url, Boolean isLiked) {
+    User currentUser = null;
+    try {
+      currentUser = currentUserService.getCurrentUserEntity();
+    } catch (Exception e) {
+      // Ignored: Anonymous user
+    }
+
+    CommentResponse.Permissions permissions = new CommentResponse.Permissions();
+    if (currentUser != null) {
+      boolean isCommentCreator = authorizationService.isCommentCreator(c, currentUser);
+      boolean canSoftDeletePost = authorizationService.canSoftDeletePost(c.getPost(), currentUser);
+      permissions.setCanEdit(isCommentCreator);
+      permissions.setCanDelete(isCommentCreator || canSoftDeletePost);
+      permissions.setCanReport(!isCommentCreator);
+    } else {
+      permissions.setCanEdit(false);
+      permissions.setCanDelete(false);
+      permissions.setCanReport(false);
+    }
+
+    return CommentResponse.builder()
+        .id(c.getId())
+        .content(c.getContent())
+        .author(
+            UserSummaryDto.builder()
+                .id(c.getAuthor().getId())
+                .fullName(c.getAuthor().getFullName())
+                .avatarUrl(c.getAuthor().getAvatarUrl())
+                .build())
+        .parentId(Objects.nonNull(c.getParent()) ? c.getParent().getId() : null)
+        .postId(c.getPost().getId())
+        .deleted(c.getDeleted())
+        .createdDateTime(c.getCreatedDateTime())
+        .url(url)
+        .reactionCount(c.getReactionCount())
+        .isLiked(isLiked)
+        .permissions(permissions)
+        .build();
   }
 
   @Transactional
   public void toggleCommentUseful(UUID postId, UUID commentId) {
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    Post post =
-        postRepository
-            .findById(postId)
-            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post = postRepository
+        .findById(postId)
+        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     if (!post.getAuthor().getId().equals(currentUser.getId())) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
 
-    Comment comment =
-        commentRepository
-            .findById(commentId)
-            .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+    Comment comment = commentRepository
+        .findById(commentId)
+        .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
     // 4. Validate Comment phải thuộc về Post này
     if (!comment.getPost().getId().equals(postId)) {

@@ -12,17 +12,21 @@ import org.springframework.data.repository.query.Param;
 
 public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
-  @Query(
-      "SELECT d "
-          + " from Document as d where  "
-          + " (:title is NULL or d.title like concat('%', :title, '%')) and "
-          + " (:documentType is null or :documentType = d.documentType ) and  "
-          + " (:subjectId is null or d.subject.id = :subjectId )")
-  Page<Document> findByTitleAndDocumentTypeAndSubjectId(
+  @Query("SELECT d "
+      + " from Document as d where  "
+      + " (:title is NULL or d.title like concat('%', :title, '%')) and "
+      + " (:documentType is null or :documentType = d.documentType ) and  "
+      + " (:documentStatus is null or :documentStatus = d.documentStatus ) and  "
+      + " (:subjectId is null or d.subject.id = :subjectId )")
+  Page<Document> findByTitleAndDocumentTypeAndSubjectIdAndDocumentStatus(
       @Param("title") String title,
       @Param("documentType") DocumentType documentType,
       @Param("subjectId") UUID subjectId,
+      @Param("documentStatus") com.graduation.project.library.constant.DocumentStatus documentStatus,
       Pageable pageable);
 
   List<Document> findByTitle(String title);
+
+  @org.springframework.data.jpa.repository.EntityGraph(attributePaths = { "subject", "uploadedBy" })
+  Page<Document> findByUploadedBy_Id(UUID uploadedById, Pageable pageable);
 }

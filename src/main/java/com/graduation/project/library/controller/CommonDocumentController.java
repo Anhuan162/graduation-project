@@ -24,41 +24,12 @@ public class CommonDocumentController {
 
   private final DocumentService documentService;
 
-  @PreAuthorize("hasAuthority('CREATE_ANY_FILES') or hasAuthority('CREATE_ALL_FILES')")
-  @PostMapping("/upload")
-  public ApiResponse<DocumentResponse> createDocument(
-      @RequestParam("document") MultipartFile document,
-      @RequestParam("image") MultipartFile image,
-      @RequestParam() UUID subjectId,
-      @RequestParam() String title,
-      @RequestParam(required = false, defaultValue = "") String description,
-      @RequestParam(required = false) DocumentType documentType)
-      throws IOException {
-
-    if (document.isEmpty()) {
-      throw new BadRequestException("Document cannot be empty");
-    }
-    if (image.isEmpty()) {
-      throw new BadRequestException("Image cannot be empty");
-    }
-
-    // Chỉ cho phép ảnh
-    String contentType = image.getContentType();
-    if (contentType == null ||
-            (!contentType.equals("image/jpeg")
-                    && !contentType.equals("image/png"))) {
-      throw new BadRequestException("Invalid image type. Only JPG, PNG allowed");
-    }
-
-    DocumentRequest documentRequest =
-        DocumentRequest.builder()
-            .title(title)
-            .documentType(documentType)
-            .description(description)
-            .subjectId(subjectId)
-            .build();
-    DocumentResponse res = documentService.uploadDocument(document, image, documentRequest);
-    return ApiResponse.<DocumentResponse>builder().result(res).build();
+  @GetMapping("/{id}")
+  public ApiResponse<DocumentResponse> getDocumentById(@PathVariable UUID id) {
+    // Rely on service to check permissions or throw 404 if not found/hidden
+    return ApiResponse.<DocumentResponse>builder()
+        .result(documentService.getDocumentById(id))
+        .build();
   }
 
   @GetMapping("/search")
@@ -66,8 +37,7 @@ public class CommonDocumentController {
       @RequestParam(required = false) String subjectId,
       @RequestParam(required = false) String title,
       @RequestParam(required = false) String documentType,
-      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
-          Pageable pageable) {
+      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     UUID UUIDSubjectId = null;
     DocumentType edocumentType = null;
     try {
@@ -78,52 +48,9 @@ public class CommonDocumentController {
       edocumentType = DocumentType.valueOf(documentType);
     } catch (Exception e) {
     }
-    Page<DocumentResponse> res =
-        documentService.searchDocuments(UUIDSubjectId, title, edocumentType, pageable);
+    // Enforce APPROVED status for public search
+    Page<DocumentResponse> res = documentService.searchDocuments(UUIDSubjectId, title, edocumentType,
+        com.graduation.project.library.constant.DocumentStatus.APPROVED, pageable);
     return ApiResponse.<Page<DocumentResponse>>builder().result(res).build();
-  }
-
-  @PreAuthorize("hasAuthority('UPDATE_ALL_PERMISSIONS')")
-  @PutMapping("/{id}")
-  public ApiResponse<DocumentResponse> updateDocument(
-          @PathVariable UUID id,
-          @RequestParam(name = "document", required = false) MultipartFile document,
-          @RequestParam(name = "image", required = false) MultipartFile image,
-          @RequestParam(required = false) UUID subjectId,
-          @RequestParam(required = false) String title,
-          @RequestParam(required = false, defaultValue = "") String description,
-          @RequestParam(required = false) DocumentType documentType
-  ) throws IOException {
-    if (document.isEmpty() && image.isEmpty()
-            && title == null && description == null
-            && subjectId == null && documentType == null) {
-      throw new BadRequestException("No data to update");
-    }
-    if (!image.isEmpty()) {
-      String contentType = image.getContentType();
-      if (contentType == null ||
-              (!contentType.equals("image/jpeg")
-                      && !contentType.equals("image/png"))) {
-        throw new BadRequestException("Invalid image type. Only JPG, PNG allowed");
-      }
-    }
-
-    DocumentRequest documentRequest =
-            DocumentRequest.builder()
-                    .title(title)
-                    .documentType(documentType)
-                    .description(description)
-                    .subjectId(subjectId)
-                    .id(id)
-                    .build();
-    DocumentResponse res = documentService.updateDocument(document, image, documentRequest);
-    return ApiResponse.<DocumentResponse>builder().result(res).build();
-  }
-
-  @PreAuthorize("hasAuthority('DELETE_ALL_PERMISSIONS')")
-  @DeleteMapping("/{id}")
-  public ApiResponse<String> deleteDocument(@PathVariable UUID id) {
-    documentService.deleteDocument(id);
-    return ApiResponse.<String>builder().result("deleted").build();
   }
 }
