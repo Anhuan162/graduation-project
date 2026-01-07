@@ -24,14 +24,15 @@ public class AdminAnnouncementController {
   private final UserRepository userRepository;
 
   @PostMapping
-  public ApiResponse<AnnouncementResponse> createAnnouncement(
-      @RequestBody CreateAnnouncementRequest request,
+  public ApiResponse<CreatedAnnonucementResponse> createAnnouncement(
+      @RequestBody CreatedAnnouncementRequest request,
       @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-    User user = userRepository
-        .findByEmail(userPrincipal.getEmail())
-        .orElseThrow(() -> new RuntimeException("User not found"));
-    return ApiResponse.<AnnouncementResponse>builder()
+    User user =
+        userRepository
+            .findByEmail(userPrincipal.getEmail())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+    return ApiResponse.<CreatedAnnonucementResponse>builder()
         .result(announcementService.createAnnouncement(request, user))
         .build();
   }
