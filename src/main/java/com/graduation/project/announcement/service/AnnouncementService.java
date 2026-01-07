@@ -166,10 +166,20 @@ public class AnnouncementService {
             .findById(announcementId)
             .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
-    List<String> fileMetadataList =
-        fileService.getFileMetadataIds(announcementId, ResourceType.ANNOUNCEMENT);
+    List<AnnouncementFileResponse> attachments = fileService
+        .findFileMetadataByResourceTarget(announcementId, ResourceType.ANNOUNCEMENT)
+        .stream()
+        .map(
+            file -> AnnouncementFileResponse.builder()
+                .id(file.getId())
+                .fileName(file.getFileName())
+                .url(file.getUrl())
+                .fileType(file.getContentType())
+                .size(file.getSize())
+                .build())
+        .toList();
 
-    return DetailedAnnouncementResponse.from(announcement, fileMetadataList);
+    return DetailedAnnouncementResponse.from(announcement, attachments);
   }
 
   @Transactional
