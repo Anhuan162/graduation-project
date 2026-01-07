@@ -9,6 +9,7 @@ public class SearchAnnouncementRequest {
   String announcementType;
   Boolean announcementStatus;
   String announcementProvider;
+  Boolean onDrive;
   LocalDate fromDate;
   LocalDate toDate;
 }

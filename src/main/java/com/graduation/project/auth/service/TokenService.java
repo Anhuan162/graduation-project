@@ -77,6 +77,7 @@ public class TokenService {
         .expirationTime(
             new Date(Instant.now().plus(refreshTokenValidityMs, ChronoUnit.SECONDS).toEpochMilli()))
         .jwtID(UUID.randomUUID().toString())
+        .claim("userId", user.getId())
         .build();
   }
 
@@ -88,6 +89,7 @@ public class TokenService {
         .expirationTime(
             new Date(Instant.now().plus(accessTokenValidityMs, ChronoUnit.SECONDS).toEpochMilli()))
         .jwtID(UUID.randomUUID().toString())
+        .claim("userId", user.getId())
         .claim("scope", buildScope(user))
         .claim("userId", user.getId().toString())
         .claim("fullName", user.getFullName())

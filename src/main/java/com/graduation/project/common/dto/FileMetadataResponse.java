@@ -32,4 +32,6 @@ public class FileMetadataResponse {
   private LocalDateTime createdAt = LocalDateTime.now();
 
   private String userId;
+
+  private Boolean onDrive;
 }

@@ -20,6 +20,7 @@ public class AnnouncementResponse {
   String createdBy;
   LocalDate createdDate;
   String modifiedBy;
+  Boolean onDrive;
   LocalDate modifiedDate;
 
   public static AnnouncementResponse from(Announcement announcement) {
@@ -38,6 +39,7 @@ public class AnnouncementResponse {
             Objects.nonNull(announcement.getModifiedBy())
                 ? announcement.getModifiedBy().getFullName()
                 : "")
+        .onDrive(announcement.getOnDrive())
         .modifiedDate(announcement.getModifiedDate())
         .build();
   }
