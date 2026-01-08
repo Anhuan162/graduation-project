@@ -19,6 +19,9 @@ public class UserNotificationResponse {
   private UUID relatedId;
 
   private String title;
+  private String content;
+  private UUID senderId;
+  private String senderName;
 
   private Instant deliveredAt;
   private Instant readAt;
@@ -28,11 +31,18 @@ public class UserNotificationResponse {
       UserNotification userNotification) {
     return UserNotificationResponse.builder()
         .id(userNotification.getId())
-        .relatedId(userNotification.getNotificationEvent().getRelatedId())
+        .referenceId(userNotification.getNotificationEvent().getReferenceId())
         .resourceType(userNotification.getNotificationEvent().getType())
         .parentReferenceId(userNotification.getNotificationEvent().getParentReferenceId())
         .relatedId(userNotification.getNotificationEvent().getRelatedId())
         .title(userNotification.getNotificationEvent().getTitle())
+        .content(userNotification.getNotificationEvent().getContent())
+        .senderId(userNotification.getNotificationEvent().getCreatedBy() != null
+            ? userNotification.getNotificationEvent().getCreatedBy().getId()
+            : null)
+        .senderName(userNotification.getNotificationEvent().getCreatedBy() != null
+            ? userNotification.getNotificationEvent().getCreatedBy().getFullName()
+            : "System")
         .deliveredAt(userNotification.getDeliveredAt())
         .readAt(userNotification.getReadAt())
         .notificationStatus(userNotification.getNotificationStatus())

@@ -15,7 +15,8 @@ public enum ResourceType {
   COMMENT("comments/"),
   TOPIC_MEMBER("topic-members/"),
   REACTION("reactions/"),
-  REPORT("reports/");
+  REPORT("reports/"),
+  DOCUMENT("documents/");
 
   private final String folderName;
 

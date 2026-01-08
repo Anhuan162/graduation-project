@@ -23,7 +23,7 @@ public class WebSocketStompConfig implements WebSocketMessageBrokerConfigurer {
     // endpoint used by front-end to connect
     registry
         .addEndpoint("/ws/notification")
-        .setAllowedOriginPatterns("*")
+        .setAllowedOrigins("http://localhost:3000") // Required for withCredentials: true
         .setHandshakeHandler(new JwtHandshakeHandler(jwtService))
         .withSockJS();
   }
@@ -33,7 +33,8 @@ public class WebSocketStompConfig implements WebSocketMessageBrokerConfigurer {
     registry.setApplicationDestinationPrefixes("/app");
     // Simple broker for topic and queue
     registry.enableSimpleBroker("/topic", "/queue");
-    // If scaling, replace enableSimpleBroker with enableStompBrokerRelay(...) for Redis/Rabbit
+    // If scaling, replace enableSimpleBroker with enableStompBrokerRelay(...) for
+    // Redis/Rabbit
     // relay
   }
 }

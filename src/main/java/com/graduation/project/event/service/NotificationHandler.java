@@ -27,46 +27,47 @@ public class NotificationHandler {
   private final SimpMessagingTemplate messagingTemplate;
 
   public void handleNotification(NotificationEventDTO dto) {
-    User sender = userRepository.findById(dto.getSenderId()).orElse(null);
+    User sender = dto.getSenderId() != null
+        ? userRepository.findById(dto.getSenderId()).orElse(null)
+        : null;
 
-    NotificationEvent event =
-        NotificationEvent.builder()
-            .referenceId(dto.getReferenceId())
-            .type(dto.getType())
-            .parentReferenceId(dto.getParentReferenceId())
-            .relatedId(dto.getRelatedId())
-            .title(dto.getTitle())
-            .content(dto.getContent())
-            .createdBy(sender)
-            .createdAt(LocalDateTime.now())
-            .build();
+    NotificationEvent event = NotificationEvent.builder()
+        .referenceId(dto.getReferenceId())
+        .type(dto.getType())
+        .parentReferenceId(dto.getParentReferenceId())
+        .relatedId(dto.getRelatedId())
+        .title(dto.getTitle())
+        .content(dto.getContent())
+        .createdBy(sender)
+        .createdAt(LocalDateTime.now())
+        .build();
     notificationEventRepository.save(event);
 
     dto.getReceiverIds()
         .forEach(
-            userId ->
-                userRepository
-                    .findById(userId)
-                    .ifPresent(
-                        user -> {
-                          UserNotification userNotif =
-                              UserNotification.builder()
-                                  .notificationEvent(event)
-                                  .user(user)
-                                  .deliveredAt(Instant.now())
-                                  .notificationStatus(NotificationStatus.SENT)
-                                  .build();
-                          userNotificationRepository.save(userNotif);
-                          var response =
-                              UserNotificationResponse.toUserNotificationResponse(userNotif);
+            userId -> userRepository
+                .findById(userId)
+                .ifPresent(
+                    user -> {
+                      UserNotification userNotif = UserNotification.builder()
+                          .notificationEvent(event)
+                          .user(user)
+                          .deliveredAt(Instant.now())
+                          .notificationStatus(NotificationStatus.SENT)
+                          .build();
+                      userNotificationRepository.save(userNotif);
+                      var response = UserNotificationResponse.toUserNotificationResponse(userNotif);
 
-                          try {
-                            messagingTemplate.convertAndSendToUser(
-                                String.valueOf(userId), "/queue/notifications", response);
-                          } catch (Exception e) {
-                            log.error(
-                                "Failed to send STOMP message to {}: {}", response, e.getMessage());
-                          }
-                        }));
+                      try {
+                        messagingTemplate.convertAndSendToUser(
+                            String.valueOf(userId), "/queue/notifications", response);
+                        userNotif.setNotificationStatus(NotificationStatus.SENT);
+                        userNotificationRepository.save(userNotif);
+                      } catch (Exception e) {
+                        // Keep as SENT even if WebSocket fails - notification is stored in DB
+                        log.error(
+                            "Failed to send STOMP message to user {}: {}", userId, e.getMessage());
+                      }
+                    }));
   }
 }
