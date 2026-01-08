@@ -37,7 +37,7 @@ public class TopicMemberService {
   private final TopicRepository topicRepository;
   private final CurrentUserService currentUserService;
   private final UserRepository userRepository;
-  private final StreamProducer streamProducer;
+  private final com.graduation.project.event.service.NotificationHandler notificationHandler;
   private final AuthorizationService authorizationService;
 
   public Page<TopicMemberResponse> getMembers(UUID topicId, Boolean approved, Pageable pageable) {
@@ -86,17 +86,17 @@ public class TopicMemberService {
     topicMemberRepository.save(topicMember);
 
     NotificationEventDTO dto = NotificationEventDTO.builder()
+        .referenceId(topicId)
+        .type(ResourceType.TOPIC)
         .relatedId(topicMember.getId())
-        .type(ResourceType.TOPIC_MEMBER)
         .title("Join Topic")
-        .content(user.getFullName() + " want to join your topic")
+        .content(user.getFullName() + " wants to join your topic")
         .senderId(user.getId())
-        .senderName(user.getEmail())
+        .senderName(user.getFullName())
         .receiverIds(managerIds)
         .createdAt(LocalDateTime.now())
         .build();
-    EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
-    streamProducer.publish(eventEnvelope);
+    notificationHandler.handleNotification(dto);
     return TopicMemberResponse.toTopicMemberResponse(topicMember);
   }
 
@@ -115,17 +115,17 @@ public class TopicMemberService {
     tm.setApproved(true);
     TopicMember save = topicMemberRepository.save(tm);
     NotificationEventDTO dto = NotificationEventDTO.builder()
+        .referenceId(tm.getTopic().getId())
+        .type(ResourceType.TOPIC)
         .relatedId(topicMemberId)
-        .type(ResourceType.TOPIC_MEMBER)
         .title("Approve Member")
-        .content("Bạn đã được chấp thuận là thành viên của Topic")
+        .content("Bạn đã được chấp thuận là thành viên của Topic: " + tm.getTopic().getTitle())
         .senderId(current.getId())
-        .senderName(current.getEmail())
-        .receiverIds(Set.of(tm.getUser().getId())) // build list of UUID receivers
+        .senderName(current.getFullName())
+        .receiverIds(Set.of(tm.getUser().getId()))
         .createdAt(LocalDateTime.now())
         .build();
-    EventEnvelope eventEnvelope = EventEnvelope.from(EventType.NOTIFICATION, dto, "TOPIC_MEMBER");
-    streamProducer.publish(eventEnvelope);
+    notificationHandler.handleNotification(dto);
     return TopicMemberResponse.toTopicMemberResponse(save);
   }
 

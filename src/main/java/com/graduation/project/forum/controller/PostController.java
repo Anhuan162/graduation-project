@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class PostController {
 
   private final PostService postService;
+  private final com.graduation.project.auth.service.CurrentUserService currentUserService;
 
   @PostMapping("/topic/{topicId}")
   public ApiResponse<PostResponse> createPost(
@@ -118,7 +119,8 @@ public class PostController {
     postAcceptedSelectList.setNameFile(fileName);
 
     // Process in background
-    postService.upLoadPostAndCommentToDrive(postAcceptedSelectList);
+    String currentUserId = currentUserService.getCurrentUserEntity().getId().toString();
+    postService.upLoadPostAndCommentToDrive(postAcceptedSelectList, currentUserId);
 
     return ApiResponse.<String>builder()
         .result("Request accepted. File is being generated and uploaded in background.")

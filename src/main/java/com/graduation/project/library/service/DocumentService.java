@@ -10,6 +10,9 @@ import com.graduation.project.library.entity.Document;
 import com.graduation.project.library.entity.Subject;
 import com.graduation.project.library.repository.DocumentRepository;
 import com.graduation.project.library.repository.SubjectRepository;
+import com.graduation.project.common.event.NotificationEvent;
+import com.graduation.project.common.event.NotificationType;
+import org.springframework.context.ApplicationEventPublisher;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +37,7 @@ public class DocumentService {
   private final FirebaseService firebaseService;
   private final DocumentRepository documentRepository;
   private final SubjectRepository subjectRepository;
+  private final ApplicationEventPublisher publisher;
 
   private final String FOLDER_DOCUMENT = "documents";
   private final String FOLDER_IMAGE = "images";
@@ -243,6 +247,18 @@ public class DocumentService {
     document.setApprovedBy(User.builder().id(SecurityUtils.getCurrentUserId()).build());
     document.setApprovedAt(LocalDateTime.now());
     documentRepository.save(document);
+
+    // Fire DOCUMENT_APPROVED notification if author exists
+    if (document.getUploadedBy() != null) {
+      publisher.publishEvent(new NotificationEvent(
+          document.getUploadedBy().getId().toString(),
+          "SYSTEM",
+          "Tài liệu đã được duyệt",
+          "Tài liệu \"" + document.getTitle() + "\" đã được duyệt và hiển thị công khai.",
+          NotificationType.DOCUMENT_APPROVED,
+          document.getId().toString(),
+          "DOCUMENT"));
+    }
   }
 
   public void rejectDocument(UUID id) {
@@ -250,6 +266,16 @@ public class DocumentService {
         .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
     document.setDocumentStatus(DocumentStatus.REJECTED);
     // document.setRejectionReason(reason); // If DB has this field
-    documentRepository.save(document);
+    // Fire DOCUMENT_REJECTED notification if author exists
+    if (document.getUploadedBy() != null) {
+      publisher.publishEvent(new NotificationEvent(
+          document.getUploadedBy().getId().toString(),
+          "SYSTEM",
+          "Tài liệu bị từ chối",
+          "Tài liệu \"" + document.getTitle() + "\" đã bị từ chối phê duyệt. Vui lòng kiểm tra lại nội dung.",
+          NotificationType.DOCUMENT_REJECTED,
+          document.getId().toString(),
+          "DOCUMENT"));
+    }
   }
 }
