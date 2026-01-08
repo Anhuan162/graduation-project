@@ -7,8 +7,8 @@ import com.graduation.project.auth.repository.UserRepository;
 import com.graduation.project.auth.security.UserPrincipal;
 import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.common.entity.User;
-
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -49,15 +49,16 @@ public class AdminAnnouncementController {
       @PathVariable String announcementId,
       @RequestBody UpdatedAnnouncementRequest request,
       @AuthenticationPrincipal UserPrincipal userPrincipal) {
-    User user = userRepository
-        .findByEmail(userPrincipal.getEmail())
-        .orElseThrow(() -> new RuntimeException("User not found"));
+    User user =
+        userRepository
+            .findByEmail(userPrincipal.getEmail())
+            .orElseThrow(() -> new RuntimeException("User not found"));
     return ApiResponse.<AnnouncementResponse>builder()
         .result(announcementService.updateAnnouncement(announcementId, request, user))
         .build();
   }
 
-  @GetMapping("/{announcementId}")
+  @GetMapping("/detail/{announcementId}")
   public ApiResponse<DetailedAnnouncementResponse> getAnnouncement(
       @PathVariable UUID announcementId) {
     return ApiResponse.<DetailedAnnouncementResponse>builder()
@@ -68,14 +69,16 @@ public class AdminAnnouncementController {
   @GetMapping("/all")
   public ApiResponse<Page<AnnouncementResponse>> searchAnnouncements(
       @ModelAttribute SearchAnnouncementRequest request, Pageable pageable) {
-    Page<AnnouncementResponse> announcementResponses = announcementService.searchAnnouncement(request, pageable);
+    Page<AnnouncementResponse> announcementResponses =
+        announcementService.searchAnnouncement(request, pageable);
     return ApiResponse.<Page<AnnouncementResponse>>builder().result(announcementResponses).build();
   }
 
   @PostMapping("/add-to-drive/{announcementId}")
-  public ApiResponse<FileResponse> addToDrive(
-      @PathVariable String announcementId) throws IOException {
-    return ApiResponse.<FileResponse>builder().result(announcementService.addAnnouncementToDrive(announcementId))
+  public ApiResponse<FileResponse> addToDrive(@PathVariable String announcementId)
+      throws IOException {
+    return ApiResponse.<FileResponse>builder()
+        .result(announcementService.addAnnouncementToDrive(announcementId))
         .build();
   }
 
@@ -83,5 +86,12 @@ public class AdminAnnouncementController {
   public ApiResponse<String> deleteAnnouncement(@PathVariable String announcementId) {
     announcementService.deleteAnnouncement(announcementId);
     return ApiResponse.<String>builder().result("Deleted announcement successfully").build();
+  }
+
+  @GetMapping("/latest")
+  public ApiResponse<List<AnnouncementResponse>> getLatestAnnouncements() {
+    return ApiResponse.<List<AnnouncementResponse>>builder()
+        .result(announcementService.getLatestAnnouncements())
+        .build();
   }
 }

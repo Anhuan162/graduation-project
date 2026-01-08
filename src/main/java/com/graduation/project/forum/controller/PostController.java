@@ -1,19 +1,16 @@
 package com.graduation.project.forum.controller;
 
 import com.graduation.project.auth.dto.response.ApiResponse;
-import com.graduation.project.common.dto.FileResponse;
 import com.graduation.project.forum.constant.PostStatus;
 import com.graduation.project.forum.dto.*;
 import com.graduation.project.forum.service.PostService;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -110,9 +107,7 @@ public class PostController {
   public ApiResponse<List<PostAcceptedResonse>> getPostAccepted(
       @ModelAttribute PostAcceptedFilterRequest postAcceptedRequest) {
     List<PostAcceptedResonse> res = postService.searchPostAccepted(postAcceptedRequest);
-    return ApiResponse.<List<PostAcceptedResonse>>builder()
-        .result(res)
-        .build();
+    return ApiResponse.<List<PostAcceptedResonse>>builder().result(res).build();
   }
 
   @PreAuthorize("hasRole('ADMIN')")
@@ -130,4 +125,22 @@ public class PostController {
         .build();
   }
 
+  @GetMapping("/dashboard/top-reacted")
+  public ApiResponse<List<PostResponse>> getTopReactedPosts() {
+    return ApiResponse.<List<PostResponse>>builder()
+        .result(postService.getTopReactedPosts())
+        .build();
+  }
+
+  @GetMapping("/dashboard/stats/daily")
+  public ApiResponse<List<PostStatDTO>> getDailyPostStats() {
+    return ApiResponse.<List<PostStatDTO>>builder().result(postService.getDailyPostStats()).build();
+  }
+
+  @GetMapping("/dashboard/stats/monthly")
+  public ApiResponse<List<PostStatDTO>> getMonthlyPostStats() {
+    return ApiResponse.<List<PostStatDTO>>builder()
+        .result(postService.getMonthlyPostStats())
+        .build();
+  }
 }
