@@ -44,6 +44,11 @@ public class UserController {
     return ApiResponse.<UserResponse>builder().result(userService.getUser(userId)).build();
   }
 
+  @GetMapping("/{userId}/stats")
+  ApiResponse<UserStatsResponse> getUserStats(@PathVariable("userId") String userId) {
+    return ApiResponse.<UserStatsResponse>builder().result(userService.getUserStats(userId)).build();
+  }
+
   @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
   ApiResponse<Page<UserResponse>> searchUsers(
@@ -104,14 +109,13 @@ public class UserController {
       @RequestParam(value = "studentCode", required = false) String studentCode,
       @RequestParam(value = "classCode", required = false) String classCode) {
 
-    UserProfileUpdateRequest userProfileRequest =
-        UserProfileUpdateRequest.builder()
-            .phone(phone)
-            .classCode(classCode)
-            .studentCode(studentCode)
-            .avatarFile(avatarFile)
-            .fullName(fullName)
-            .build();
+    UserProfileUpdateRequest userProfileRequest = UserProfileUpdateRequest.builder()
+        .phone(phone)
+        .classCode(classCode)
+        .studentCode(studentCode)
+        .avatarFile(avatarFile)
+        .fullName(fullName)
+        .build();
     return ApiResponse.<UserProfileResponse>builder()
         .result(userService.updateUserProfile(userProfileRequest))
         .build();

@@ -28,6 +28,13 @@ import jakarta.validation.Validator;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
+
+import com.graduation.project.forum.repository.PostRepository;
+import com.graduation.project.library.repository.DocumentRepository;
+import com.graduation.project.forum.repository.CommentRepository;
+import com.graduation.project.forum.constant.PostStatus;
+import com.graduation.project.library.constant.DocumentStatus;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
@@ -54,6 +61,10 @@ public class UserService {
   private final Validator validator;
   private final UserRegistrationService userRegistrationService;
   private final UserProfileService userProfileService;
+
+  private final PostRepository postRepository;
+  private final DocumentRepository documentRepository;
+  private final CommentRepository commentRepository;
 
   private String AVATAR_FOLDER = "avatars";
 
@@ -339,14 +350,14 @@ public class UserService {
       throw new AppException(ErrorCode.INVALID_FACULTY_CODE);
     }
     Optional<Faculty> faculty = facultyRepository.findByFacultyCode(facultiesCodeFromClass);
-    if (faculty.isEmpty()) throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
+    if (faculty.isEmpty())
+      throw new AppException(ErrorCode.FACULTY_NOT_FOUND);
     return faculty.get().getFacultyName();
   }
 
   public UserProfileResponse updateUserProfile(UserProfileUpdateRequest userProfileRequest) {
     // Validate the request
-    Set<ConstraintViolation<UserProfileUpdateRequest>> violations =
-        validator.validate(userProfileRequest);
+    Set<ConstraintViolation<UserProfileUpdateRequest>> violations = validator.validate(userProfileRequest);
     if (!violations.isEmpty()) {
       StringBuilder message = new StringBuilder();
       for (ConstraintViolation<UserProfileUpdateRequest> violation : violations) {
@@ -362,8 +373,7 @@ public class UserService {
     if (userProfileRequest.getAvatarFile() != null
         && !userProfileRequest.getAvatarFile().isEmpty()) {
       try {
-        String newAvatarUrl =
-            firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER);
+        String newAvatarUrl = firebaseService.uploadFile(userProfileRequest.getAvatarFile(), AVATAR_FOLDER);
         user.setAvatarUrl(newAvatarUrl);
       } catch (IOException e) {
         throw new AppException(ErrorCode.UPLOAD_FILE_FAILED);
@@ -374,9 +384,8 @@ public class UserService {
         && !userProfileRequest.getClassCode().isEmpty()
         && userProfileRequest.getStudentCode() != null
         && !userProfileRequest.getStudentCode().isEmpty()) {
-      facultiesName =
-          getAndValidateFacultiesCode(
-              userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
+      facultiesName = getAndValidateFacultiesCode(
+          userProfileRequest.getStudentCode(), userProfileRequest.getClassCode());
       user.setStudentCode(userProfileRequest.getStudentCode());
       user.setClassCode(userProfileRequest.getClassCode());
     }
@@ -394,5 +403,33 @@ public class UserService {
 
   public UserProfileResponse updateProfileInfo(UserProfileUpdateRequest request) {
     return userProfileService.updateProfileInfo(request);
+  }
+
+  public UserStatsResponse getUserStats(String userId) {
+    UUID uuid = UUID.fromString(userId);
+    // Counts - PUBLIC facing: shows approved content
+    // But wait, the requirement says "dashboard" which is usually for OWNER.
+    // If owner, show everything? If visitor, show approved?
+    // The user said: "thông tin về bài viết pending... không được hiện ra khi người
+    // khác ấn vào xem profile"
+    // So if visitor -> count stats of APPROVED only.
+    // If owner -> count ALL?
+    // Usually stats are public stats (Reputation).
+    // Let's implement strict public stats for now to be safe.
+
+    long postCount = postRepository.countByAuthor_IdAndPostStatus(uuid, PostStatus.APPROVED);
+    long docCount = documentRepository.countByUploadedBy_IdAndDocumentStatus(uuid, DocumentStatus.APPROVED);
+    long commentCount = commentRepository.countByAuthorIdAndDeletedFalse(uuid);
+
+    // Sum of post reactions as valid reputation metric?
+    // Or just return counts.
+    long reputation = postCount * 10 + docCount * 20 + commentCount * 1;
+
+    return UserStatsResponse.builder()
+        .postCount(postCount)
+        .documentCount(docCount)
+        .commentCount(commentCount)
+        .reputation(reputation) // Or viewCount if we had it
+        .build();
   }
 }

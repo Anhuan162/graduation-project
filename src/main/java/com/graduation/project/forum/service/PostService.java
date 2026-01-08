@@ -342,13 +342,25 @@ public class PostService {
 
   @Transactional(readOnly = true)
   public Page<PostResponse> getPostsByUserId(UUID userId, Pageable pageable) {
-    Page<Post> postPage = postRepository.findAllByAuthor_Id(userId, pageable);
+    var userOpt = currentUserService.getCurrentUserEntityOptional();
+    User currentUser = userOpt.orElse(null);
+    boolean isOwnerOrAdmin = currentUser != null
+        && (currentUser.getId().equals(userId) || authorizationService.isAdmin(currentUser));
+
+    Page<Post> postPage;
+    if (isOwnerOrAdmin) {
+      postPage = postRepository.findAllByAuthor_Id(userId, pageable);
+    } else {
+      postPage = postRepository.findAllByAuthor_IdAndPostStatus(userId, PostStatus.APPROVED, pageable);
+    }
+
     if (postPage.isEmpty()) {
       return Page.empty(pageable);
     }
 
     Map<UUID, List<FileMetadataResponse>> filesMap = mapPostWithFileMetadata(postPage);
-    Map<UUID, Boolean> likedMap = mapPostWithUserLiked(postPage, userId);
+    Map<UUID, Boolean> likedMap = currentUser != null ? mapPostWithUserLiked(postPage, currentUser.getId())
+        : Collections.emptyMap();
     return postPage.map(
         post -> postMapper.toPostResponse(
             post,

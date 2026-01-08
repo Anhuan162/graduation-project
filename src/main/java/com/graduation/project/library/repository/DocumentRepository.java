@@ -17,12 +17,14 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
       + " (:title is NULL or d.title like concat('%', :title, '%')) and "
       + " (:documentType is null or :documentType = d.documentType ) and  "
       + " (:documentStatus is null or :documentStatus = d.documentStatus ) and  "
-      + " (:subjectId is null or d.subject.id = :subjectId )")
+      + " (:subjectId is null or d.subject.id = :subjectId ) and "
+      + " (:uploaderId is null or d.uploadedBy.id = :uploaderId)")
   Page<Document> findByTitleAndDocumentTypeAndSubjectIdAndDocumentStatus(
       @Param("title") String title,
       @Param("documentType") DocumentType documentType,
       @Param("subjectId") UUID subjectId,
       @Param("documentStatus") com.graduation.project.library.constant.DocumentStatus documentStatus,
+      @Param("uploaderId") UUID uploaderId,
       Pageable pageable);
 
   List<Document> findByTitle(String title);
@@ -35,4 +37,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
   @org.springframework.data.jpa.repository.EntityGraph(attributePaths = { "subject", "uploadedBy" })
   Page<Document> findByUploadedBy_Id(UUID uploadedById, Pageable pageable);
+
+  long countByUploadedBy_IdAndDocumentStatus(UUID uploadedById,
+      com.graduation.project.library.constant.DocumentStatus documentStatus);
 }
