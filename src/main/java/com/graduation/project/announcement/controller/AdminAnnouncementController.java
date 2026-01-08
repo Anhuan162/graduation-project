@@ -58,7 +58,7 @@ public class AdminAnnouncementController {
         .build();
   }
 
-  @GetMapping("/detail/{announcementId}")
+  @GetMapping("/{announcementId}")
   public ApiResponse<DetailedAnnouncementResponse> getAnnouncement(
       @PathVariable UUID announcementId) {
     return ApiResponse.<DetailedAnnouncementResponse>builder()
