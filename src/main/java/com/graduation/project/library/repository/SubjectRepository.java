@@ -42,4 +42,6 @@ public interface SubjectRepository extends JpaRepository<Subject, UUID> {
       @Param("cohortCode") CohortCode cohortCode,
       @Param("subjectName") String subjectName,
       Pageable pageable);
+
+  boolean existsBySubjectCode(String subjectCode);
 }

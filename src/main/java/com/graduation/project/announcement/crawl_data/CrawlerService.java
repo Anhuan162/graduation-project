@@ -3,12 +3,15 @@ package com.graduation.project.announcement.crawl_data;
 import com.graduation.project.announcement.constant.AnnouncementProvider;
 import com.graduation.project.announcement.constant.AnnouncementType;
 import com.graduation.project.announcement.dto.CrawlerSourceConfig;
+import com.graduation.project.announcement.dto.SubjectCrawlerSourceConfig;
 import com.graduation.project.announcement.entity.Announcement;
 import com.graduation.project.announcement.repository.AnnouncementRepository;
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.entity.FileMetadata;
+import com.graduation.project.library.entity.Subject;
+import com.graduation.project.library.repository.SubjectRepository;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.time.LocalDate;
@@ -16,6 +19,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -33,9 +39,11 @@ public class CrawlerService {
 
   private final AnnouncementRepository announcementRepository;
   private final FileMetadataRepository fileMetadataRepository;
+  private final SubjectRepository subjectRepository;
   private static final String USER_AGENT =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36";
 
+  private static final String facultyCrawlUrl = "https://daotao.ptit.edu.vn/ctdt-list/";
   // ... bên trong class CrawlerService
 
   // Định dạng ngày tháng phổ biến ở VN
@@ -282,5 +290,61 @@ public class CrawlerService {
 
     return Jsoup.clean(
         doc.html(), "", Safelist.none(), new Document.OutputSettings().prettyPrint(false));
+  }
+
+  public void crawlAllSubjects() {
+    SubjectCrawlerSourceConfig config = new SubjectCrawlerSourceConfig();
+    config.setCrawlUrl(facultyCrawlUrl);
+    config.setFacultyUrl("a.ptit-ctdt-card");
+    config.setItemSelector(".card-mon-hoc");
+    config.setSubjectNameSelector(".card-mon-hoc .title");
+    config.setCreditSelector(".card-mon-hoc .tag");
+    config.setSubjectCodeAttr("data-ma");
+
+    Document facultyDoc = connectWithRetry(facultyCrawlUrl);
+
+    Elements facultyEls = Objects.requireNonNull(facultyDoc).select(config.getFacultyUrl());
+
+    for (Element facultyEl : facultyEls) {
+      String facultyUrl = facultyEl.attr("abs:href");
+
+      log.info("Crawl khoa: {}", facultyUrl);
+
+      Document subjectDoc = connectWithRetry(facultyUrl);
+
+      Elements subjects = Objects.requireNonNull(subjectDoc).select(config.getItemSelector());
+
+      for (Element subjectEl : subjects) {
+
+        String subjectCode = subjectEl.attr(config.getSubjectCodeAttr());
+        String subjectName =
+            Objects.requireNonNull(subjectEl.selectFirst(config.getSubjectNameSelector())).text();
+        String creditText =
+            Objects.requireNonNull(subjectEl.selectFirst(config.getCreditSelector()))
+                .text(); // "3 tín chỉ"
+
+        Integer credit = extractCredit(creditText);
+
+        log.info("Mã: {}, Tên: {}, Số TC: {}", subjectCode, subjectName, credit);
+        if (subjectRepository.existsBySubjectCode(subjectCode)) {
+          log.info("Môn học {} đã tồn tại, bỏ qua.", subjectCode);
+          continue;
+        }
+
+        Subject subject =
+            Subject.builder()
+                .credit(credit)
+                .subjectCode(subjectCode)
+                .subjectName(subjectName)
+                .build();
+        subjectRepository.save(subject);
+      }
+    }
+  }
+
+  private Integer extractCredit(String creditText) {
+    if (creditText == null) return null;
+    Matcher m = Pattern.compile("(\\d+)").matcher(creditText);
+    return m.find() ? Integer.parseInt(m.group(1)) : null;
   }
 }

@@ -19,4 +19,11 @@ public class CrawlerController {
     new Thread(crawlerService::crawlAll).start();
     return ApiResponse.<String>builder().result("Đã kích hoạt tiến trình Crawl dữ liệu!").build();
   }
+
+  @PostMapping("/trigger-subjects")
+  public ApiResponse<String> triggerCrawlSubjects() {
+    // Nên chạy async để không block thread của API
+    new Thread(crawlerService::crawlAllSubjects).start();
+    return ApiResponse.<String>builder().result("Đã kích hoạt tiến trình Crawl dữ liệu!").build();
+  }
 }
