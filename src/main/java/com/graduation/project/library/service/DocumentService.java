@@ -19,11 +19,13 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import com.graduation.project.security.ultilities.SecurityUtils;
 import java.time.LocalDateTime;
+import org.springframework.dao.DataIntegrityViolationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -45,9 +47,12 @@ public class DocumentService {
       throw new RuntimeException("subject not found!!!");
     }
 
-    List<Document> checkOldDocument = documentRepository.findByTitle(documentRequest.getTitle());
-    if (checkOldDocument.size() > 0) {
-      throw new RuntimeException("document name already exist!!!");
+    // Check for case-insensitive duplicate title within the same subject
+    // Prevents "Toán cao cấp.pdf" and "TOÁN CAO CẤP.pdf" from both existing
+    if (documentRepository.existsByTitleCaseInsensitiveAndSubjectId(
+        documentRequest.getTitle().trim(),
+        documentRequest.getSubjectId())) {
+      throw new AppException(ErrorCode.DOCUMENT_TITLE_ALREADY_EXISTS);
     }
     String filePath = "";
     String imageUrl = "";
@@ -73,7 +78,18 @@ public class DocumentService {
         .uploadedBy(User.builder().id(SecurityUtils.getCurrentUserId()).build())
         .createdAt(LocalDateTime.now())
         .build();
-    documentRepository.save(documentEntity);
+
+    // Save with database-level race condition safety net
+    try {
+      documentRepository.save(documentEntity);
+    } catch (DataIntegrityViolationException e) {
+      // Unique index violation caught by DB - concurrent request with same title
+      if (e.getMessage().contains("uk_document_title_subject_ci")) {
+        throw new AppException(ErrorCode.DOCUMENT_TITLE_ALREADY_EXISTS);
+      }
+      throw e; // Re-throw if it's a different constraint
+    }
+
     return documentEntity.toDocumentResponse();
   }
 
@@ -175,6 +191,7 @@ public class DocumentService {
     documentRepository.delete(document);
   }
 
+  @Transactional(readOnly = true)
   public Page<DocumentResponse> searchDocuments(
       UUID subjectId, String title, DocumentType documentType, DocumentStatus status, Pageable pageable) {
     if (title == null) {
@@ -191,6 +208,7 @@ public class DocumentService {
         .map(Document::toDocumentResponse);
   }
 
+  @Transactional(readOnly = true)
   public DocumentResponse getDocumentById(UUID id) {
     Document document = documentRepository.findById(id)
         .orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));

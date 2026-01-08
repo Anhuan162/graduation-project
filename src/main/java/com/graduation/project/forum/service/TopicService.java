@@ -45,9 +45,10 @@ public class TopicService {
   private final com.graduation.project.forum.repository.TopicMemberRepository topicMemberRepository;
 
   public TopicResponse create(UUID categoryId, TopicRequest request) {
-    Category category = categoryRepository
-        .findById(categoryId)
-        .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
+    Category category =
+        categoryRepository
+            .findById(categoryId)
+            .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.canCreateTopic(category, user)) {
@@ -58,23 +59,25 @@ public class TopicService {
     topicRepository.save(topic);
 
     // Add creator as OWNER
-    TopicMember ownerMember = TopicMember.builder()
-        .topic(topic)
-        .user(user)
-        .topicRole(com.graduation.project.forum.constant.TopicRole.OWNER)
-        .approved(true)
-        .joinedAt(LocalDateTime.now())
-        .build();
+    TopicMember ownerMember =
+        TopicMember.builder()
+            .topic(topic)
+            .user(user)
+            .topicRole(com.graduation.project.forum.constant.TopicRole.OWNER)
+            .approved(true)
+            .joinedAt(LocalDateTime.now())
+            .build();
     topicMemberRepository.save(ownerMember);
 
-    ActivityLogDTO activityLogDTO = ActivityLogDTO.from(
-        user.getId(),
-        "CREATE",
-        "FORUM",
-        ResourceType.TOPIC,
-        topic.getId(),
-        "Người dùng " + user.getEmail() + " đã tạo topic mới: " + topic.getTitle(),
-        "127.0.0.1");
+    ActivityLogDTO activityLogDTO =
+        ActivityLogDTO.from(
+            user.getId(),
+            "CREATE",
+            "FORUM",
+            ResourceType.TOPIC,
+            topic.getId(),
+            "Người dùng " + user.getEmail() + " đã tạo topic mới: " + topic.getTitle(),
+            "127.0.0.1");
     publisher.publishEvent(activityLogDTO);
     return topicMapper.toTopicResponse(topic);
   }
@@ -82,9 +85,10 @@ public class TopicService {
   @org.springframework.transaction.annotation.Transactional(readOnly = true)
   public DetailTopicResponse getOneTopic(UUID topicId) {
     User user = currentUserService.getCurrentUserEntity();
-    Topic topic = topicRepository
-        .findById(topicId)
-        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic =
+        topicRepository
+            .findById(topicId)
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     boolean isTopicCreator = authorizationService.isTopicCreator(user, topic);
     boolean isTopicManager = authorizationService.isTopicManager(user, topic);
@@ -97,52 +101,54 @@ public class TopicService {
       requestStatus = membershipOpt.get().isApproved() ? "APPROVED" : "PENDING";
     }
 
-    DetailTopicResponse.CurrentUserContext currentUserContext = DetailTopicResponse.CurrentUserContext
-        .from(isTopicCreator, isTopicMember, isTopicManager, requestStatus);
+    DetailTopicResponse.CurrentUserContext currentUserContext =
+        DetailTopicResponse.CurrentUserContext.from(
+            isTopicCreator, isTopicMember, isTopicManager, requestStatus);
     return DetailTopicResponse.from(topic, currentUserContext);
   }
 
   @org.springframework.transaction.annotation.Transactional(readOnly = true)
   public Page<TopicResponse> searchTopics(SearchTopicRequest request, Pageable pageable) {
-    Specification<Topic> spec = (root, query, cb) -> {
-      List<Predicate> predicates = new ArrayList<>();
-      Join<Object, Object> categoryJoin = root.join("category", JoinType.LEFT);
+    Specification<Topic> spec =
+        (root, query, cb) -> {
+          List<Predicate> predicates = new ArrayList<>();
+          Join<Object, Object> categoryJoin = root.join("category", JoinType.LEFT);
 
-      if (Objects.nonNull(request.getCategoryId())) {
-        predicates.add(cb.equal(categoryJoin.get("id"), request.getCategoryId()));
-      }
+          if (Objects.nonNull(request.getCategoryId())) {
+            predicates.add(cb.equal(categoryJoin.get("id"), request.getCategoryId()));
+          }
 
-      if (Objects.nonNull(request.getKeyword()) && !request.getKeyword().trim().isEmpty()) {
-        String pattern = "%" + request.getKeyword().trim().toLowerCase() + "%";
+          if (Objects.nonNull(request.getKeyword()) && !request.getKeyword().trim().isEmpty()) {
+            String pattern = "%" + request.getKeyword().trim().toLowerCase() + "%";
 
-        Predicate hasTitle = cb.like(cb.lower(root.get("title")), pattern);
-        Predicate hasContent = cb.like(cb.lower(root.get("content")), pattern);
+            Predicate hasTitle = cb.like(cb.lower(root.get("title")), pattern);
+            Predicate hasContent = cb.like(cb.lower(root.get("content")), pattern);
 
-        predicates.add(cb.or(hasTitle, hasContent));
-      }
+            predicates.add(cb.or(hasTitle, hasContent));
+          }
 
-      if (Objects.nonNull(request.getVisibility())) {
-        predicates.add(
-            cb.equal(
-                root.get("visibility").as(TopicVisibility.class), request.getVisibility()));
-      }
+          if (Objects.nonNull(request.getVisibility())) {
+            predicates.add(
+                cb.equal(
+                    root.get("visibility").as(TopicVisibility.class), request.getVisibility()));
+          }
 
-      if (Objects.nonNull(request.getFromDate())) {
-        predicates.add(
-            cb.greaterThanOrEqualTo(
-                root.get("createdAt"), request.getFromDate().atStartOfDay()));
-      }
+          if (Objects.nonNull(request.getFromDate())) {
+            predicates.add(
+                cb.greaterThanOrEqualTo(
+                    root.get("createdAt"), request.getFromDate().atStartOfDay()));
+          }
 
-      if (Objects.nonNull(request.getToDate())) {
-        predicates.add(
-            cb.lessThanOrEqualTo(
-                root.get("createdAt"), request.getToDate().atTime(23, 59, 59)));
-      }
+          if (Objects.nonNull(request.getToDate())) {
+            predicates.add(
+                cb.lessThanOrEqualTo(
+                    root.get("createdAt"), request.getToDate().atTime(23, 59, 59)));
+          }
 
-      Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdAt")));
+          Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdAt")));
 
-      return cb.and(predicates.toArray(new Predicate[0]));
-    };
+          return cb.and(predicates.toArray(new Predicate[0]));
+        };
 
     return topicRepository.findAll(spec, pageable).map(topicMapper::toTopicResponse);
   }
@@ -155,9 +161,10 @@ public class TopicService {
   }
 
   public TopicResponse update(UUID topicId, TopicRequest request) {
-    Topic topic = topicRepository
-        .findById(topicId)
-        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic =
+        topicRepository
+            .findById(topicId)
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canManageTopic(user, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -172,7 +179,8 @@ public class TopicService {
   }
 
   public void delete(UUID id) {
-    Topic topic = topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic =
+        topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.isAdmin(user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -181,7 +189,8 @@ public class TopicService {
   }
 
   public TopicResponse softDelete(UUID id) {
-    Topic topic = topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic =
+        topicRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     User user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canManageTopic(user, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -189,5 +198,11 @@ public class TopicService {
     topic.setDeleted(true);
     topicRepository.save(topic);
     return topicMapper.toTopicResponse(topic);
+  }
+
+  public List<TopicResponse> getTopTopicsByMemberCount() {
+    return topicRepository.findTop10ByOrderByTopicMembersSizeDesc().stream()
+        .map(topicMapper::toTopicResponse)
+        .toList();
   }
 }

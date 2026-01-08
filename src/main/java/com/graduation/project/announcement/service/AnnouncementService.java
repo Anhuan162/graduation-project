@@ -21,14 +21,12 @@ import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
-
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.checkerframework.checker.units.qual.A;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -161,23 +159,24 @@ public class AnnouncementService {
   }
 
   public DetailedAnnouncementResponse getAnnouncement(UUID announcementId) {
-    var announcement =
-        announcementRepository
-            .findById(announcementId)
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+    var announcement = announcementRepository
+        .findById(announcementId)
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
-    List<AnnouncementFileResponse> attachments = fileService
-        .findFileMetadataByResourceTarget(announcementId, ResourceType.ANNOUNCEMENT)
-        .stream()
-        .map(
-            file -> AnnouncementFileResponse.builder()
-                .id(file.getId())
-                .fileName(file.getFileName())
-                .url(file.getUrl())
-                .fileType(file.getContentType())
-                .size(file.getSize())
-                .build())
-        .toList();
+    List<AnnouncementFileResponse> attachments =
+        fileService
+            .findFileMetadataByResourceTarget(announcementId, ResourceType.ANNOUNCEMENT)
+            .stream()
+            .map(
+                file ->
+                    AnnouncementFileResponse.builder()
+                        .id(file.getId())
+                        .fileName(file.getFileName())
+                        .url(file.getUrl())
+                        .fileType(file.getContentType())
+                        .size(file.getSize())
+                        .build())
+            .toList();
 
     return DetailedAnnouncementResponse.from(announcement, attachments);
   }
@@ -185,62 +184,60 @@ public class AnnouncementService {
   @Transactional
   public Page<AnnouncementResponse> searchAnnouncement(
       SearchAnnouncementRequest request, Pageable pageable) {
-    Specification<Announcement> specification =
-        (root, query, cb) -> {
-          List<Predicate> predicates = new ArrayList<>();
+    Specification<Announcement> specification = (root, query, cb) -> {
+      List<Predicate> predicates = new ArrayList<>();
 
-          if (Objects.nonNull(request.getTitle())) {
-            predicates.add(
-                cb.like(root.get("title").as(String.class), "%" + request.getTitle() + "%"));
-          }
+      if (Objects.nonNull(request.getTitle())) {
+        predicates.add(
+            cb.like(root.get("title").as(String.class), "%" + request.getTitle() + "%"));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementType())) {
-            predicates.add(
-                cb.equal(
-                    root.get("announcementType").as(String.class), request.getAnnouncementType()));
-          }
+      if (Objects.nonNull(request.getAnnouncementType())) {
+        predicates.add(
+            cb.equal(
+                root.get("announcementType").as(String.class), request.getAnnouncementType()));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementStatus())) {
-            predicates.add(
-                cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
-          }
+      if (Objects.nonNull(request.getAnnouncementStatus())) {
+        predicates.add(
+            cb.equal(root.get("announcementStatus"), request.getAnnouncementStatus()));
+      }
 
-          if (Objects.nonNull(request.getOnDrive())) {
-            predicates.add(
-                cb.equal(root.get("onDrive"), request.getOnDrive()));
-          }
+      if (Objects.nonNull(request.getOnDrive())) {
+        predicates.add(
+            cb.equal(root.get("onDrive"), request.getOnDrive()));
+      }
 
-          if (Objects.nonNull(request.getAnnouncementProvider())) {
-            predicates.add(
-                cb.equal(root.get("announcementProvider"), request.getAnnouncementProvider()));
-          }
+      if (Objects.nonNull(request.getAnnouncementProvider())) {
+        predicates.add(
+            cb.equal(root.get("announcementProvider"), request.getAnnouncementProvider()));
+      }
 
-          if (Objects.nonNull(request.getFromDate())) {
-            predicates.add(
-                cb.greaterThanOrEqualTo(
-                    root.get("createdDate"), request.getFromDate().atStartOfDay()));
-          }
+      if (Objects.nonNull(request.getFromDate())) {
+        predicates.add(
+            cb.greaterThanOrEqualTo(
+                root.get("createdDate"), request.getFromDate().atStartOfDay()));
+      }
 
-          if (Objects.nonNull(request.getToDate())) {
-            predicates.add(
-                cb.lessThanOrEqualTo(
-                    root.get("createdDate"), request.getToDate().atTime(23, 59, 59)));
-          }
+      if (Objects.nonNull(request.getToDate())) {
+        predicates.add(
+            cb.lessThanOrEqualTo(
+                root.get("createdDate"), request.getToDate().atTime(23, 59, 59)));
+      }
 
-          Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDate")));
+      Objects.requireNonNull(query).orderBy(cb.desc(root.get("createdDate")));
 
-          return cb.and(predicates.toArray(new Predicate[0]));
-        };
+      return cb.and(predicates.toArray(new Predicate[0]));
+    };
 
     Page<Announcement> announcementPage = announcementRepository.findAll(specification, pageable);
     return announcementPage.map(AnnouncementResponse::from);
   }
 
   public void deleteAnnouncement(String announcementId) {
-    Announcement announcement =
-        announcementRepository
-            .findById(UUID.fromString(announcementId))
-            .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
+    Announcement announcement = announcementRepository
+        .findById(UUID.fromString(announcementId))
+        .orElseThrow(() -> new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND));
 
     announcementRepository.delete(announcement);
   }
@@ -248,8 +245,7 @@ public class AnnouncementService {
   @Transactional
   public Page<AnnouncementResponse> searchActiveAnnouncements(
       SearchActiveAnnouncementRequest request, Pageable pageable) {
-    Page<Announcement> announcementPage =
-        announcementRepository.findAllActiveAnnouncements(request, pageable);
+    Page<Announcement> announcementPage = announcementRepository.findAllActiveAnnouncements(request, pageable);
     return announcementPage.map(announcementMapper::toResponse);
   }
 
@@ -261,12 +257,26 @@ public class AnnouncementService {
       throw new AppException(ErrorCode.UUID_IS_INVALID);
     }
     Optional<Announcement> announcement = announcementRepository.findById(id);
-    if (announcement.isEmpty()){
+    if (announcement.isEmpty()) {
       throw new AppException(ErrorCode.ANNOUNCEMENT_NOT_FOUND);
     }
-    FileResponse fileResponse = driveService.uploadTextToDrive(announcement.get().getTitle(), announcement.get().getContent());
+
+    // Upload attachments
+    List<FileMetadata> attachments = fileService.findFileMetadataByResourceTarget(id, ResourceType.ANNOUNCEMENT);
+    for (FileMetadata attachment : attachments) {
+      fileService.uploadFileMetadataToDrive(attachment);
+      attachment.setOnDrive(true);
+    }
+
+    FileResponse fileResponse = driveService.uploadTextToDrive(announcement.get().getTitle(),
+        announcement.get().getContent());
     announcement.get().setOnDrive(true);
     announcementRepository.save(announcement.get());
     return fileResponse;
+  }
+
+  public List<AnnouncementResponse> getLatestAnnouncements() {
+    List<Announcement> announcements = announcementRepository.findTop10ByOrderByCreatedDateDesc();
+    return announcements.stream().map(AnnouncementResponse::from).toList();
   }
 }

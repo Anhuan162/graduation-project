@@ -32,14 +32,15 @@ public class Subject {
   @OneToMany(mappedBy = "subject", cascade = CascadeType.ALL, orphanRemoval = true)
   List<Document> documents;
 
-//  ThieuNN
+  // ThieuNN
   public SubjectResponse toSubjectResponse() {
     return SubjectResponse.builder()
-            .id(this.id)
-            .subjectName(this.subjectName)
-            .subjectCode(this.subjectCode)
-            .description(this.description)
-            .createdDate(this.createdDate)
-            .lastModifiedDate(this.lastModifiedDate).build();
+        .id(this.id)
+        .subjectName(this.subjectName)
+        .subjectCode(this.subjectCode)
+        .credit(this.credit)
+        .description(this.description)
+        .createdDate(this.createdDate)
+        .lastModifiedDate(this.lastModifiedDate).build();
   }
 }

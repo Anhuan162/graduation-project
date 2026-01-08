@@ -57,24 +57,28 @@ public class Post {
   @Column(name = "reaction_count")
   private Long reactionCount = 0L;
 
-  @Builder.Default private Boolean deleted = Boolean.FALSE;
-  //  @ManyToMany
-  //  @JoinTable(
-  //      name = "post_tags",
-  //      joinColumns = @JoinColumn(name = "post_id"),
-  //      inverseJoinColumns = @JoinColumn(name = "tag_id"))
-  //  private Set<Tag> tags = new HashSet<>();
+  @Builder.Default
+  private Boolean deleted = Boolean.FALSE;
+  // @ManyToMany
+  // @JoinTable(
+  // name = "post_tags",
+  // joinColumns = @JoinColumn(name = "post_id"),
+  // inverseJoinColumns = @JoinColumn(name = "tag_id"))
+  // private Set<Tag> tags = new HashSet<>();
 
   public PostAcceptedResonse toPostAcceptedResonse() {
     return PostAcceptedResonse.builder()
-            .title(this.title)
-            .postId(this.id)
-            .content(this.content)
-            .comments(this.comments.stream().map(comment -> {
-              return CommentAcceptedResponse.builder()
-                      .id(comment.getId())
-                      .content(comment.getContent()).build();
-            }).toList())
-            .build();
+        .title(this.title)
+        .postId(this.id)
+        .content(this.content)
+        .authorName(this.author != null ? this.author.getFullName() : "Unknown")
+        .comments(this.comments.stream().map(comment -> {
+          return CommentAcceptedResponse.builder()
+              .commentId(comment.getId())
+              .content(comment.getContent())
+              .authorName(comment.getAuthor() != null ? comment.getAuthor().getFullName() : "Unknown")
+              .build();
+        }).toList())
+        .build();
   }
 }

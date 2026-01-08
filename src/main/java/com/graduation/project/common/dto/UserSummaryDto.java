@@ -15,4 +15,5 @@ public class UserSummaryDto {
     String avatarUrl;
     String studentCode;
     String classCode;
+    String email;
 }

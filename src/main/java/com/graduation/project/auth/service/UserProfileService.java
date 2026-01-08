@@ -111,7 +111,7 @@ public class UserProfileService {
                 .id(principal.getId().toString())
                 .email(principal.getEmail())
                 .fullName(user.getFullName())
-                .avatar(user.getAvatarUrl() != null ? user.getAvatarUrl() : principal.getAvatar())
+                .avatarUrl(user.getAvatarUrl())
                 .permissions(getUserPermissionsFromPrincipal(principal))
                 .phone(user.getPhone())
                 .studentCode(user.getStudentCode())

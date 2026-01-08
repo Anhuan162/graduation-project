@@ -1,5 +1,6 @@
 package com.graduation.project.forum.dto;
 
+import com.graduation.project.forum.constant.SyncStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,4 +15,5 @@ public class PostAcceptedFilterRequest {
     private String title;
     private UUID topicId;
     private Integer reactionCount;
+    private SyncStatus syncStatus;
 }

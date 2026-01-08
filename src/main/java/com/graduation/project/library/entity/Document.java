@@ -30,7 +30,7 @@ public class Document {
   @JoinColumn(name = "subject_id")
   private Subject subject;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "uploaded_by")
   private User uploadedBy;
 

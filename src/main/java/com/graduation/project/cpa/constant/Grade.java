@@ -28,7 +28,8 @@ public enum Grade {
       if (Objects.isNull(letter)) {
         return null;
       }
-      return Grade.valueOf(letter.toUpperCase()).getScore();
+      String normalized = letter.toUpperCase().replace("+", "_PLUS");
+      return Grade.valueOf(normalized).getScore();
     } catch (IllegalArgumentException e) {
       return 0.0;
     }

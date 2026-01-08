@@ -70,4 +70,11 @@ public class TopicController {
         .result(topicService.getByCategory(categoryId, pageable))
         .build();
   }
+
+  @GetMapping("/dashboard/top-members")
+  public ApiResponse<java.util.List<TopicResponse>> getTopTopicsByMemberCount() {
+    return ApiResponse.<java.util.List<TopicResponse>>builder()
+        .result(topicService.getTopTopicsByMemberCount())
+        .build();
+  }
 }

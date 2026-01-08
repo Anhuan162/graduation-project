@@ -19,7 +19,7 @@ public class FirebaseService {
   /**
    * Upload a file to Firebase Cloud Storage
    *
-   * @param file MultipartFile from client
+   * @param file       MultipartFile from client
    * @param folderName folder in storage (optional, e.g., "images/")
    * @return uploaded file name
    * @throws IOException
@@ -39,11 +39,11 @@ public class FirebaseService {
     Bucket bucket = StorageClient.getInstance().bucket();
     Blob blob = bucket.get(fileName);
 
-    if (blob == null) return null;
+    if (blob == null)
+      return null;
 
     // Lấy metadata token hiện tại
-    String token =
-        blob.getMetadata() != null ? blob.getMetadata().get("firebaseStorageDownloadTokens") : null;
+    String token = blob.getMetadata() != null ? blob.getMetadata().get("firebaseStorageDownloadTokens") : null;
 
     // Nếu chưa có token, tạo mới
     if (token == null || token.isEmpty()) {
@@ -68,7 +68,8 @@ public class FirebaseService {
   public String getSignedFileUrl(String fileName, long durationMinutes) {
     Bucket bucket = StorageClient.getInstance().bucket();
     Blob blob = bucket.get(fileName);
-    if (blob == null) return null;
+    if (blob == null)
+      return null;
 
     URL signedUrl = blob.signUrl(durationMinutes, TimeUnit.MINUTES);
     return signedUrl.toString();
@@ -104,5 +105,12 @@ public class FirebaseService {
     }
   }
 
+  public byte[] downloadFile(String fileName) {
+    Bucket bucket = StorageClient.getInstance().bucket();
+    Blob blob = bucket.get(fileName);
+    if (blob == null)
+      return null;
+    return blob.getContent();
+  }
 
 }

@@ -23,12 +23,20 @@ public class GpaProfileService {
   private final GpaProfileRepository gpaProfileRepository;
 
   private final GradeSubjectAverageProfileService gradeSubjectAverageProfileService;
+  private final com.graduation.project.library.repository.SemesterRepository semesterRepository;
 
   public GpaProfile addGpaProfile(String studentCode, int semesterId, CpaProfile cpaProfile) {
     String gpaProfileCode = "GPA" + studentCode + semesterId;
-    String cohortCode = "D" + studentCode.substring(1, 3);
-    String facultyCode = studentCode.substring(5, 7);
-    GpaProfile gpaProfile = GpaProfile.builder().gpaProfileCode(gpaProfileCode).build();
+    // String cohortCode = "D" + studentCode.substring(1, 3);
+    // String facultyCode = studentCode.substring(5, 7);
+
+    com.graduation.project.library.entity.Semester semester = semesterRepository.findById(semesterId)
+        .orElseThrow(() -> new AppException(ErrorCode.SEMESTER_NOT_FOUND));
+
+    GpaProfile gpaProfile = GpaProfile.builder()
+        .gpaProfileCode(gpaProfileCode)
+        .semester(semester)
+        .build();
 
     // Don't create default Subject Scores list
     // List<GradeSubjectAverageProfile> gradeSubjectAverageProfiles =
@@ -52,14 +60,14 @@ public class GpaProfileService {
       if (itemRequest.getId() == null) {
         // New Subject
         GradeSubjectAverageProfile score = gradeSubjectAverageProfileService
-            .updateGradeAverageScoreProfile(itemRequest);
+            .updateGradeAverageScoreProfile(itemRequest, gpaProfile);
         score.setGpaProfile(gpaProfile);
         if (!gpaProfile.getGradeSubjectAverageProfiles().contains(score)) {
           gpaProfile.getGradeSubjectAverageProfiles().add(score);
         }
       } else {
         // Existing Subject
-        gradeSubjectAverageProfileService.updateGradeAverageScoreProfile(itemRequest);
+        gradeSubjectAverageProfileService.updateGradeAverageScoreProfile(itemRequest, gpaProfile);
       }
     }
 

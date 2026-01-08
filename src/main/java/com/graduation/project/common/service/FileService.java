@@ -40,11 +40,11 @@ public class FileService {
   private final DriveService driveService;
 
   public FileService(
-          FirebaseService firebaseService,
-          FileMetadataRepository fileMetadataRepository,
-          CurrentUserService currentUserService,
-          FileMetadataMapper fileMetadataMapper,
-          FileMetadataPermissionHandler fileMetadataPermissionHandler, DriveService driveService) {
+      FirebaseService firebaseService,
+      FileMetadataRepository fileMetadataRepository,
+      CurrentUserService currentUserService,
+      FileMetadataMapper fileMetadataMapper,
+      FileMetadataPermissionHandler fileMetadataPermissionHandler, DriveService driveService) {
     this.firebaseService = firebaseService;
     this.fileMetadataRepository = fileMetadataRepository;
     this.currentUserService = currentUserService;
@@ -55,33 +55,33 @@ public class FileService {
 
   public FileMetadataResponse uploadAndSaveFile(
       MultipartFile file,
-      String folderName,
       AccessType accessType,
       String resourceType,
       String resourceId)
       throws IOException {
-    // Upload file lên Firebase Storage
+    // Determine folder from ResourceType
+    ResourceType type = ResourceType.valueOf(resourceType);
+    String folderName = type.getFolderName();
+
     String fileName = firebaseService.uploadFile(file, folderName);
     User currentUser = currentUserService.getCurrentUserEntity();
 
-    String url =
-        AccessType.PUBLIC.equals(accessType)
-            ? firebaseService.getPublicUrl(folderName + fileName)
-            : null;
+    String url = AccessType.PUBLIC.equals(accessType)
+        ? firebaseService.getPublicUrl(folderName + fileName)
+        : null;
 
     // Lưu metadata vào DB
-    FileMetadata metadata =
-        FileMetadata.builder()
-            .user(currentUser)
-            .fileName(fileName)
-            .folder(folderName)
-            .url(url)
-            .contentType(file.getContentType())
-            .accessType(accessType)
-            .resourceType(Objects.isNull(resourceType) ? null : ResourceType.valueOf(resourceType))
-            .resourceId(Objects.isNull(resourceId) ? null : UUID.fromString(resourceId))
-            .createdAt(LocalDateTime.now())
-            .build();
+    FileMetadata metadata = FileMetadata.builder()
+        .user(currentUser)
+        .fileName(fileName)
+        .folder(folderName)
+        .url(url)
+        .contentType(file.getContentType())
+        .accessType(accessType)
+        .resourceType(Objects.isNull(resourceType) ? null : ResourceType.valueOf(resourceType))
+        .resourceId(Objects.isNull(resourceId) ? null : UUID.fromString(resourceId))
+        .createdAt(LocalDateTime.now())
+        .build();
     fileMetadataRepository.save(metadata);
     return fileMetadataMapper.toFileMetadataResponse(metadata);
   }
@@ -92,10 +92,9 @@ public class FileService {
   }
 
   public FileMetadataResponse replaceFile(UUID fileId, MultipartFile newFile) throws IOException {
-    FileMetadata oldMetadata =
-        fileMetadataRepository
-            .findById(fileId)
-            .orElseThrow(() -> new RuntimeException("File not found"));
+    FileMetadata oldMetadata = fileMetadataRepository
+        .findById(fileId)
+        .orElseThrow(() -> new RuntimeException("File not found"));
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (!fileMetadataPermissionHandler.hasPermission(auth, oldMetadata, "UPDATE")) {
       throw new AccessDeniedException("No permission to update this file");
@@ -110,10 +109,9 @@ public class FileService {
     firebaseService.deleteFile(oldMetadata.getFileName());
     String newFileName = firebaseService.uploadFile(newFile, oldMetadata.getFolder());
 
-    String newUrl =
-        oldMetadata.getAccessType() == AccessType.PUBLIC
-            ? firebaseService.getPublicUrl(oldMetadata.getFolder() + newFileName)
-            : null;
+    String newUrl = oldMetadata.getAccessType() == AccessType.PUBLIC
+        ? firebaseService.getPublicUrl(oldMetadata.getFolder() + newFileName)
+        : null;
 
     oldMetadata.setFileName(newFileName);
     oldMetadata.setUrl(newUrl);
@@ -130,10 +128,10 @@ public class FileService {
   }
 
   public List<FileMetadataResponse> uploadMultipleFiles(
-      List<MultipartFile> files, String folderName) throws IOException {
+      List<MultipartFile> files) throws IOException {
     List<FileMetadataResponse> responses = new ArrayList<>();
     for (MultipartFile file : files) {
-      FileMetadataResponse res = uploadAndSaveFile(file, folderName, AccessType.PUBLIC, null, null);
+      FileMetadataResponse res = uploadAndSaveFile(file, AccessType.PUBLIC, ResourceType.FILE.name(), null);
       responses.add(res);
     }
     return responses;
@@ -168,10 +166,9 @@ public class FileService {
   }
 
   public void deleteFile(UUID fileId) {
-    FileMetadata metadata =
-        fileMetadataRepository
-            .findById(fileId)
-            .orElseThrow(() -> new RuntimeException("File not found"));
+    FileMetadata metadata = fileMetadataRepository
+        .findById(fileId)
+        .orElseThrow(() -> new RuntimeException("File not found"));
     User user = currentUserService.getCurrentUserEntity();
     if (!user.getId().equals(metadata.getUser().getId())) {
       throw new AccessDeniedException("No permission to delete this file");
@@ -212,48 +209,89 @@ public class FileService {
 
   public Page<FileMetadataResponse> searchFiles(
       SearchFileRequest searchFileRequest, Pageable pageable) {
-    Page<FileMetadata> fileMetadataPage =
-        fileMetadataRepository.searchFiles(searchFileRequest, pageable);
+    // 1. Validate Folder & ResourceType
+    if (searchFileRequest.getResourceType() != null && searchFileRequest.getFolder() != null) {
+      String expectedFolder = searchFileRequest.getResourceType().getFolderName();
+      if (!expectedFolder.equals(searchFileRequest.getFolder())
+          && !searchFileRequest.getFolder().startsWith(expectedFolder)) {
+        throw new AppException(ErrorCode.INVALID_REQUEST);
+      }
+    }
+
+    // 2. Validate ANNOUNCEMENT/CRAWL specific logic if needed
+    // Example: If strict mode is required to prevent traversing other folders
+
+    Page<FileMetadata> fileMetadataPage = fileMetadataRepository.searchFiles(searchFileRequest, pageable);
     return fileMetadataPage.map(fileMetadataMapper::toFileMetadataResponse);
   }
 
   public FileResponse uploadToDrive(FileMetadataSelected fileMetadataSelected) throws IOException {
 
-
     UUID fileId = UUID.fromString(fileMetadataSelected.getFileId());
 
-    Optional<FileMetadata> fileMetadata =  fileMetadataRepository.findById(fileId);
-    if (fileMetadata.isEmpty()){
+    Optional<FileMetadata> fileMetadata = fileMetadataRepository.findById(fileId);
+    if (fileMetadata.isEmpty()) {
       throw new AppException(ErrorCode.FILE_NOT_FOUND);
     }
-//    if (!fileMetadata.get().getUrl().equals(fileMetadataSelected.getUrl())){
-//      throw new AppException(ErrorCode.URL_NOT_MATCH);
-//    }
-//    if (fileMetadata.get().getFolder() == null ) {
-//      throw new AppException(ErrorCode.FILE_MUST_UPLOAD_TO_FIRE_BASE_FIRST);
-//    }
+    // if (!fileMetadata.get().getUrl().equals(fileMetadataSelected.getUrl())){
+    // throw new AppException(ErrorCode.URL_NOT_MATCH);
+    // }
+    // if (fileMetadata.get().getFolder() == null ) {
+    // throw new AppException(ErrorCode.FILE_MUST_UPLOAD_TO_FIRE_BASE_FIRST);
+    // }
 
     fileMetadata.get().setOnDrive(true);
-    String fileUrlFromDb = fileMetadata.get().getUrl();
-    String fileUrl = fileMetadata.get().getUrl();
-    // 1. Download file từ Firebase Storage URL
-    RestTemplate rest = new RestTemplate();
-    ResponseEntity<byte[]> response = rest.getForEntity(fileUrl, byte[].class);
-
-    if (!response.getStatusCode().is2xxSuccessful()) {
-      throw new IOException("Không tải được file từ Firebase URL");
-    }
-
-    byte[] fileBytes = response.getBody();
-    String fileName = extractFileName(fileUrl);
-    String contentType = URLConnection.guessContentTypeFromName(fileName);
-
-    FileResponse fileResponse = driveService.uploadFile(fileBytes, fileName, contentType);
-//    fileMetadataRepository.save(fileMetadata.get());
+    FileResponse fileResponse = uploadFileMetadataToDrive(fileMetadata.get());
+    fileMetadataRepository.save(fileMetadata.get());
     return fileResponse;
   }
 
+  public FileResponse uploadFileMetadataToDrive(FileMetadata fileMetadata) {
+    String fileUrl = fileMetadata.getUrl();
+    String fileName = extractFileName(fileUrl);
+    String contentType = URLConnection.guessContentTypeFromName(fileName);
+
+    // [CASE 1] Internal File (Stored in Firebase)
+    // If folder is present, it's definitely an internal file managed by us.
+    // We should use FirebaseService to download directly (bypassing public URL /
+    // token issues)
+    if (fileMetadata.getFolder() != null && !fileMetadata.getFolder().isEmpty()) {
+      try {
+        String fullPath = fileMetadata.getFolder() + fileMetadata.getFileName();
+        byte[] content = firebaseService.downloadFile(fullPath);
+        return driveService.uploadFile(content, fileMetadata.getFileName(), contentType);
+      } catch (Exception e) {
+        // Fallback or Log
+        // If Firebase download fails, we might try public URL, but usually if SDK
+        // fails, public URL also fails.
+        throw new RuntimeException("Failed to download internal file from Firebase: " + e.getMessage(), e);
+      }
+    }
+
+    // [CASE 2] External File (Crawled from other sites)
+    // Use RestTemplate with User-Agent to avoid 403 Forbidden
+    RestTemplate rest = new RestTemplate();
+    return rest.execute(
+        fileUrl,
+        org.springframework.http.HttpMethod.GET,
+        requestCallback -> {
+          requestCallback
+              .getHeaders()
+              .add(
+                  "User-Agent",
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+        },
+        clientHttpResponse -> {
+          return driveService.uploadFile(clientHttpResponse.getBody(), fileName, contentType);
+        });
+  }
+
   private String extractFileName(String url) {
-    return url.substring(url.lastIndexOf('/') + 1).split("\\?")[0];
+    try {
+      String decoded = java.net.URLDecoder.decode(url, java.nio.charset.StandardCharsets.UTF_8);
+      return decoded.substring(decoded.lastIndexOf('/') + 1).split("\\?")[0];
+    } catch (Exception e) {
+      return url.substring(url.lastIndexOf('/') + 1).split("\\?")[0];
+    }
   }
 }

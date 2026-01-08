@@ -23,7 +23,9 @@ public class UpdatedAnnouncementRequest {
   String announcementType;
   List<UUID> facultyIds;
   List<String> classCodes;
+
   List<CohortCode> schoolYearCodes;
+  List<UUID> fileMetadataIds;
 
   public static Announcement toAnnouncement(UpdatedAnnouncementRequest request, User user) {
     return Announcement.builder()

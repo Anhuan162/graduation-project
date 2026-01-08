@@ -14,6 +14,7 @@ public class CommentWithReplyCountResponse {
       UUID authorId,
       String authorName,
       String authorAvatarUrl,
+      String authorEmail,
       LocalDateTime createdDateTime,
       Long repliesCount,
       String url,
@@ -25,6 +26,7 @@ public class CommentWithReplyCountResponse {
         .id(authorId)
         .fullName(authorName)
         .avatarUrl(authorAvatarUrl)
+        .email(authorEmail)
         .build();
     this.createdDateTime = createdDateTime;
     this.repliesCount = repliesCount;

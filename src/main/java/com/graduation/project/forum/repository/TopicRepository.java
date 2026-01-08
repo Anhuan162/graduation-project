@@ -13,4 +13,8 @@ public interface TopicRepository extends JpaRepository<Topic, UUID> {
   Page<Topic> findByCategoryIdAndDeletedIsFalse(UUID categoryId, Pageable pageable);
 
   Page<Topic> findAll(Specification<Topic> spec, Pageable pageable);
+
+  @org.springframework.data.jpa.repository.Query(
+      "SELECT t FROM Topic t LEFT JOIN t.topicMembers m GROUP BY t ORDER BY COUNT(m) DESC")
+  java.util.List<Topic> findTop10ByOrderByTopicMembersSizeDesc();
 }

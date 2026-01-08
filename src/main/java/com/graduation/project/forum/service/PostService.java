@@ -2,6 +2,7 @@ package com.graduation.project.forum.service;
 
 import com.graduation.project.auth.repository.FileMetadataRepository;
 import com.graduation.project.auth.service.CurrentUserService;
+import com.graduation.project.common.constant.AccessType;
 import com.graduation.project.common.constant.ResourceType;
 import com.graduation.project.common.dto.FileMetadataResponse;
 import com.graduation.project.common.dto.FileResponse;
@@ -11,8 +12,12 @@ import com.graduation.project.common.mapper.FileMetadataMapper;
 import com.graduation.project.common.service.DriveService;
 import com.graduation.project.common.service.FileService;
 import com.graduation.project.forum.constant.PostStatus;
+import com.graduation.project.forum.constant.SyncStatus;
 import com.graduation.project.forum.constant.TargetType;
 import com.graduation.project.forum.dto.*;
+import com.graduation.project.forum.dto.PostAcceptedFilterRequest;
+import com.graduation.project.forum.dto.PostAcceptedResonse;
+import com.graduation.project.forum.entity.Comment;
 import com.graduation.project.forum.entity.Post;
 import com.graduation.project.forum.entity.Reaction;
 import com.graduation.project.forum.entity.Topic;
@@ -20,29 +25,28 @@ import com.graduation.project.forum.mapper.PostMapper;
 import com.graduation.project.forum.repository.PostRepository;
 import com.graduation.project.forum.repository.ReactionRepository;
 import com.graduation.project.forum.repository.TopicRepository;
-import com.graduation.project.forum.dto.PostAcceptedFilterRequest;
-import com.graduation.project.forum.dto.PostAcceptedResonse;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.persistence.criteria.Predicate;
-import jakarta.transaction.Transactional;
-
-import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PostService {
 
   private final PostRepository postRepository;
@@ -59,9 +63,10 @@ public class PostService {
 
   @Transactional
   public PostResponse createPost(UUID topicId, PostRequest request) {
-    Topic topic = topicRepository
-        .findById(topicId)
-        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic =
+        topicRepository
+            .findById(topicId)
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canCreatePost(topic, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -70,19 +75,21 @@ public class PostService {
     Post post = postMapper.toPost(request, topic, user);
     Post save = postRepository.save(post);
 
-    List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
-        request.getFileMetadataIds(), save.getId(), ResourceType.POST, user.getId());
-    List<FileMetadataResponse> attachments = fileMetadataList.stream()
-        .map(fileMetadataMapper::toFileMetadataResponse)
-        .toList();
+    List<FileMetadata> fileMetadataList =
+        fileService.updateFileMetadataList(
+            request.getFileMetadataIds(), save.getId(), ResourceType.POST, user.getId());
+    List<FileMetadataResponse> attachments =
+        fileMetadataList.stream().map(fileMetadataMapper::toFileMetadataResponse).toList();
 
     CreatedPostEvent event = CreatedPostEvent.from(post);
     publisher.publishEvent(event);
     return postMapper.toPostResponse(post, attachments, false);
   }
 
+  @Transactional(readOnly = true)
   public PostResponse getOne(UUID id) {
-    Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post =
+        postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     var userOpt = currentUserService.getCurrentUserEntityOptional();
     User user = userOpt.orElse(null);
 
@@ -105,59 +112,65 @@ public class PostService {
     return postMapper.toPostResponse(post, attachments, isLiked);
   }
 
+  @Transactional(readOnly = true)
   public Page<PostResponse> searchPosts(SearchPostRequest request, Pageable pageable) {
-    Specification<Post> spec = (root, query, criteriaBuilder) -> {
-      List<Predicate> predicates = new ArrayList<>();
+    Specification<Post> spec =
+        (root, query, criteriaBuilder) -> {
+          List<Predicate> predicates = new ArrayList<>();
 
-      if (StringUtils.hasText(request.getTitle())) {
-        String searchKey = "%" + request.getTitle().toLowerCase() + "%";
-        predicates.add(
-            criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), searchKey));
-      }
+          if (StringUtils.hasText(request.getTitle())) {
+            String searchKey = "%" + request.getTitle().toLowerCase() + "%";
+            predicates.add(
+                criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), searchKey));
+          }
 
-      if (request.getPostStatus() != null) {
-        predicates.add(criteriaBuilder.equal(root.get("postStatus"), request.getPostStatus()));
-      }
+          if (request.getPostStatus() != null) {
+            predicates.add(criteriaBuilder.equal(root.get("postStatus"), request.getPostStatus()));
+          }
 
-      if (StringUtils.hasText(request.getTopicId())) {
-        predicates.add(criteriaBuilder.equal(root.get("topicId"), request.getTopicId()));
-      }
+          if (StringUtils.hasText(request.getTopicId())) {
+            predicates.add(criteriaBuilder.equal(root.get("topicId"), request.getTopicId()));
+          }
 
-      if (request.getAuthorId() != null) {
-        predicates.add(criteriaBuilder.equal(root.get("authorId"), request.getAuthorId()));
-      }
+          if (request.getAuthorId() != null) {
+            predicates.add(criteriaBuilder.equal(root.get("authorId"), request.getAuthorId()));
+          }
 
-      predicates.add(criteriaBuilder.equal(root.get("deleted"), request.getDeleted()));
+          predicates.add(criteriaBuilder.equal(root.get("deleted"), request.getDeleted()));
 
-      if (request.getFromDate() != null) {
-        predicates.add(
-            criteriaBuilder.greaterThanOrEqualTo(
-                root.get("createdDateTime"), request.getFromDate()));
-      }
-      if (request.getToDate() != null) {
-        predicates.add(
-            criteriaBuilder.lessThanOrEqualTo(
-                root.get("createdDateTime"), request.getToDate()));
-      }
+          if (request.getFromDate() != null) {
+            predicates.add(
+                criteriaBuilder.greaterThanOrEqualTo(
+                    root.get("createdDateTime"), request.getFromDate()));
+          }
+          if (request.getToDate() != null) {
+            predicates.add(
+                criteriaBuilder.lessThanOrEqualTo(
+                    root.get("createdDateTime"), request.getToDate()));
+          }
 
-      return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
-    };
+          return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
 
     Page<Post> posts = postRepository.findAll(spec, pageable);
     User currentUser = currentUserService.getCurrentUserEntity();
     Map<UUID, List<FileMetadataResponse>> filesMap = mapPostWithFileMetadata(posts);
     Map<UUID, Boolean> likedMap = mapPostWithUserLiked(posts, currentUser.getId());
 
-    return posts.map(post -> postMapper.toPostResponse(
-        post,
-        filesMap.getOrDefault(post.getId(), List.of()),
-        likedMap.getOrDefault(post.getId(), false)));
+    return posts.map(
+        post ->
+            postMapper.toPostResponse(
+                post,
+                filesMap.getOrDefault(post.getId(), List.of()),
+                likedMap.getOrDefault(post.getId(), false)));
   }
 
+  @Transactional(readOnly = true)
   public Page<DetailPostResponse> getPostsByTopic(UUID topicId, Pageable pageable) {
-    Topic topic = topicRepository
-        .findById(topicId)
-        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic =
+        topicRepository
+            .findById(topicId)
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
     if (!authorizationService.canViewTopic(topic, user)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -182,23 +195,27 @@ public class PostService {
       return Page.empty(pageable);
     }
     Map<UUID, List<FileMetadataResponse>> filesMap = mapPostWithFileMetadata(postPage);
-    Map<UUID, Boolean> likedMap = user != null
-        ? mapPostWithUserLiked(postPage, user.getId())
-        : Collections.emptyMap();
+    Map<UUID, Boolean> likedMap =
+        user != null ? mapPostWithUserLiked(postPage, user.getId()) : Collections.emptyMap();
 
     boolean canManageTopic = authorizationService.canManageTopic(user, topic);
 
     return postPage.map(
         post -> {
           boolean isPostCreator = authorizationService.isPostCreator(post, user);
-          return DetailPostResponse.from(post, filesMap, canManageTopic, isPostCreator,
+          return DetailPostResponse.from(
+              post,
+              filesMap,
+              canManageTopic,
+              isPostCreator,
               likedMap.getOrDefault(post.getId(), false));
         });
   }
 
   @Transactional
   public PostResponse update(UUID id, PostRequest request) {
-    Post post = postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post =
+        postRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.isPostCreator(post, user)) {
@@ -213,19 +230,37 @@ public class PostService {
     post.setTitle(request.getTitle());
     post.setContent(request.getContent());
     postRepository.save(post);
-    List<FileMetadata> fileMetadataList = fileService.updateFileMetadataList(
-        request.getFileMetadataIds(), post.getId(), ResourceType.POST, user.getId());
-    List<FileMetadataResponse> attachments = fileMetadataList.stream()
-        .map(fileMetadataMapper::toFileMetadataResponse)
-        .toList();
+
+    // Filter and delete removed files
+    List<FileMetadata> currentFiles =
+        fileService.findFileMetadataByResourceTarget(post.getId(), ResourceType.POST);
+    Set<UUID> newFileIds =
+        request.getFileMetadataIds() == null
+            ? new HashSet<>()
+            : new HashSet<>(request.getFileMetadataIds());
+
+    for (FileMetadata file : currentFiles) {
+      if (!newFileIds.contains(file.getId())) {
+        if (file.getUser().getId().equals(user.getId())) {
+          fileService.deleteFile(file.getId());
+        }
+      }
+    }
+
+    List<FileMetadata> fileMetadataList =
+        fileService.updateFileMetadataList(
+            request.getFileMetadataIds(), post.getId(), ResourceType.POST, user.getId());
+    List<FileMetadataResponse> attachments =
+        fileMetadataList.stream().map(fileMetadataMapper::toFileMetadataResponse).toList();
     Boolean isLiked = checkUserLiked(user.getId(), post.getId());
     return postMapper.toPostResponse(post, attachments, isLiked);
   }
 
   public void delete(String id) {
-    Post post = postRepository
-        .findById(UUID.fromString(id))
-        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post =
+        postRepository
+            .findById(UUID.fromString(id))
+            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.isAdmin(user)) {
@@ -236,9 +271,10 @@ public class PostService {
   }
 
   public PostResponse softDelete(String id) {
-    Post post = postRepository
-        .findById(UUID.fromString(id))
-        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post =
+        postRepository
+            .findById(UUID.fromString(id))
+            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
     var user = currentUserService.getCurrentUserEntity();
 
     if (!authorizationService.canSoftDeletePost(post, user)) {
@@ -252,9 +288,10 @@ public class PostService {
 
   @Transactional
   public PostResponse upgradePostStatus(UUID postId, PostStatus postStatus) {
-    Post post = postRepository
-        .findById(postId)
-        .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
+    Post post =
+        postRepository
+            .findById(postId)
+            .orElseThrow(() -> new AppException(ErrorCode.POST_NOT_FOUND));
 
     User currentUser = currentUserService.getCurrentUserEntity();
 
@@ -277,9 +314,10 @@ public class PostService {
   @Transactional
   public Page<PostResponse> searchPostsByTopic(
       UUID topicId, PostStatus postStatus, Pageable pageable) {
-    Topic topic = topicRepository
-        .findById(topicId)
-        .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
+    Topic topic =
+        topicRepository
+            .findById(topicId)
+            .orElseThrow(() -> new AppException(ErrorCode.TOPIC_NOT_FOUND));
 
     User user = currentUserService.getCurrentUserEntity();
 
@@ -292,7 +330,7 @@ public class PostService {
         .map(post -> postMapper.toPostResponse(post, List.of(), false));
   }
 
-  @Transactional
+  @Transactional(readOnly = true)
   public Page<PostResponse> getPostsByUserId(UUID userId, Pageable pageable) {
     Page<Post> postPage = postRepository.findAllByAuthor_Id(userId, pageable);
     if (postPage.isEmpty()) {
@@ -301,13 +339,15 @@ public class PostService {
 
     Map<UUID, List<FileMetadataResponse>> filesMap = mapPostWithFileMetadata(postPage);
     Map<UUID, Boolean> likedMap = mapPostWithUserLiked(postPage, userId);
-    return postPage.map(post -> postMapper.toPostResponse(
-        post,
-        filesMap.getOrDefault(post.getId(), List.of()),
-        likedMap.getOrDefault(post.getId(), false)));
+    return postPage.map(
+        post ->
+            postMapper.toPostResponse(
+                post,
+                filesMap.getOrDefault(post.getId(), List.of()),
+                likedMap.getOrDefault(post.getId(), false)));
   }
 
-  @Transactional
+  @Transactional(readOnly = true)
   public Page<PostResponse> getMyPosts(Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();
     Page<Post> postPage = postRepository.findAllByAuthor_Id(user.getId(), pageable);
@@ -318,67 +358,205 @@ public class PostService {
 
     Map<UUID, List<FileMetadataResponse>> filesMap = mapPostWithFileMetadata(postPage);
     Map<UUID, Boolean> likedMap = mapPostWithUserLiked(postPage, user.getId());
-    return postPage.map(post -> postMapper.toPostResponse(
-        post,
-        filesMap.getOrDefault(post.getId(), List.of()),
-        likedMap.getOrDefault(post.getId(), false)));
+    return postPage.map(
+        post ->
+            postMapper.toPostResponse(
+                post,
+                filesMap.getOrDefault(post.getId(), List.of()),
+                likedMap.getOrDefault(post.getId(), false)));
   }
 
   private Map<UUID, List<FileMetadataResponse>> mapPostWithFileMetadata(Page<Post> postPage) {
     List<UUID> postIds = postPage.getContent().stream().map(Post::getId).toList();
 
-    List<FileMetadata> allFiles = fileMetadataRepository.findByResourceTypeAndResourceIdIn(ResourceType.POST, postIds);
+    List<FileMetadata> allFiles =
+        fileMetadataRepository.findByResourceTypeAndResourceIdIn(ResourceType.POST, postIds);
     return allFiles.stream()
         .collect(
             Collectors.groupingBy(
                 FileMetadata::getResourceId,
-                Collectors.mapping(fileMetadataMapper::toFileMetadataResponse, Collectors.toList())));
+                Collectors.mapping(
+                    fileMetadataMapper::toFileMetadataResponse, Collectors.toList())));
   }
 
   private Map<UUID, Boolean> mapPostWithUserLiked(Page<Post> postPage, UUID userId) {
     List<UUID> postIds = postPage.getContent().stream().map(Post::getId).toList();
-    List<Reaction> reactions = reactionRepository.findByUser_IdAndTargetTypeAndTargetIdIn(
-        userId, TargetType.POST, postIds);
-    return reactions.stream()
-        .collect(Collectors.toMap(
-            Reaction::getTargetId,
-            r -> true));
+    List<Reaction> reactions =
+        reactionRepository.findByUser_IdAndTargetTypeAndTargetIdIn(
+            userId, TargetType.POST, postIds);
+    return reactions.stream().collect(Collectors.toMap(Reaction::getTargetId, r -> true));
   }
 
   private List<FileMetadataResponse> getFileMetadataResponses(UUID postId) {
     List<String> urls = fileService.getFileMetadataIds(postId, ResourceType.POST);
-    List<FileMetadata> files = fileMetadataRepository.findByResourceTypeAndResourceIdIn(
-        ResourceType.POST, List.of(postId));
-    return files.stream()
-        .map(fileMetadataMapper::toFileMetadataResponse)
-        .toList();
+    List<FileMetadata> files =
+        fileMetadataRepository.findByResourceTypeAndResourceIdIn(
+            ResourceType.POST, List.of(postId));
+    return files.stream().map(fileMetadataMapper::toFileMetadataResponse).toList();
   }
 
   private Boolean checkUserLiked(UUID userId, UUID postId) {
-    return reactionRepository.findByUser_IdAndTargetIdAndTargetType(
-        userId, postId, TargetType.POST).isPresent();
+    return reactionRepository
+        .findByUser_IdAndTargetIdAndTargetType(userId, postId, TargetType.POST)
+        .isPresent();
   }
 
-  public List<PostAcceptedResonse> searchPostAccepted(PostAcceptedFilterRequest postAcceptedRequest) {
+  public List<PostAcceptedResonse> searchPostAccepted(
+      PostAcceptedFilterRequest postAcceptedRequest) {
+    // Step 1: Query Posts (basic filtering at DB level)
     List<Post> posts = postRepository.getPostAccepted(postAcceptedRequest);
-    return posts.stream().map(Post::toPostAcceptedResonse).toList();
-  }
 
-  public FileResponse upLoadPostAndCommentToDrive(PostAcceptedSelectList postAcceptedSelectList) throws IOException {
-    StringBuilder res = new StringBuilder();
-
-    for (PostAcceptedSelect post : postAcceptedSelectList.getPostAcceptedSelects()) {
-      // Thêm thông tin bài post
-      res.append("#").append(post.getTitle());
-      res.append(post.getContent()).append("\n");
-
-      // Comments
-      for (CommentAcceptedResponse comment : post.getComments()) {
-        res.append(comment.getContent()).append("\n");
-      }
-      res.append("\n\n");
+    if (posts.isEmpty()) {
+      return List.of();
     }
-    return driveService.uploadTextToDrive(postAcceptedSelectList.getNameFile(), res.toString());
+
+    // Step 2: Extract Post IDs
+    List<UUID> postIds = posts.stream().map(Post::getId).toList();
+
+    // Step 3: Bulk fetch FileMetadata (1 query for all posts)
+    List<FileMetadata> metadataList =
+        fileMetadataRepository.findByResourceTypeAndResourceIdIn(ResourceType.POST, postIds);
+
+    // Step 4: Convert to Map for O(1) lookup
+    Map<UUID, FileMetadata> metadataMap =
+        metadataList.stream()
+            .collect(
+                Collectors.toMap(
+                    FileMetadata::getResourceId, fm -> fm, (existing, replacement) -> existing));
+
+    // Step 5: Map to DTO with SyncStatus calculation
+    List<PostAcceptedResonse> result =
+        posts.stream()
+            .map(
+                post -> {
+                  FileMetadata fm = metadataMap.get(post.getId());
+                  SyncStatus status = calculateSyncStatus(post, fm);
+
+                  PostAcceptedResonse response = post.toPostAcceptedResonse();
+                  response.setSyncStatus(status);
+                  return response;
+                })
+            .toList();
+
+    // Step 6: Filter by syncStatus if specified
+    if (postAcceptedRequest.getSyncStatus() != null) {
+      return result.stream()
+          .filter(p -> p.getSyncStatus() == postAcceptedRequest.getSyncStatus())
+          .toList();
+    }
+
+    return result;
   }
 
+  private SyncStatus calculateSyncStatus(Post post, FileMetadata fileMetadata) {
+    if (fileMetadata == null) {
+      return SyncStatus.NOT_SYNCED;
+    }
+
+    LocalDateTime syncedAt = fileMetadata.getCreatedAt();
+    if (syncedAt == null) {
+      return SyncStatus.SYNCED; // Fallback if createdAt is missing
+    }
+
+    // Check if post was modified after the file was created on Drive
+    if (post.getLastModifiedDateTime() != null
+        && post.getLastModifiedDateTime().isAfter(syncedAt)) {
+      return SyncStatus.OUTDATED;
+    }
+
+    // CRITICAL: Check if any comments were added/modified after sync
+    // Since comments are part of the exported content, new comments = outdated
+    // content
+    if (post.getComments() != null && !post.getComments().isEmpty()) {
+      LocalDateTime latestCommentTime =
+          post.getComments().stream()
+              .map(Comment::getCreatedDateTime)
+              .filter(dt -> dt != null)
+              .max(LocalDateTime::compareTo)
+              .orElse(null);
+
+      if (latestCommentTime != null && latestCommentTime.isAfter(syncedAt)) {
+        return SyncStatus.OUTDATED;
+      }
+    }
+
+    return SyncStatus.SYNCED;
+  }
+
+  @Async
+  @Transactional
+  public void upLoadPostAndCommentToDrive(PostAcceptedSelectList postAcceptedSelectList) {
+    try {
+      log.info(
+          "Starting background upload for {} posts...", postAcceptedSelectList.getPostIds().size());
+
+      List<Post> posts = postRepository.findAllById(postAcceptedSelectList.getPostIds());
+      StringBuilder htmlBuilder = new StringBuilder();
+      htmlBuilder.append("<html><body>");
+
+      for (Post post : posts) {
+        // Post Title & Content
+        htmlBuilder.append("<h1>").append(post.getTitle()).append("</h1>");
+        htmlBuilder.append("<div>").append(post.getContent()).append("</div>");
+
+        // Comments
+        htmlBuilder.append("<h3>Comments:</h3><ul>");
+        if (post.getComments() != null) {
+          for (Comment comment : post.getComments()) {
+            htmlBuilder.append("<li>").append(comment.getContent()).append("</li>");
+          }
+        }
+        htmlBuilder.append("</ul><hr/>");
+      }
+      htmlBuilder.append("</body></html>");
+
+      // Convert to Stream
+      byte[] contentBytes = htmlBuilder.toString().getBytes(StandardCharsets.UTF_8);
+      ByteArrayInputStream inputStream = new ByteArrayInputStream(contentBytes);
+
+      // Upload (DriveService handles HTML -> Google Doc conversion)
+      FileResponse response =
+          driveService.uploadFile(inputStream, postAcceptedSelectList.getNameFile(), "text/html");
+
+      log.info("Upload successful! File ID: {}", response.getFileId());
+
+      // CRITICAL: Save FileMetadata for each post to track sync status
+      for (Post post : posts) {
+        FileMetadata fileMetadata =
+            FileMetadata.builder()
+                .fileName(postAcceptedSelectList.getNameFile())
+                .url(response.getFileId()) // Store Drive file ID
+                .contentType("application/vnd.google-apps.document") // Google Docs MIME type
+                .size(contentBytes.length)
+                .accessType(AccessType.PRIVATE) // System upload, not public
+                .resourceType(ResourceType.POST)
+                .resourceId(post.getId())
+                .onDrive(true)
+                .createdAt(LocalDateTime.now())
+                .user(null) // System upload, no specific user
+                .build();
+
+        fileMetadataRepository.save(fileMetadata);
+        log.info("FileMetadata saved for post: {}", post.getId());
+      }
+
+    } catch (Exception e) {
+      log.error("Failed to upload posts to Drive", e);
+      // TODO: Update DB status to ERROR
+    }
+  }
+
+  public List<PostResponse> getTopReactedPosts() {
+    return postRepository.findTop10ByOrderByReactionCountDesc().stream()
+        .map(post -> postMapper.toPostResponse(post, List.of(), false))
+        .toList();
+  }
+
+  public List<PostStatDTO> getDailyPostStats() {
+    return postRepository.countPostsByDate(java.time.LocalDateTime.now().minusDays(30));
+  }
+
+  public List<PostStatDTO> getMonthlyPostStats() {
+    return postRepository.countPostsByMonth(java.time.LocalDateTime.now().minusMonths(12));
+  }
 }

@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -32,12 +33,11 @@ public class FileController {
   @PostMapping("/upload")
   public ApiResponse<FileMetadataResponse> uploadFile(
       @RequestParam("file") MultipartFile file,
-      @RequestParam String folderName,
       @RequestParam(defaultValue = "PUBLIC") AccessType accessType,
-      @RequestParam(required = false) String resourceType,
+      @RequestParam(required = true) String resourceType,
       @RequestParam(required = false) String resourceId)
       throws IOException {
-    FileMetadataResponse metadata = fileService.uploadAndSaveFile(file, folderName, accessType, resourceType,
+    FileMetadataResponse metadata = fileService.uploadAndSaveFile(file, accessType, resourceType,
         resourceId);
 
     return ApiResponse.<FileMetadataResponse>builder().result(metadata).build();
@@ -45,10 +45,10 @@ public class FileController {
 
   @PostMapping("/upload-multiple-files")
   public ApiResponse<List<FileMetadataResponse>> uploadMultipleFiles(
-      @RequestParam("files") List<MultipartFile> files, @RequestParam String folderName)
+      @RequestParam("files") List<MultipartFile> files)
       throws IOException {
 
-    List<FileMetadataResponse> responses = fileService.uploadMultipleFiles(files, folderName);
+    List<FileMetadataResponse> responses = fileService.uploadMultipleFiles(files);
     return ApiResponse.<List<FileMetadataResponse>>builder().result(responses).build();
   }
 
@@ -84,7 +84,7 @@ public class FileController {
   @GetMapping
   public ApiResponse<Page<FileMetadataResponse>> searchFiles(
       @ModelAttribute SearchFileRequest searchFileRequest,
-      @PageableDefault(page = 0, size = 10, sort = "createdAt") Pageable pageable) {
+      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<FileMetadataResponse>>builder()
         .result(fileService.searchFiles(searchFileRequest, pageable))
         .build();

@@ -30,10 +30,9 @@ public class SubjectService {
   }
 
   public SubjectResponse getSubject(UUID id) {
-    Subject subject =
-        subjectRepository
-            .findById(id)
-            .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_NOT_FOUND));
+    Subject subject = subjectRepository
+        .findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_NOT_FOUND));
     return subjectMapper.toSubjectResponse(subject);
   }
 
@@ -47,16 +46,14 @@ public class SubjectService {
       CohortCode cohortCode,
       String subjectName,
       Pageable pageable) {
-    Page<Subject> subjects =
-        subjectRepository.searchSubjects(facultyId, semesterId, cohortCode, subjectName, pageable);
-    return subjects.map(Subject::toSubjectResponse);
+    Page<Subject> subjects = subjectRepository.searchSubjects(facultyId, semesterId, cohortCode, subjectName, pageable);
+    return subjects.map(subjectMapper::toSubjectResponse);
   }
 
   public SubjectResponse updateSubject(UUID id, SubjectRequest request) {
-    Subject subject =
-        subjectRepository
-            .findById(id)
-            .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_NOT_FOUND));
+    Subject subject = subjectRepository
+        .findById(id)
+        .orElseThrow(() -> new AppException(ErrorCode.SUBJECT_NOT_FOUND));
     subject.setSubjectName(request.getSubjectName());
     subject.setSubjectCode(request.getSubjectCode());
     subject.setCredit(request.getCredit());
