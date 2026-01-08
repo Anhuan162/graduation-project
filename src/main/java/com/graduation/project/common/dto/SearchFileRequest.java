@@ -22,4 +22,7 @@ public class SearchFileRequest {
 
   @JsonProperty("fromDate")
   LocalDateTime fromDate;
+
+  @JsonProperty("keyword")
+  private String keyword;
 }

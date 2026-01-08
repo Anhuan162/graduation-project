@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -83,7 +84,7 @@ public class FileController {
   @GetMapping
   public ApiResponse<Page<FileMetadataResponse>> searchFiles(
       @ModelAttribute SearchFileRequest searchFileRequest,
-      @PageableDefault(page = 0, size = 10, sort = "createdAt") Pageable pageable) {
+      @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<FileMetadataResponse>>builder()
         .result(fileService.searchFiles(searchFileRequest, pageable))
         .build();

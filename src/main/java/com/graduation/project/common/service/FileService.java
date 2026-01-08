@@ -209,6 +209,18 @@ public class FileService {
 
   public Page<FileMetadataResponse> searchFiles(
       SearchFileRequest searchFileRequest, Pageable pageable) {
+    // 1. Validate Folder & ResourceType
+    if (searchFileRequest.getResourceType() != null && searchFileRequest.getFolder() != null) {
+      String expectedFolder = searchFileRequest.getResourceType().getFolderName();
+      if (!expectedFolder.equals(searchFileRequest.getFolder())
+          && !searchFileRequest.getFolder().startsWith(expectedFolder)) {
+        throw new AppException(ErrorCode.INVALID_REQUEST);
+      }
+    }
+
+    // 2. Validate ANNOUNCEMENT/CRAWL specific logic if needed
+    // Example: If strict mode is required to prevent traversing other folders
+
     Page<FileMetadata> fileMetadataPage = fileMetadataRepository.searchFiles(searchFileRequest, pageable);
     return fileMetadataPage.map(fileMetadataMapper::toFileMetadataResponse);
   }
@@ -229,22 +241,57 @@ public class FileService {
     // }
 
     fileMetadata.get().setOnDrive(true);
-    String fileUrlFromDb = fileMetadata.get().getUrl();
-    String fileUrl = fileMetadata.get().getUrl();
-    // 1. Download file and Stream directly to Drive (No Memory Leak)
-    RestTemplate rest = new RestTemplate();
-    String fileName = extractFileName(fileUrl);
-    String contentType = URLConnection.guessContentTypeFromName(fileName);
-
-    FileResponse fileResponse = rest.execute(fileUrl, org.springframework.http.HttpMethod.GET, null,
-        clientHttpResponse -> {
-          return driveService.uploadFile(clientHttpResponse.getBody(), fileName, contentType);
-        });
+    FileResponse fileResponse = uploadFileMetadataToDrive(fileMetadata.get());
     fileMetadataRepository.save(fileMetadata.get());
     return fileResponse;
   }
 
+  public FileResponse uploadFileMetadataToDrive(FileMetadata fileMetadata) {
+    String fileUrl = fileMetadata.getUrl();
+    String fileName = extractFileName(fileUrl);
+    String contentType = URLConnection.guessContentTypeFromName(fileName);
+
+    // [CASE 1] Internal File (Stored in Firebase)
+    // If folder is present, it's definitely an internal file managed by us.
+    // We should use FirebaseService to download directly (bypassing public URL /
+    // token issues)
+    if (fileMetadata.getFolder() != null && !fileMetadata.getFolder().isEmpty()) {
+      try {
+        String fullPath = fileMetadata.getFolder() + fileMetadata.getFileName();
+        byte[] content = firebaseService.downloadFile(fullPath);
+        return driveService.uploadFile(content, fileMetadata.getFileName(), contentType);
+      } catch (Exception e) {
+        // Fallback or Log
+        // If Firebase download fails, we might try public URL, but usually if SDK
+        // fails, public URL also fails.
+        throw new RuntimeException("Failed to download internal file from Firebase: " + e.getMessage(), e);
+      }
+    }
+
+    // [CASE 2] External File (Crawled from other sites)
+    // Use RestTemplate with User-Agent to avoid 403 Forbidden
+    RestTemplate rest = new RestTemplate();
+    return rest.execute(
+        fileUrl,
+        org.springframework.http.HttpMethod.GET,
+        requestCallback -> {
+          requestCallback
+              .getHeaders()
+              .add(
+                  "User-Agent",
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+        },
+        clientHttpResponse -> {
+          return driveService.uploadFile(clientHttpResponse.getBody(), fileName, contentType);
+        });
+  }
+
   private String extractFileName(String url) {
-    return url.substring(url.lastIndexOf('/') + 1).split("\\?")[0];
+    try {
+      String decoded = java.net.URLDecoder.decode(url, java.nio.charset.StandardCharsets.UTF_8);
+      return decoded.substring(decoded.lastIndexOf('/') + 1).split("\\?")[0];
+    } catch (Exception e) {
+      return url.substring(url.lastIndexOf('/') + 1).split("\\?")[0];
+    }
   }
 }

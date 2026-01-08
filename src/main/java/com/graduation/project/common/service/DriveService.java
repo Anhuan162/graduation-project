@@ -37,9 +37,10 @@ public class DriveService {
     fileMetadata.setName(fileName);
     fileMetadata.setParents(Collections.singletonList(FOLDER_ID));
 
-    // SMART UPLOAD: If HTML, convert to Google Doc
-    if ("text/html".equalsIgnoreCase(contentType)) {
-      fileMetadata.setMimeType("application/vnd.google-apps.document");
+    // SMART MAPPING: Convert based on Source MimeType
+    String targetMimeType = getTargetMimeType(contentType);
+    if (targetMimeType != null) {
+      fileMetadata.setMimeType(targetMimeType);
     }
 
     // 2. Prepare content
@@ -143,8 +144,11 @@ public class DriveService {
     fileMetadata.setName(fileName);
     fileMetadata.setParents(Collections.singletonList(FOLDER_ID));
 
-    // Convert sang Google Docs
-    fileMetadata.setMimeType("application/vnd.google-apps.document");
+    // SMART MAPPING: Convert based on Source MimeType
+    String targetMimeType = getTargetMimeType(contentType);
+    if (targetMimeType != null) {
+      fileMetadata.setMimeType(targetMimeType);
+    }
 
     // 2. Chuẩn bị nội dung file
     ByteArrayContent mediaContent = new ByteArrayContent(contentType, fileBytes);
@@ -177,4 +181,30 @@ public class DriveService {
         contentType);
   }
 
+  // Helper method xác định Target MimeType
+  private String getTargetMimeType(String sourceMimeType) {
+    if (sourceMimeType == null)
+      return null;
+
+    switch (sourceMimeType) {
+      case "application/msword":
+      case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      case "text/plain":
+      case "text/html":
+      case "application/pdf": // PDF convert sang Doc để lấy text (OCR)
+        return "application/vnd.google-apps.document";
+
+      case "application/vnd.ms-excel":
+      case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+      case "text/csv":
+        return "application/vnd.google-apps.spreadsheet"; // Excel phải sang Sheet
+
+      case "application/vnd.ms-powerpoint":
+      case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+        return "application/vnd.google-apps.presentation"; // PPT sang Slide
+
+      default:
+        return null; // Giữ nguyên gốc (Ví dụ: Ảnh, Zip, Video)
+    }
+  }
 }

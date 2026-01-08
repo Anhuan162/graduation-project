@@ -15,33 +15,34 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface FileMetadataRepository extends JpaRepository<FileMetadata, UUID> {
-  List<FileMetadata> findAllByUserId(UUID userId);
+        List<FileMetadata> findAllByUserId(UUID userId);
 
-  List<FileMetadata> findAllByIdIn(List<UUID> fileMetadataIds);
+        List<FileMetadata> findAllByIdIn(List<UUID> fileMetadataIds);
 
-  List<FileMetadata> findAllByResourceIdAndResourceType(UUID resourceId, ResourceType resourceType);
+        List<FileMetadata> findAllByResourceIdAndResourceType(UUID resourceId, ResourceType resourceType);
 
-  List<FileMetadata> findAllByResourceIdInAndResourceType(
-      List<UUID> commentIds, ResourceType resourceType);
+        List<FileMetadata> findAllByResourceIdInAndResourceType(
+                        List<UUID> commentIds, ResourceType resourceType);
 
-  List<FileMetadata> findByResourceTypeAndResourceIdIn(
-      ResourceType resourceType, List<UUID> postIds);
+        List<FileMetadata> findByResourceTypeAndResourceIdIn(
+                        ResourceType resourceType, List<UUID> postIds);
 
-  // Trong FileMetadataRepository
-  // Cũ: List<FileMetadata> findAllByResourceIdAndResourceType(UUID resourceId, ResourceType
-  // resourceType);
+        // Trong FileMetadataRepository
+        // Cũ: List<FileMetadata> findAllByResourceIdAndResourceType(UUID resourceId,
+        // ResourceType
+        // resourceType);
 
-  // Mới: Trả về Optional
-  Optional<FileMetadata> findByResourceIdAndResourceType(
-      UUID resourceId, ResourceType resourceType);
+        // Mới: Trả về Optional
+        Optional<FileMetadata> findByResourceIdAndResourceType(
+                        UUID resourceId, ResourceType resourceType);
 
-  @Query(
-      "SELECT f FROM FileMetadata f "
-          + "WHERE (:#{#req.folder} IS NULL OR f.folder = :#{#req.folder}) "
-          + "AND (:#{#req.resourceType} IS NULL OR f.resourceType = :#{#req.resourceType}) "
-          + "AND (:#{#req.resourceId} IS NULL OR f.resourceId = :#{#req.resourceId}) "
-          + "AND (:#{#req.fromDate} IS NULL OR f.createdAt >= :#{#req.fromDate}) "
-          + "AND (:#{#req.toDate} IS NULL OR f.createdAt <= :#{#req.toDate})")
-  Page<FileMetadata> searchFiles(
-      @Param("req") SearchFileRequest searchFileRequest, Pageable pageable);
+        @Query("SELECT f FROM FileMetadata f "
+                        + "WHERE (:#{#req.folder} IS NULL OR f.folder = :#{#req.folder}) "
+                        + "AND (:#{#req.resourceType} IS NULL OR f.resourceType = :#{#req.resourceType}) "
+                        + "AND (:#{#req.resourceId} IS NULL OR f.resourceId = :#{#req.resourceId}) "
+                        + "AND (:#{#req.fromDate} IS NULL OR f.createdAt >= :#{#req.fromDate}) "
+                        + "AND (:#{#req.toDate} IS NULL OR f.createdAt <= :#{#req.toDate}) "
+                        + "AND (:#{#req.keyword} IS NULL OR lower(f.fileName) LIKE lower(concat('%', :#{#req.keyword}, '%')))")
+        Page<FileMetadata> searchFiles(
+                        @Param("req") SearchFileRequest searchFileRequest, Pageable pageable);
 }

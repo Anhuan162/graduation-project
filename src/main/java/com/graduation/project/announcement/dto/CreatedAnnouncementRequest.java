@@ -6,6 +6,8 @@ import com.graduation.project.common.entity.User;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor; // <-- (Nên thêm cho @Builder)
 import lombok.Builder;
 import lombok.Data; // <-- SỬA TỪ @Value THÀNH @Data
@@ -20,6 +22,14 @@ public class CreatedAnnouncementRequest {
   String content;
   String announcementType;
   List<UUID> fileMetadataIds;
+  @NotNull(message = "isGlobal must not be null")
+  Boolean isGlobal;
+  @Valid
+  List<String> targetFaculties;
+  @Valid
+  List<String> targetCohorts;
+  @Valid
+  List<String> specificClassCodes;
 
   public static Announcement toAnnouncement(CreatedAnnouncementRequest request, User user) {
     return Announcement.builder()
@@ -28,6 +38,7 @@ public class CreatedAnnouncementRequest {
         .announcementType(AnnouncementType.valueOf(request.getAnnouncementType()))
         .createdBy(user)
         .createdDate(LocalDate.now())
+        .announcementStatus(false)
         .build();
   }
 }
