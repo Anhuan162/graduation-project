@@ -56,7 +56,7 @@ public class AdminDocumentController {
         }
 
         return ApiResponse.<Page<DocumentResponse>>builder()
-                .result(documentService.searchDocuments(uuidSubjectId, title, type, status, pageable))
+                .result(documentService.searchDocuments(uuidSubjectId, title, type, status, null, pageable))
                 .build();
     }
 

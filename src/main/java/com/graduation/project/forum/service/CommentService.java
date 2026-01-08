@@ -323,6 +323,29 @@ public class CommentService {
         .build();
   }
 
+  @Transactional(readOnly = true)
+  public Page<CommentResponse> getUserComments(UUID userId, Pageable pageable) {
+    Page<Comment> comments = commentRepository.findAllByAuthorIdAndDeletedFalse(userId, pageable);
+
+    User currentUser = null;
+    try {
+      currentUser = currentUserService.getCurrentUserEntity();
+    } catch (Exception e) {
+      // Anonymous
+    }
+
+    // Batch fetch likes
+    List<UUID> commentIds = comments.getContent().stream().map(Comment::getId).toList();
+    Set<UUID> likedCommentIds = new HashSet<>();
+    if (currentUser != null && !commentIds.isEmpty()) {
+      List<Reaction> reactions = reactionRepository.findByUser_IdAndTargetTypeAndTargetIdIn(
+          currentUser.getId(), TargetType.COMMENT, commentIds);
+      reactions.forEach(r -> likedCommentIds.add(r.getTargetId()));
+    }
+
+    return comments.map(c -> toResponse(c, null, likedCommentIds.contains(c.getId())));
+  }
+
   @Transactional
   public Page<CommentResponse> getMyComments(Pageable pageable) {
     User user = currentUserService.getCurrentUserEntity();

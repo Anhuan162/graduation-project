@@ -37,9 +37,11 @@ public class CommonDocumentController {
       @RequestParam(required = false) String subjectId,
       @RequestParam(required = false) String title,
       @RequestParam(required = false) String documentType,
+      @RequestParam(required = false) String uploaderId,
       @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     UUID UUIDSubjectId = null;
     DocumentType edocumentType = null;
+    UUID UUIDUploaderId = null;
     try {
       UUIDSubjectId = UUID.fromString(subjectId);
     } catch (Exception e) {
@@ -48,9 +50,15 @@ public class CommonDocumentController {
       edocumentType = DocumentType.valueOf(documentType);
     } catch (Exception e) {
     }
+    try {
+      if (uploaderId != null && !uploaderId.isEmpty()) {
+        UUIDUploaderId = UUID.fromString(uploaderId);
+      }
+    } catch (Exception e) {
+    }
     // Enforce APPROVED status for public search
     Page<DocumentResponse> res = documentService.searchDocuments(UUIDSubjectId, title, edocumentType,
-        com.graduation.project.library.constant.DocumentStatus.APPROVED, pageable);
+        com.graduation.project.library.constant.DocumentStatus.APPROVED, UUIDUploaderId, pageable);
     return ApiResponse.<Page<DocumentResponse>>builder().result(res).build();
   }
 }

@@ -197,12 +197,13 @@ public class DocumentService {
 
   @Transactional(readOnly = true)
   public Page<DocumentResponse> searchDocuments(
-      UUID subjectId, String title, DocumentType documentType, DocumentStatus status, Pageable pageable) {
+      UUID subjectId, String title, DocumentType documentType, DocumentStatus status, UUID uploaderId,
+      Pageable pageable) {
     if (title == null) {
       title = "";
     }
     Page<Document> documentOptionals = documentRepository.findByTitleAndDocumentTypeAndSubjectIdAndDocumentStatus(
-        title, documentType, subjectId, status, pageable);
+        title, documentType, subjectId, status, uploaderId, pageable);
     return documentOptionals.map(Document::toDocumentResponse);
   }
 

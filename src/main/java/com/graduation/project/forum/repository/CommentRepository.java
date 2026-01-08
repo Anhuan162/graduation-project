@@ -40,4 +40,6 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
         Page<CommentResponse> findAll(Specification<Comment> spec, Pageable pageable);
 
         Page<Comment> findAllByAuthorIdAndDeletedFalse(UUID id, Pageable pageable);
+
+        long countByAuthorIdAndDeletedFalse(UUID authorId);
 }
