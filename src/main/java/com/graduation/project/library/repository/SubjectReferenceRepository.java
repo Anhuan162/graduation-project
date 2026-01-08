@@ -21,5 +21,11 @@ public interface SubjectReferenceRepository extends JpaRepository<SubjectReferen
   Page<SubjectReference> findAll(Specification<SubjectReference> specification, Pageable pageable);
 
   boolean existsBySubjectIdAndFacultyIdAndSemesterIdAndCohortCode(
-          UUID subject_id, UUID faculty_id, Integer semester_id, CohortCode cohortCode);
+      UUID subject_id, UUID faculty_id, Integer semester_id, CohortCode cohortCode);
+
+  java.util.Optional<SubjectReference> findBySubject_IdAndSemester_IdAndFaculty_FacultyCodeAndCohortCode(
+      UUID subjectId,
+      Integer semesterId,
+      String facultyCode,
+      CohortCode cohortCode);
 }

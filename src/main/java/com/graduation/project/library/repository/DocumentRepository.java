@@ -27,6 +27,12 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
   List<Document> findByTitle(String title);
 
+  // CRITICAL: Must use LOWER() to match database index
+  // uk_document_title_subject_ci
+  // Spring's IgnoreCase generates UPPER() which doesn't use the index!
+  @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM Document d WHERE LOWER(d.title) = LOWER(:title) AND d.subject.id = :subjectId")
+  boolean existsByTitleCaseInsensitiveAndSubjectId(@Param("title") String title, @Param("subjectId") UUID subjectId);
+
   @org.springframework.data.jpa.repository.EntityGraph(attributePaths = { "subject", "uploadedBy" })
   Page<Document> findByUploadedBy_Id(UUID uploadedById, Pageable pageable);
 }

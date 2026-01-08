@@ -40,6 +40,10 @@ public class GpaProfile {
 
   private LocalDateTime createdAt;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "semester_id", nullable = false)
+  private com.graduation.project.library.entity.Semester semester;
+
   @JsonIgnore
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "cpa_profile_id")

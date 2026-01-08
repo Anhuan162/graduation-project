@@ -8,15 +8,14 @@ import com.graduation.project.cpa.dto.CpaProfileResponse;
 import com.graduation.project.cpa.dto.GpaProfileRequest;
 import com.graduation.project.cpa.entity.CpaProfile;
 import com.graduation.project.cpa.entity.GpaProfile;
+import com.graduation.project.cpa.entity.GradeSubjectAverageProfile;
 import com.graduation.project.cpa.mapper.CpaProfileMapper;
 import com.graduation.project.cpa.repository.CpaProfileRepository;
 import com.graduation.project.cpa.repository.GpaProfileRepository;
 import com.graduation.project.security.exception.AppException;
 import com.graduation.project.security.exception.ErrorCode;
 import jakarta.transaction.Transactional;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*; // Use wildcard for List, Map, HashMap, UUID, Objects
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
@@ -37,17 +36,35 @@ public class CpaProfileService {
   public CpaProfileResponse initializeCpaProfile() {
     User user = currentUserService.getCurrentUserEntity();
 
-    // Check if profile exists
-    List<CpaProfile> existingProfiles = cpaProfileRepository.findAllByUserId(user.getId());
-    if (!existingProfiles.isEmpty()) {
-      return cpaProfileMapper.toCpaProfileResponse(existingProfiles.get(0));
-    }
-
+    // Check if student code exists first
     String studentCode = user.getStudentCode();
     if (studentCode == null) {
       throw new AppException(ErrorCode.STUDENT_CODE_NULL);
     }
+
     String cpaProfileCode = "CPA" + studentCode;
+    log.info("Initializing CPA profile for user: {}, studentCode: {}, cpaProfileCode: {}",
+        user.getId(), studentCode, cpaProfileCode);
+
+    // First check: Look up by user_id
+    List<CpaProfile> existingProfilesByUser = cpaProfileRepository.findAllByUserId(user.getId());
+    if (!existingProfilesByUser.isEmpty()) {
+      log.info("Found existing CPA profile by user_id: {}", existingProfilesByUser.get(0).getId());
+      return cpaProfileMapper.toCpaProfileResponse(existingProfilesByUser.get(0));
+    }
+
+    // Second check: Look up by cpa_profile_code (unique constraint)
+    // This handles edge cases where a profile exists but might not be linked to
+    // current user_id
+    var existingProfileByCode = cpaProfileRepository.findByCpaProfileCode(cpaProfileCode);
+    if (existingProfileByCode.isPresent()) {
+      log.warn("Found existing CPA profile by code: {}, but not linked to user_id: {}. Returning existing profile.",
+          cpaProfileCode, user.getId());
+      return cpaProfileMapper.toCpaProfileResponse(existingProfileByCode.get());
+    }
+
+    // No existing profile found, create new one
+    log.info("Creating new CPA profile for user: {}, code: {}", user.getId(), cpaProfileCode);
     CpaProfile cpaProfile = CpaProfile.builder()
         .cpaProfileCode(cpaProfileCode)
         .cpaProfileName(studentCode)
@@ -58,6 +75,7 @@ public class CpaProfileService {
     cpaProfile.getGpaProfiles().add(gpaProfile);
     cpaProfileRepository.save(cpaProfile);
 
+    log.info("Successfully created CPA profile: {}", cpaProfile.getId());
     return cpaProfileMapper.toCpaProfileResponse(cpaProfile);
   }
 
@@ -104,34 +122,83 @@ public class CpaProfileService {
 
   public CpaProfileResponse updateCpaProfile(
       String cpaProfileId, CpaProfileRequest cpaProfileRequest) {
-    int accumulatedCredits = 0;
-    double totalAccumulatedScore = 0;
     CpaProfile cpaProfile = cpaProfileRepository
         .findById(UUID.fromString(cpaProfileId))
         .orElseThrow(() -> new AppException(ErrorCode.CPA_PROFILE_NOT_FOUND));
 
-    List<GpaProfile> gpaProfiles = new ArrayList<>();
+    // 1. Process Updates
     for (GpaProfileRequest gpaProfileRequest : cpaProfileRequest.getGpaProfileRequests()) {
-      GpaProfile gpaProfile = gpaProfileService.updateGpaProfile(gpaProfileRequest);
-      gpaProfile.setCpaProfile(cpaProfile);
-      accumulatedCredits += gpaProfile.getPassedCredits();
-      totalAccumulatedScore += gpaProfile.getTotalWeightedScore();
-      gpaProfiles.add(gpaProfile);
+      gpaProfileService.updateGpaProfile(gpaProfileRequest);
     }
 
-    cpaProfile.setAccumulatedCredits(accumulatedCredits);
+    // 2. Recalculate Totals based on BEST GRADE per SUBJECT across ALL semesters
+    List<GpaProfile> allGpaProfiles = cpaProfile.getGpaProfiles();
+
+    // Map: SubjectId -> GradeSubjectAverageProfile (Best Performance)
+    Map<UUID, GradeSubjectAverageProfile> bestSubjectGrades = new HashMap<>();
+
+    for (GpaProfile gp : allGpaProfiles) {
+      for (GradeSubjectAverageProfile entry : gp.getGradeSubjectAverageProfiles()) {
+        if (entry.getSubjectReference() == null
+            || entry.getSubjectReference().getSubject() == null) {
+          continue; // Skip invalid records
+        }
+
+        UUID subjectId = entry.getSubjectReference().getSubject().getId();
+        Double effectiveScore = getEffectiveScore(entry);
+
+        if (!bestSubjectGrades.containsKey(subjectId)) {
+          bestSubjectGrades.put(subjectId, entry);
+        } else {
+          // Compare with existing best
+          GradeSubjectAverageProfile existingBest = bestSubjectGrades.get(subjectId);
+          Double existingScore = getEffectiveScore(existingBest);
+
+          if (effectiveScore > existingScore) {
+            bestSubjectGrades.put(subjectId, entry);
+          }
+        }
+      }
+    }
+
+    // 3. Aggregate Stats from Unique Best Subjects
+    int totalPassedCredits = 0;
+    int totalAttemptedCredits = 0;
+    double totalAccumulatedScore = 0;
+
+    for (GradeSubjectAverageProfile bestEntry : bestSubjectGrades.values()) {
+      int credit = bestEntry.getSubjectReference().getSubject().getCredit();
+      Double score = getEffectiveScore(bestEntry);
+
+      totalAttemptedCredits += credit;
+      totalAccumulatedScore += (score * credit);
+
+      if (score >= 1.0) { // D or higher
+        totalPassedCredits += credit;
+      }
+    }
+
+    cpaProfile.setAccumulatedCredits(totalPassedCredits);
     cpaProfile.setTotalAccumulatedScore(totalAccumulatedScore);
-    if (accumulatedCredits == 0) {
-      cpaProfile.setNumberCpaScore(null);
+
+    if (totalAttemptedCredits == 0) {
+      cpaProfile.setNumberCpaScore(0.0);
       cpaProfile.setLetterCpaScore(null);
     } else {
-      cpaProfile.setNumberCpaScore(totalAccumulatedScore / accumulatedCredits);
-      cpaProfile.setLetterCpaScore(Grade.fromScore(totalAccumulatedScore / accumulatedCredits));
+      double cpa = totalAccumulatedScore / totalAttemptedCredits;
+      cpaProfile.setNumberCpaScore(cpa);
+      cpaProfile.setLetterCpaScore(Grade.fromScore(cpa));
     }
 
-    cpaProfile.getGpaProfiles().addAll(gpaProfiles);
     cpaProfileRepository.save(cpaProfile);
     return cpaProfileMapper.toCpaProfileResponse(cpaProfile);
+  }
+
+  private Double getEffectiveScore(GradeSubjectAverageProfile entry) {
+    if (Objects.nonNull(entry.getImprovementScore())) {
+      return entry.getImprovementScore();
+    }
+    return entry.getCurrentScore() != null ? entry.getCurrentScore() : 0.0;
   }
 
   public void deleteCpaProfile(String cpaProfileId) {
