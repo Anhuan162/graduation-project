@@ -37,8 +37,7 @@ public class ReportController {
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
   public ApiResponse<Page<ReportResponse>> getReports(
-      @RequestParam(required = false)
-          ReportStatus status, // Lọc theo trạng thái (PENDING/APPROVED...)
+      @RequestParam(required = false) ReportStatus status, // Lọc theo trạng thái (PENDING/APPROVED...)
       @RequestParam(required = false) TargetType type, // Lọc theo loại (POST/COMMENT)
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<ReportResponse>>builder()
@@ -49,9 +48,10 @@ public class ReportController {
   @GetMapping("topic/{topicId}")
   public ApiResponse<Page<ReportResponse>> searchReportsByTopic(
       @PathVariable UUID topicId,
+      @RequestParam(required = false) ReportStatus status,
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     return ApiResponse.<Page<ReportResponse>>builder()
-        .result(reportService.searchReportsByTopic(topicId, pageable))
+        .result(reportService.searchReportsByTopic(topicId, status, pageable))
         .build();
   }
 
@@ -64,7 +64,6 @@ public class ReportController {
 
   // 3. Xử lý báo cáo (Duyệt/Từ chối + Xóa nội dung vi phạm)
   @PatchMapping("/{id}/process")
-  @ResponseStatus(HttpStatus.NO_CONTENT) // 204 No Content
   // @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
   public ApiResponse<ReportResponse> processReport(
       @PathVariable UUID id, @Valid @RequestBody ProcessReportRequest request) {

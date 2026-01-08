@@ -1,5 +1,6 @@
 package com.graduation.project.forum.dto;
 
+import com.graduation.project.forum.constant.SyncStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -12,5 +13,7 @@ public class PostAcceptedResonse {
     private UUID postId;
     private String title;
     private String content;
+    private String authorName;
     private List<CommentAcceptedResponse> comments;
+    private SyncStatus syncStatus;
 }

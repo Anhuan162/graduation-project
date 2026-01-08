@@ -32,12 +32,11 @@ public class FileController {
   @PostMapping("/upload")
   public ApiResponse<FileMetadataResponse> uploadFile(
       @RequestParam("file") MultipartFile file,
-      @RequestParam String folderName,
       @RequestParam(defaultValue = "PUBLIC") AccessType accessType,
-      @RequestParam(required = false) String resourceType,
+      @RequestParam(required = true) String resourceType,
       @RequestParam(required = false) String resourceId)
       throws IOException {
-    FileMetadataResponse metadata = fileService.uploadAndSaveFile(file, folderName, accessType, resourceType,
+    FileMetadataResponse metadata = fileService.uploadAndSaveFile(file, accessType, resourceType,
         resourceId);
 
     return ApiResponse.<FileMetadataResponse>builder().result(metadata).build();
@@ -45,10 +44,10 @@ public class FileController {
 
   @PostMapping("/upload-multiple-files")
   public ApiResponse<List<FileMetadataResponse>> uploadMultipleFiles(
-      @RequestParam("files") List<MultipartFile> files, @RequestParam String folderName)
+      @RequestParam("files") List<MultipartFile> files)
       throws IOException {
 
-    List<FileMetadataResponse> responses = fileService.uploadMultipleFiles(files, folderName);
+    List<FileMetadataResponse> responses = fileService.uploadMultipleFiles(files);
     return ApiResponse.<List<FileMetadataResponse>>builder().result(responses).build();
   }
 

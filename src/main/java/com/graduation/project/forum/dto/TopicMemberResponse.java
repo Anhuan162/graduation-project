@@ -25,6 +25,11 @@ public class TopicMemberResponse {
   private UUID topicId;
 
   public static TopicMemberResponse toTopicMemberResponse(TopicMember topicMember) {
+    String fullName = topicMember.getUser().getFullName();
+    if (fullName == null || fullName.isEmpty()) {
+      fullName = topicMember.getUser().getEmail();
+    }
+
     return TopicMemberResponse.builder()
         .id(topicMember.getId())
         .topicRole(topicMember.getTopicRole())
@@ -32,7 +37,7 @@ public class TopicMemberResponse {
         .approved(topicMember.isApproved())
         .joinedAt(topicMember.getJoinedAt())
         .userId(topicMember.getUser().getId())
-        .fullName(topicMember.getUser().getFullName())
+        .fullName(fullName)
         .avatarUrl(topicMember.getUser().getAvatarUrl())
         .email(topicMember.getUser().getEmail())
         .build();

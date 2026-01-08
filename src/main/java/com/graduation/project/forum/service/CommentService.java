@@ -29,6 +29,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.graduation.project.common.mapper.UserMapper;
+
 @Service
 @RequiredArgsConstructor
 public class CommentService {
@@ -41,6 +43,7 @@ public class CommentService {
   private final FileMetadataRepository fileMetadataRepository;
   private final FileService fileService;
   private final ApplicationEventPublisher publisher;
+  private final UserMapper userMapper;
 
   // Constants để tránh hardcode
   private static final String IP_ADDRESS = "127.0.0.1"; // Nên lấy từ Request thực tế
@@ -152,8 +155,26 @@ public class CommentService {
     return comments.map(
         c -> {
           boolean isCommentCreator = authorizationService.isCommentCreator(c, currentUser);
-          return DetailCommentResponse.toResponse(
-              c, fileMap.get(c.getId()), isCommentCreator, canSoftDeletePost, likedMap.getOrDefault(c.getId(), false));
+          DetailCommentResponse.Permissions permissions = new DetailCommentResponse.Permissions();
+          permissions.setCanEdit(isCommentCreator);
+          permissions.setCanDelete(isCommentCreator || canSoftDeletePost);
+          permissions.setCanReport(!isCommentCreator);
+
+          return DetailCommentResponse.builder()
+              .id(c.getId())
+              .content(c.getContent())
+              .author(userMapper.toUserSummaryDto(c.getAuthor()))
+              .postId(c.getPost().getId())
+              .parentId(Objects.nonNull(c.getParent()) ? c.getParent().getId() : null)
+              .createdDateTime(c.getCreatedDateTime())
+              .deleted(c.getDeleted())
+              .url(fileMap.get(c.getId()))
+              .reactionCount(c.getReactionCount())
+              .permissions(permissions)
+              .isCommentCreator(isCommentCreator)
+              .canSoftDeletePost(canSoftDeletePost)
+              .isLiked(likedMap.getOrDefault(c.getId(), false))
+              .build();
         });
   }
 
@@ -280,7 +301,26 @@ public class CommentService {
           user.getId(), commentId, TargetType.COMMENT).isPresent();
     }
 
-    return DetailCommentResponse.toResponse(comment, fileUrl, isCommentCreator, canSoftDeletePost, isLiked);
+    DetailCommentResponse.Permissions permissions = new DetailCommentResponse.Permissions();
+    permissions.setCanEdit(isCommentCreator);
+    permissions.setCanDelete(isCommentCreator || canSoftDeletePost);
+    permissions.setCanReport(!isCommentCreator);
+
+    return DetailCommentResponse.builder()
+        .id(comment.getId())
+        .content(comment.getContent())
+        .author(userMapper.toUserSummaryDto(comment.getAuthor()))
+        .postId(comment.getPost().getId())
+        .parentId(Objects.nonNull(comment.getParent()) ? comment.getParent().getId() : null)
+        .createdDateTime(comment.getCreatedDateTime())
+        .deleted(comment.getDeleted())
+        .url(fileUrl)
+        .reactionCount(comment.getReactionCount())
+        .permissions(permissions)
+        .isCommentCreator(isCommentCreator)
+        .canSoftDeletePost(canSoftDeletePost)
+        .isLiked(isLiked)
+        .build();
   }
 
   @Transactional
@@ -324,12 +364,7 @@ public class CommentService {
     return CommentResponse.builder()
         .id(c.getId())
         .content(c.getContent())
-        .author(
-            UserSummaryDto.builder()
-                .id(c.getAuthor().getId())
-                .fullName(c.getAuthor().getFullName())
-                .avatarUrl(c.getAuthor().getAvatarUrl())
-                .build())
+        .author(userMapper.toUserSummaryDto(c.getAuthor()))
         .parentId(Objects.nonNull(c.getParent()) ? c.getParent().getId() : null)
         .postId(c.getPost().getId())
         .deleted(c.getDeleted())

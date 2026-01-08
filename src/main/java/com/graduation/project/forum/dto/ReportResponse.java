@@ -1,5 +1,6 @@
 package com.graduation.project.forum.dto;
 
+import com.graduation.project.common.dto.UserSummaryDto;
 import com.graduation.project.forum.constant.ReportReason;
 import com.graduation.project.forum.constant.ReportStatus;
 import com.graduation.project.forum.constant.TargetType;
@@ -16,9 +17,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ReportResponse {
   private UUID id;
-  private UUID reporterId;
-  private String reporterFullName;
-  private String reporterAvatarUrl;
+  private UserSummaryDto reporter;
   private ReportReason reason;
 
   private String description;
@@ -30,6 +29,6 @@ public class ReportResponse {
   private UUID topicId;
 
   private String ipAddress;
-  private LocalDateTime createdAt;
+  private java.time.Instant createdAt;
   private String targetPreview;
 }

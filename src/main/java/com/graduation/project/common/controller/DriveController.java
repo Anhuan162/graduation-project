@@ -15,7 +15,8 @@ import org.springframework.web.multipart.MultipartFile;
 @CrossOrigin(origins = "*") // Cho phép Frontend gọi API
 public class DriveController {
 
-  @Autowired private DriveService driveService;
+  @Autowired
+  private DriveService driveService;
 
   // 1. API Upload
   // Method: POST
@@ -34,7 +35,7 @@ public class DriveController {
   // 2. API Xóa File
   // Method: DELETE
   // URL: http://localhost:8080/api/drive/delete/{fileId}
-  @DeleteMapping("/delete/{fileId}")
+  @DeleteMapping("/{fileId}")
   public ResponseEntity<String> deleteFile(@PathVariable String fileId) {
     try {
       driveService.deleteFile(fileId);

@@ -24,6 +24,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.graduation.project.common.mapper.UserMapper;
+
 @Service
 @RequiredArgsConstructor
 public class ReportService {
@@ -34,6 +36,7 @@ public class ReportService {
   private final CurrentUserService currentUserService;
   private final AuthorizationService authorizationService;
   private final TopicRepository topicRepository;
+  private final UserMapper userMapper;
 
   @Transactional
   public void createReport(ReportRequest request) {
@@ -106,7 +109,7 @@ public class ReportService {
   }
 
   @Transactional
-  public Page<ReportResponse> searchReportsByTopic(UUID topicId, Pageable pageable) {
+  public Page<ReportResponse> searchReportsByTopic(UUID topicId, ReportStatus status, Pageable pageable) {
     User reporter = currentUserService.getCurrentUserEntity();
     Topic topic = topicRepository
         .findById(topicId)
@@ -115,7 +118,7 @@ public class ReportService {
     if (!authorizationService.canManageTopic(reporter, topic)) {
       throw new AppException(ErrorCode.UNAUTHORIZED);
     }
-    Page<Report> reports = reportRepository.findAllReportsByTopic(topicId, pageable);
+    Page<Report> reports = reportRepository.findAllReportsByTopic(topicId, status, pageable);
     return reports.map(this::mapToResponse);
   }
 
@@ -194,9 +197,7 @@ public class ReportService {
 
     return ReportResponse.builder()
         .id(report.getId())
-        .reporterId(report.getReporter().getId())
-        .reporterFullName(report.getReporter().getFullName())
-        .reporterAvatarUrl(report.getReporter().getAvatarUrl())
+        .reporter(userMapper.toUserSummaryDto(report.getReporter()))
         .reason(report.getReason())
         .description(report.getDescription())
         .status(report.getStatus())
@@ -205,7 +206,7 @@ public class ReportService {
         .commentId(report.getTargetType() == TargetType.COMMENT ? targetId : null)
         .topicId(report.getTargetType() == TargetType.TOPIC ? targetId : null)
         .targetPreview(targetPreview)
-        .createdAt(report.getCreatedAt())
+        .createdAt(report.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant())
         .build();
   }
 }

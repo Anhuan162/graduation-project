@@ -20,7 +20,7 @@ public class UserAuthResponse {
     String id;
     String email;
     String fullName;
-    String avatar;
+    String avatarUrl;
     Set<String> permissions;
 
     String phone;

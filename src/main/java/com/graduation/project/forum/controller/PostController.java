@@ -117,12 +117,16 @@ public class PostController {
 
   @PreAuthorize("hasRole('ADMIN')")
   @PostMapping("/post-accepted/upload")
-  public ApiResponse<FileResponse> postAcceptedSelect(
+  public ApiResponse<String> postAcceptedSelect(
       @RequestBody PostAcceptedSelectList postAcceptedSelectList) throws IOException {
     String fileName = postAcceptedSelectList.getNameFile() + "-" + UUID.randomUUID().toString();
     postAcceptedSelectList.setNameFile(fileName);
-    return ApiResponse.<FileResponse>builder()
-        .result(postService.upLoadPostAndCommentToDrive(postAcceptedSelectList))
+
+    // Process in background
+    postService.upLoadPostAndCommentToDrive(postAcceptedSelectList);
+
+    return ApiResponse.<String>builder()
+        .result("Request accepted. File is being generated and uploaded in background.")
         .build();
   }
 
